@@ -49,9 +49,7 @@ class WPLA_Shipping_Options {
      * @return string
      */
     public function get_cart_type() {
-    	if ( is_null( WC()->cart ) ) {
-    		WC()->initialize_cart();
-	    }
+	    $this->initialize_cart();
     	
         if ( $this->cart_is_fba() ) {
             WPLA()->logger->info('WPLASO: get_cart_type() returns FBA (1)');
@@ -85,10 +83,9 @@ class WPLA_Shipping_Options {
     public function cart_is_fba() {
         $all_fba = true;
 
-	    if ( is_null( WC()->cart ) ) {
-		    WC()->initialize_cart();
-	    }
+	    $this->initialize_cart();
 
+		if ( WC()->cart )
         foreach ( WC()->cart->get_cart() as $cart_item ) {
             $product_id = ( $cart_item['variation_id'] ) ? $cart_item['variation_id'] : $cart_item['product_id'];
             if ( !$this->product_is_fba( $product_id ) ) {
@@ -226,6 +223,16 @@ class WPLA_Shipping_Options {
             $wc_order->save();
         }
     }
+
+	protected function initialize_cart() {
+		if ( is_null( WC()->cart ) ) {
+			WC()->initialize_cart();
+		}
+
+		if ( is_null( WC()->session ) ) {
+			WC()->initialize_session();
+		}
+	}
 
 }
 

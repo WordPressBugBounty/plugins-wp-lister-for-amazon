@@ -12,6 +12,7 @@ class WPLA_OrdersModel extends WPLA_Model {
 
 	var $_session;
 	var $_cs;
+	var $api;
 
 	var $count_total    = 0;
 	var $count_skipped  = 0;
@@ -146,18 +147,18 @@ class WPLA_OrdersModel extends WPLA_Model {
 	public function updateFromAmazon( $id ) {
 
 		// get order
-		$order = $this->getItem( $id );
-		if ( ! $order ) return false;
+		$wpla_order = $this->getItem( $id );
+		if ( ! $wpla_order ) return false;
 
 		// get account
-		$account = new WPLA_AmazonAccount( $order['account_id'] );
+		$account = new WPLA_AmazonAccount( $wpla_order['account_id'] );
 		if ( ! $account ) return false;
 
 		// init API
 		$this->api = new WPLA_Amazon_SP_API( $account->id );
 		$importer  = new WPLA_OrdersImporter();
 
-        $order = $this->api->getOrder( $order['order_id'] );
+        $order = $this->api->getOrder( $wpla_order['order_id'] );
 
         if ( WPLA_Amazon_SP_API::isError( $order ) ) {
             WPLA()->logger->error( 'GetOrder error: '. $order->ErrorMessage );
@@ -166,41 +167,17 @@ class WPLA_OrdersModel extends WPLA_Model {
 
         $importer->importOrder( $order, $account );
 
-//        if ( is_array($orders) && ! empty($orders) ) {
-//            $importer->importOrder( $orders[0], $account ); // import will update existing order automatically - but not order line items
-//        } elseif ( is_object($orders) && ! empty($orders->Error->Code) && ( $orders->Error->Code == 'RequestThrottled' ) ) {
-//            $this->lastOrderID = $order['order_id'];
-//            return 'RequestThrottled';
-//        } else {
-//            wpla_show_message("There was a problem fetching order details for order {$order['order_id']} from Amazon.", 'error');
-//            wpla_show_message('<pre>DEBUG DATA:' . print_r($orders,1) . '</pre>', 'error');
-//        }
+		if ( empty( $wpla_order['items'] ) ) {
+			$api = new WPLA_Amazon_SP_API( $account->id );
 
+			// get report requests
+			$items = $api->getOrderItems( $wpla_order['order_id'] );
 
-		// update order details
-		/*$orders = $this->api->getOrder( $order['order_id'] );
-		if ( is_array($orders) && ! empty($orders) ) {
-			$importer->importOrder( $orders[0], $account ); // import will update existing order automatically - but not order line items
-		} elseif ( is_object($orders) && ! empty($orders->Error->Code) && ( $orders->Error->Code == 'RequestThrottled' ) ) {
-			$this->lastOrderID = $order['order_id'];
-			return 'RequestThrottled';
-		} else {
-			wpla_show_message("There was a problem fetching order details for order {$order['order_id']} from Amazon.", 'error');
-			wpla_show_message('<pre>DEBUG DATA:' . print_r($orders,1) . '</pre>', 'error');
-		}*/
-
-		// update order line items
-//		$this->api = new WPLA_AmazonAPI( $account->id ); // init API again to allow to log the second request as well
-//		$items = $this->api->getOrderLineItems( $order['order_id'] );
-//		if ( is_array($items) && ! empty($items) ) {
-//			$importer->importOrderItems( $items, $order['order_id'] );
-//		} elseif ( is_object($items) && ! empty($items->Error->Code) && ( $items->Error->Code == 'RequestThrottled' ) ) {
-//			$this->lastOrderID = $order['order_id'];
-//			return 'RequestThrottled';
-//		} else {
-//			wpla_show_message("There was a problems fetching order line items for order {$order['order_id']} from Amazon.", 'error');
-//			wpla_show_message('<pre>DEBUG DATA:' . print_r($orders,1) . '</pre>', 'error');
-//		}
+			if ( is_array( $items ) )  {
+				// run the import
+				$importer->importOrderItems( $items, $wpla_order['order_id'] );
+			}
+		}
 
 	}
 

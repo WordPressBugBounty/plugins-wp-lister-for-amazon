@@ -1,6 +1,8 @@
 <?php
 // include the SP-API library using the autoload
-require_once WPLA_PATH . '/includes/amazon/vendor/autoload.php';
+require_once WPLA_PATH . '/includes/amazon/vendor-prefixed/autoload.php';
+require_once WPLA_PATH . '/includes/amazon/vendor/jlevers/selling-partner-api/lib/Model/ProductPricingV0/CompetitivePriceType.php';
+require_once WPLA_PATH . '/includes/amazon/vendor/jlevers/selling-partner-api/lib/Model/ProductPricingV0/PriceType.php';
 
     $pricing_info = maybe_unserialize( $wpl_item['pricing_info'] );
     $buybox_data  = maybe_unserialize( $wpl_item['buybox_data'] );
@@ -147,11 +149,11 @@ require_once WPLA_PATH . '/includes/amazon/vendor/autoload.php';
                 </td>
                 <td>
                     <span style="font-weight: <?php echo $wpl_item['price'] == $wpl_item['loffer_price'] ? 'bold' : 'normal' ?> ">
-                        <?php echo number_format( $offer->ListingPrice, 2 ) ?>
+                        <?php echo number_format( $offer->ListingPrice->getAmount(), 2 ) ?>
                     </span>
                 </td>
                 <td>
-                    <?php echo number_format( $offer->Shipping, 2 ) ?>
+                    <?php echo number_format( $offer->Shipping->getAmount(), 2 ) ?>
                 </td>
             </tr>
 

@@ -191,7 +191,7 @@ class WPLA_InventoryCheck extends WPLA_Model  {
             'date_finished' => '',
         ];
 
-        array_push( $this->oos_products, $report_data );
+        $this->oos_products[] = $report_data;
 
         WPLA()->logger->info( 'Added item #'. $item['post_id'] .' to the OOS list' );
         WPLA()->logger->info( 'List now contains '. count( $this->oos_products ) .' items' );
@@ -262,11 +262,14 @@ class WPLA_InventoryCheck extends WPLA_Model  {
             update_option( 'wpla_bg_inventory_check_step', $page );
             as_schedule_single_action( time() + 1, 'wpla_bg_inventory_check_run', array( 'report' => $report->id ) );
         } else {
+	        WPLA()->logger->info( 'Done processing report. Out of sync products found: '. count($this->oos_products) );
             // Done processing. Reset the data then send the notification email
             delete_option( 'wpla_bg_inventory_check_step' );
 
             if ( count( $this->oos_products ) ) {
                 // out-of-sync products found!
+	            WPLA()->logger->info( 'Out of sync products found: '. count($this->oos_products) );
+	            do_action( 'wpla_out_of_sync_products_found', $this->oos_products );
                 $this->sendSyncNotificationEmail();
                 $this->resetData();
             }
@@ -275,6 +278,7 @@ class WPLA_InventoryCheck extends WPLA_Model  {
     }
 
     private function sendSyncNotificationEmail() {
+		WPLA()->logger->info('sendSyncNotificationEmail');
         $admin_email = get_option( 'wpla_inventory_check_notification_email', get_bloginfo( 'admin_email' ) );
         $mailer = WC()->mailer();
         $subject = 'Your WP-Lister products are out of sync!';

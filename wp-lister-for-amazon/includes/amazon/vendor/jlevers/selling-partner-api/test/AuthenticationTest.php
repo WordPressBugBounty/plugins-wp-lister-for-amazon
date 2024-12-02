@@ -2,10 +2,10 @@
 
 namespace SellingPartnerApi\Tests;
 
-use WPLab\GuzzeHttp\Client;
-use WPLab\GuzzeHttp\Handler\MockHandler;
-use WPLab\GuzzeHttp\Psr7\Request;
-use WPLab\GuzzeHttp\Psr7\Response;
+use GuzzleHttp\Client;
+use GuzzleHttp\Handler\MockHandler;
+use GuzzleHttp\Psr7\Request;
+use GuzzleHttp\Psr7\Response;
 use PHPUnit\Framework\TestCase;
 use SellingPartnerApi\Contract\AuthorizationSignerContract;
 use SellingPartnerApi\Authentication;

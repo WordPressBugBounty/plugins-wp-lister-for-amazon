@@ -2,7 +2,7 @@
 Contributors: wp-lab
 Tags: amazon, woocommerce, integration, products, import, export
 Requires at least: 4.2
-Tested up to: 6.5.2
+Tested up to: 6.7.1
 Stable tag: trunk
 License: GPLv2 or later
 License URI: http://www.gnu.org/licenses/gpl-2.0.html
@@ -53,6 +53,55 @@ You can report security bugs through the Patchstack Vulnerability Disclosure Pro
 Yes, there are. Please check out our growing knowledgebase at <https://www.wplab.com/plugins/wp-lister-for-amazon/faq/>
 
 == Changelog ==
+
+= 2.7.3 - 2024-12-02 =
+Fix: Error in the Repricing page when GetItemOffers returns an invalid response
+Fix: Missing API class in the Repricing page
+Fix: Improved support for the beta product feed templates
+Fix: Warning `undefined variable $success`
+Fix: Check for throttled getOrderItems calls
+Fix: Promotional discount is included in the line item total when Tax Mode is set to Import from Amazon
+Fix: Initialize the WC_Cart and WC_Session classes when FBA Shipping Methods is enabled
+
+= 2.7.2 - 2024-10-29 =
+Fix: Skip loading JS assets on the Elementor design page
+Fix: Error `unsupported operand types` in the Repricer
+Fix: Get the correct shipping tax class for orders
+Fix: Fatal error thrown when Amazon returns an empty ReponsibleParty value in GetOrder calls
+Fix: Background inventory check with inconsistent counts
+Dev: Added back missing SP-API classes for backwards compatibility
+
+= 2.7.1 - 2024-10-12 =
+Fix: Match Product window not loading due to an error
+Tweak: Retry a listing update in WPL_AmazonFeed::processListingDataResults() in case a deadlock error occurs
+
+= 2.7.0 - 2024-10-05 =
+New: Ability to match products using EAN
+Tweak: Improved the handling of throttled calls
+Fix: Skip reverting stocks on cancelled Amazon orders if the WC order's status is already refunded or cancelled
+Fix: Show line discounts in WC orders
+Fix: Skip completing orders again during HPOS sync
+Fix: Error `call to a member function getOrders on null`
+Fix: Fatal error when throwing an Exception
+Fix: When bulk updating orders, download line items if they do not exist
+Fix: Check getOrderItems response to prevent getting a fatal error
+Fix: Error during implode() call
+Fix: Typo in Up Price setting
+Fix: Background Inventory Check frequency setting not getting used properly
+Fix: GetOrders parameters order fix
+Fix: Namespace errors preventing orders from being imported
+Fix: Warnings when checking if product update came from WP All Import
+Fix: Undefined property stdClass::$success warning
+Fix: Load the correct type from the FeedType class
+Fix: Allow 0 value from profile item specifics
+Fix: Call to getAttributes() on null
+Fix: Fatal error when calling getCompetitivePricing
+Fix: HPOS compatibility for submitting FBA orders automatically
+Dev: New action wpla_out_of_sync_products_found
+Dev: Update Amazon libraries and prefixed/namespaced classes
+Dev: Deprecated code warnings
+Dev: Deprecated utf8_decode()
+
 = 2.6.17 - 2024-05-30 =
 Fix: More compatibility issue with WC_Order::get_stock_reduced()
 Fix: Order fulfillment feed status update to prevent missed order updates

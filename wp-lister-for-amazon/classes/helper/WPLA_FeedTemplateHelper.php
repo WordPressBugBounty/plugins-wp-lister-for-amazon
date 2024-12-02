@@ -825,6 +825,8 @@ class WPLA_FeedTemplateHelper extends WPLA_Core {
 		$tpl->category  = '';
 		$header         = false;
 		$line           = 0;
+		$attribute_row  = false;
+		$labels_row     = false;
 
 		if ( strpos( $filename, 'custom-' ) !== false ) {
 		    // Custom feeds' real values start at line 2
@@ -849,13 +851,13 @@ class WPLA_FeedTemplateHelper extends WPLA_Core {
 
 	    // open file
 	    if ( ( $handle = fopen($filename, 'r') ) !== false ) {
-
 	    	// read lines
 	        while ( ( $row = fgetcsv($handle, 0, $delimiter) ) !== false ) {
 	        	// echo "<pre>line $line: ";print_r($row);echo"</pre>";die();
 
 	            if ( $line == 0 ) {
 		            if ( strpos( $row[0],  'settings=' ) === 0 ) {
+
 						// Newer custom templates have the type, version and signature in the first row
 			            $template_meta = [];
 			            parse_str( $row[0], $template_meta );
@@ -863,6 +865,8 @@ class WPLA_FeedTemplateHelper extends WPLA_Core {
 						$tpl->version = $template_meta['Version'] ?? '';
 						$tpl->signature = $template_meta['TemplateSignature'] ?? '';
 						$tpl->category = '';
+						$labels_row = $template_meta['labelRow'];
+						$attribute_row = $labels_row+1;
 		            } else {
 			            // first row contains template type and version
 			            $tpl->type      = str_replace( 'TemplateType=',      '', $row[0] );
@@ -888,25 +892,23 @@ class WPLA_FeedTemplateHelper extends WPLA_Core {
 					WPLA()->logger->info("Category: {$tpl->category}");
 					WPLA()->logger->info("Signature: {$tpl->signature}");
 
-	            } elseif ( $line == 1 ) {
+	            } elseif ( ( $labels_row && $line == $labels_row ) || ( false === $labels_row && $line == 1 ) ) {
+		            // second row contains field labels
+		            $header_labels = $row;
+		            // WPLA()->logger->info("header labels: ".print_r($header_labels,1));
 
-	            	// second row contains field labels
-	                $header_labels = $row;
-					// WPLA()->logger->info("header labels: ".print_r($header_labels,1));
+		            // fix column labels for new ListingLoader and InventoryLoader
+		            if ( $row[0] == 'sku' ) {
+			            for ($i=0; $i < sizeof($row); $i++) {
+				            $header_labels[$i] = self::generate_label_from_fieldname( $row[$i] );
+			            }
 
-	                // fix column labels for new ListingLoader and InventoryLoader
-					if ( $row[0] == 'sku' ) {
-		            	for ($i=0; $i < sizeof($row); $i++) { 
-							$header_labels[$i] = self::generate_label_from_fieldname( $row[$i] );
-						}
-
-						// InventoryLoader only has one row, so process it twice for both labels and field names
-						if ( $tpl->type == 'InventoryLoader' ) {
-			                $tpl->fields = array_combine( $row, $header_labels );
-						}
-					}
-
-	            } elseif ( $line == 2 ) {
+			            // InventoryLoader only has one row, so process it twice for both labels and field names
+			            if ( $tpl->type == 'InventoryLoader' ) {
+				            $tpl->fields = array_combine( $row, $header_labels );
+			            }
+		            }
+	            } elseif ( ($attribute_row && $line == $attribute_row ) || (false === $attribute_row && $line == 2 ) ) {
 
 	            	// third row contains field names
 	                $tpl->fields = array_combine( $row, $header_labels );

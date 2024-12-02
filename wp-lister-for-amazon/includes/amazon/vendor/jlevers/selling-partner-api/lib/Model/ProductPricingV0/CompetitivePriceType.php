@@ -6,6 +6,9 @@
  *
  * @category Class
  * @package  SellingPartnerApi
+ *
+ * @license BSD-3-Clause
+ * Modified by __root__ on 08-May-2024 using {@see https://github.com/BrianHenryIE/strauss}.
  */
 
 /**
@@ -26,10 +29,9 @@
  */
 
 namespace SellingPartnerApi\Model\ProductPricingV0;
-
-use \ArrayAccess;
-use \SellingPartnerApi\ObjectSerializer;
-use \SellingPartnerApi\Model\ModelInterface;
+use ArrayAccess;
+use WPLab\Amazon\SellingPartnerApi\Model\BaseModel;
+use WPLab\Amazon\SellingPartnerApi\Model\ModelInterface;
 
 /**
  * CompetitivePriceType Class Doc Comment
@@ -41,7 +43,7 @@ use \SellingPartnerApi\Model\ModelInterface;
  * @template TKey int|null
  * @template TValue mixed|null  
  */
-class CompetitivePriceType implements ModelInterface, ArrayAccess, \JsonSerializable, \IteratorAggregate
+class CompetitivePriceType extends BaseModel implements ModelInterface, ArrayAccess, \JsonSerializable, \IteratorAggregate
 {
     public const DISCRIMINATOR = null;
 
@@ -59,12 +61,12 @@ class CompetitivePriceType implements ModelInterface, ArrayAccess, \JsonSerializ
       */
     protected static $openAPITypes = [
         'competitive_price_id' => 'string',
-        'price' => '\SellingPartnerApi\Model\ProductPricingV0\PriceType',
+        'price' => '\WPLab\Amazon\SellingPartnerApi\Model\ProductPricingV0\PriceType',
         'condition' => 'string',
         'subcondition' => 'string',
-        'offer_type' => '\SellingPartnerApi\Model\ProductPricingV0\OfferCustomerType',
+        'offer_type' => '\WPLab\Amazon\SellingPartnerApi\Model\ProductPricingV0\OfferCustomerType',
         'quantity_tier' => 'int',
-        'quantity_discount_type' => '\SellingPartnerApi\Model\ProductPricingV0\QuantityDiscountType',
+        'quantity_discount_type' => '\WPLab\Amazon\SellingPartnerApi\Model\ProductPricingV0\QuantityDiscountType',
         'seller_id' => 'string',
         'belongs_to_requester' => 'bool'
     ];
@@ -88,25 +90,7 @@ class CompetitivePriceType implements ModelInterface, ArrayAccess, \JsonSerializ
         'belongs_to_requester' => null
     ];
 
-    /**
-     * Array of property to type mappings. Used for (de)serialization
-     *
-     * @return array
-     */
-    public static function openAPITypes()
-    {
-        return self::$openAPITypes;
-    }
 
-    /**
-     * Array of property to format mappings. Used for (de)serialization
-     *
-     * @return array
-     */
-    public static function openAPIFormats()
-    {
-        return self::$openAPIFormats;
-    }
 
     /**
      * Array of attributes where the key is the local name,
@@ -132,7 +116,7 @@ class CompetitivePriceType implements ModelInterface, ArrayAccess, \JsonSerializ
      * @var string[]
      */
     protected static $setters = [
-                'competitive_price_id' => 'setCompetitivePriceId',
+        'competitive_price_id' => 'setCompetitivePriceId',
         'price' => 'setPrice',
         'condition' => 'setCondition',
         'subcondition' => 'setSubcondition',
@@ -160,46 +144,7 @@ class CompetitivePriceType implements ModelInterface, ArrayAccess, \JsonSerializ
         'belongs_to_requester' => 'getBelongsToRequester'
     ];
 
-    /**
-     * Array of attributes where the key is the local name,
-     * and the value is the original name
-     *
-     * @return array
-     */
-    public static function attributeMap()
-    {
-        return self::$attributeMap;
-    }
 
-    /**
-     * Array of attributes to setter functions (for deserialization of responses)
-     *
-     * @return array
-     */
-    public static function setters()
-    {
-        return self::$setters;
-    }
-
-    /**
-     * Array of attributes to getter functions (for serialization of requests)
-     *
-     * @return array
-     */
-    public static function getters()
-    {
-        return self::$getters;
-    }
-
-    /**
-     * The original name of the model.
-     *
-     * @return string
-     */
-    public function getModelName()
-    {
-        return self::$openAPIModelName;
-    }
     
     /**
      * Associative array for storing property values
@@ -244,17 +189,6 @@ class CompetitivePriceType implements ModelInterface, ArrayAccess, \JsonSerializ
         return $invalidProperties;
     }
 
-    /**
-     * Validate all the properties in the model
-     * return true if all passed
-     *
-     * @return bool True if all properties are valid
-     */
-    public function valid()
-    {
-        return count($this->listInvalidProperties()) === 0;
-    }
-
 
     /**
      * Gets competitive_price_id
@@ -269,7 +203,10 @@ class CompetitivePriceType implements ModelInterface, ArrayAccess, \JsonSerializ
     /**
      * Sets competitive_price_id
      *
-     * @param string $competitive_price_id The pricing model for each price that is returned. Possible values: * 1 - New Buy Box Price. * 2 - Used Buy Box Price.
+     * @param string $competitive_price_id The pricing model for each price that is returned.
+     *   Possible values:
+     *   * 1 - New Buy Box Price.
+     *   * 2 - Used Buy Box Price.
      *
      * @return self
      */
@@ -282,7 +219,7 @@ class CompetitivePriceType implements ModelInterface, ArrayAccess, \JsonSerializ
     /**
      * Gets price
      *
-     * @return \SellingPartnerApi\Model\ProductPricingV0\PriceType
+     * @return \WPLab\Amazon\SellingPartnerApi\Model\ProductPricingV0\PriceType
      */
     public function getPrice()
     {
@@ -292,7 +229,7 @@ class CompetitivePriceType implements ModelInterface, ArrayAccess, \JsonSerializ
     /**
      * Sets price
      *
-     * @param \SellingPartnerApi\Model\ProductPricingV0\PriceType $price price
+     * @param \WPLab\Amazon\SellingPartnerApi\Model\ProductPricingV0\PriceType $price price
      *
      * @return self
      */
@@ -351,7 +288,7 @@ class CompetitivePriceType implements ModelInterface, ArrayAccess, \JsonSerializ
     /**
      * Gets offer_type
      *
-     * @return \SellingPartnerApi\Model\ProductPricingV0\OfferCustomerType|null
+     * @return \WPLab\Amazon\SellingPartnerApi\Model\ProductPricingV0\OfferCustomerType|null
      */
     public function getOfferType()
     {
@@ -361,7 +298,7 @@ class CompetitivePriceType implements ModelInterface, ArrayAccess, \JsonSerializ
     /**
      * Sets offer_type
      *
-     * @param \SellingPartnerApi\Model\ProductPricingV0\OfferCustomerType|null $offer_type offer_type
+     * @param \WPLab\Amazon\SellingPartnerApi\Model\ProductPricingV0\OfferCustomerType|null $offer_type offer_type
      *
      * @return self
      */
@@ -397,7 +334,7 @@ class CompetitivePriceType implements ModelInterface, ArrayAccess, \JsonSerializ
     /**
      * Gets quantity_discount_type
      *
-     * @return \SellingPartnerApi\Model\ProductPricingV0\QuantityDiscountType|null
+     * @return \WPLab\Amazon\SellingPartnerApi\Model\ProductPricingV0\QuantityDiscountType|null
      */
     public function getQuantityDiscountType()
     {
@@ -407,7 +344,7 @@ class CompetitivePriceType implements ModelInterface, ArrayAccess, \JsonSerializ
     /**
      * Sets quantity_discount_type
      *
-     * @param \SellingPartnerApi\Model\ProductPricingV0\QuantityDiscountType|null $quantity_discount_type quantity_discount_type
+     * @param \WPLab\Amazon\SellingPartnerApi\Model\ProductPricingV0\QuantityDiscountType|null $quantity_discount_type quantity_discount_type
      *
      * @return self
      */
@@ -461,146 +398,6 @@ class CompetitivePriceType implements ModelInterface, ArrayAccess, \JsonSerializ
     {
         $this->container['belongs_to_requester'] = $belongs_to_requester;
 
-        return $this;
-    }
-
-    /**
-     * Returns true if offset exists. False otherwise.
-     *
-     * @param integer $offset Offset
-     *
-     * @return boolean
-     */
-    #[\ReturnTypeWillChange]
-    public function offsetExists($offset)
-    {
-        return isset($this->container[$offset]);
-    }
-
-    /**
-     * Gets offset.
-     *
-     * @param integer $offset Offset
-     *
-     * @return mixed|null
-     */
-    #[\ReturnTypeWillChange]
-    public function offsetGet($offset)
-    {
-        return $this->container[$offset] ?? null;
-    }
-
-    /**
-     * Sets value based on offset.
-     *
-     * @param int|null $offset Offset
-     * @param mixed    $value  Value to be set
-     *
-     * @return void
-     */
-    #[\ReturnTypeWillChange]
-    public function offsetSet($offset, $value)
-    {
-        if (is_null($offset)) {
-            $this->container[] = $value;
-        } else {
-            $this->container[$offset] = $value;
-        }
-    }
-
-    /**
-     * Unsets offset.
-     *
-     * @param integer $offset Offset
-     *
-     * @return void
-     */
-    #[\ReturnTypeWillChange]
-    public function offsetUnset($offset)
-    {
-        unset($this->container[$offset]);
-    }
-
-    /**
-     * Serializes the object to a value that can be serialized natively by json_encode().
-     * @link https://www.php.net/manual/en/jsonserializable.jsonserialize.php
-     *
-     * @return mixed Returns data which can be serialized by json_encode(), which is a value
-     * of any type other than a resource.
-     */
-    #[\ReturnTypeWillChange]
-    public function jsonSerialize()
-    {
-       return ObjectSerializer::sanitizeForSerialization($this);
-    }
-
-    /**
-     * Gets the string presentation of the object
-     *
-     * @return string
-     */
-    public function __toString()
-    {
-        return json_encode(
-            ObjectSerializer::sanitizeForSerialization($this),
-            JSON_PRETTY_PRINT
-        );
-    }
-
-    /**
-     * Gets a header-safe presentation of the object
-     *
-     * @return string
-     */
-    public function toHeaderValue()
-    {
-        return json_encode(ObjectSerializer::sanitizeForSerialization($this));
-    }
-
-    /**
-     * Enable iterating over all of the model's attributes in $key => $value format
-     *
-     * @return \Traversable
-     */
-    public function getIterator(): \Traversable
-    {
-        return (function () {
-            foreach ($this->container as $key => $value) {
-                yield $key => $value;
-            }
-        })();
-    }
-
-    /**
-     * Retrieves the property with the given name by converting the property accession
-     * to a getter call.
-     *
-     * @param string $propertyName
-     * @return mixed
-     */
-    public function __get($propertyName)
-    {
-        // This doesn't make a syntactical difference since PHP is case-insensitive, but
-        // makes error messages clearer (e.g. "Call to undefined method getFoo()" rather
-        // than "Call to undefined method getfoo()").
-        $ucProp = ucfirst($propertyName);
-        $getter = "get$ucProp";
-        return $this->$getter();
-    }
-
-    /**
-     * Sets the property with the given name by converting the property accession
-     * to a setter call.
-     *
-     * @param string $propertyName
-     * @param mixed $propertyValue
-     * @return SellingPartnerApi\Model\ProductPricingV0\CompetitivePriceType
-     */
-    public function __set($propertyName, $propertyValue)
-    {
-        $ucProp = ucfirst($propertyName);
-        $setter = "set$ucProp";
-        $this->$setter($propertyValue);
         return $this;
     }
 }

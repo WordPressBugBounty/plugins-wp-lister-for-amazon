@@ -1,27 +1,27 @@
 <?php
 
 // include the SP-API library using the autoload
-require_once WPLA_PATH . '/includes/amazon/vendor/autoload.php';
+require_once WPLA_PATH . '/includes/amazon/vendor-prefixed/autoload.php';
 require_once WPLA_PATH .'/classes/core/WPLA_Http_Client.php';
 require_once WPLA_PATH .'/classes/core/WPLA_Amazon_SP_API_Authentication.php';
 
-use SellingPartnerApi\Api\FbaOutboundV20200701Api as FbaOutboundApi;
-use SellingPartnerApi\Api\FeedsV20210630Api as FeedsApi;
-use SellingPartnerApi\FeedType;
-use SellingPartnerApi\Api\SellersV1Api as SellersApi;
-use SellingPartnerApi\Api\CatalogItemsV20220401Api as CatalogApi;
-use SellingPartnerApi\Api\ListingsV20210801Api as ListingsApi;
-use SellingPartnerApi\Api\ProductPricingV0Api as ProductPricingApi;
-use SellingPartnerApi\Api\OrdersV0Api as OrdersApi;
-use SellingPartnerApi\Api\ReportsV20210630Api as ReportsApi;
-use SellingPartnerApi\Model\MerchantFulfillmentV0 as MerchantFulfillment;
+use WPLab\Amazon\SellingPartnerApi\Api\FbaOutboundV20200701Api as FbaOutboundApi;
+use WPLab\Amazon\SellingPartnerApi\Api\FeedsV20210630Api as FeedsApi;
+use WPLab\Amazon\SellingPartnerApi\FeedType;
+use WPLab\Amazon\SellingPartnerApi\Api\SellersV1Api as SellersApi;
+use WPLab\Amazon\SellingPartnerApi\Api\CatalogItemsV20220401Api as CatalogApi;
+use WPLab\Amazon\SellingPartnerApi\Api\ListingsV20210801Api as ListingsApi;
+use WPLab\Amazon\SellingPartnerApi\Api\ProductPricingV0Api as ProductPricingApi;
+use WPLab\Amazon\SellingPartnerApi\Api\OrdersV0Api as OrdersApi;
+use WPLab\Amazon\SellingPartnerApi\Api\ReportsV20210630Api as ReportsApi;
+use WPLab\Amazon\SellingPartnerApi\Model\MerchantFulfillmentV0 as MerchantFulfillment;
 
-use SellingPartnerApi\Model\ProductPricingV0 as ProductPricing;
-use SellingPartnerApi\Model\FbaOutboundV20200701 as FbaOutbound;
-use SellingPartnerApi\Model\FeedsV20210630 as Feeds;
-use SellingPartnerApi\Model\CatalogItemsV20220401 as Catalog;
-use SellingPartnerApi\Model\OrdersV0 as Orders;
-use SellingPartnerApi\Model\ReportsV20210630 as Reports;
+use WPLab\Amazon\SellingPartnerApi\Model\ProductPricingV0 as ProductPricing;
+use WPLab\Amazon\SellingPartnerApi\Model\FbaOutboundV20200701 as FbaOutbound;
+use WPLab\Amazon\SellingPartnerApi\Model\FeedsV20210630 as Feeds;
+use WPLab\Amazon\SellingPartnerApi\Model\CatalogItemsV20220401 as Catalog;
+use WPLab\Amazon\SellingPartnerApi\Model\OrdersV0 as Orders;
+use WPLab\Amazon\SellingPartnerApi\Model\ReportsV20210630 as Reports;
 
 class WPLA_Amazon_SP_API {
 
@@ -36,12 +36,12 @@ class WPLA_Amazon_SP_API {
     public WPLA_AmazonLogger $dblogger;
     public $service;
 
-    protected \SellingPartnerApi\Configuration $config;
+    protected WPLab\Amazon\SellingPartnerApi\Configuration $config;
 
     public $SellerId;
     public $MarketplaceId;
 
-    protected \WPLab\GuzzeHttp\Client $client;
+    protected WPLab\Amazon\GuzzleHttp\Client $client;
 
     protected $AccessKey;
     protected $SecretKey;
@@ -61,7 +61,7 @@ class WPLA_Amazon_SP_API {
     public $auth_host = 'https://auth.wplister.com/sp-api';
 
     public function __construct( $account_id = false ) {
-        $this->client = new \WPLab\GuzzeHttp\Client();
+        $this->client = new WPLab\Amazon\GuzzleHttp\Client();
 
         if ( $account_id ) {
             $account = new WPLA_AmazonAccount( $account_id );
@@ -121,7 +121,7 @@ class WPLA_Amazon_SP_API {
             "awsSecretAccessKey" => $this->SecretKey,
             "accessToken"   => $this->getSPAccessToken(),
             "accessTokenExpiration" => $this->getSPAccessTokenExpiration(),
-            "endpoint" => SellingPartnerApi\Endpoint::getByMarketplaceId( $this->MarketplaceId, (bool)$account->sandbox_mode ),
+            "endpoint" => WPLab\Amazon\SellingPartnerApi\Endpoint::getByMarketplaceId( $this->MarketplaceId, (bool)$account->sandbox_mode ),
             "authenticationClient" => new WPLA_Http_Client( [], $account_id )
         ];
 
@@ -142,7 +142,7 @@ class WPLA_Amazon_SP_API {
         $authenticator = new WPLA_Amazon_SP_API_Authentication( $authenticator_config );
 
         $config_options['requestSigner'] = $authenticator;
-        $config = new SellingPartnerApi\Configuration( $config_options );
+        $config = new WPLab\Amazon\SellingPartnerApi\Configuration( $config_options );
         $config->setUserAgent( $this->constructUserAgentString('WP-Lister for Amazon', WPLA_VERSION ) );
 
         if ( 'FBAOutbound' == $section ) {
@@ -459,7 +459,7 @@ class WPLA_Amazon_SP_API {
                 $result->success = true;
                 return $result;
             }
-        } catch ( \SellingPartnerApi\ApiException $e ) {
+        } catch ( \WPLab\Amazon\SellingPartnerApi\ApiException $e ) {
             WPLA()->logger->error( 'SP-API Exception: '. $e->getMessage() );
 
             $error = new stdClass();
@@ -515,7 +515,7 @@ class WPLA_Amazon_SP_API {
 
             }
 
-        } catch ( \SellingPartnerApi\ApiException $ex ) {
+        } catch ( \WPLab\Amazon\SellingPartnerApi\ApiException $ex ) {
             $error = new stdClass();
             $error->ErrorMessage = $ex->getMessage();
             $error->ErrorCode    = $ex->getCode();
@@ -535,7 +535,7 @@ class WPLA_Amazon_SP_API {
     }
 
     /**
-     * @param string $feed_type from \SellingPartnerApi\FeedType
+     * @param string $feed_type from \WPLab\Amazon\SellingPartnerApi\FeedType
      * @param string $feed_content
      * @param null $feed_options
      * @param null $marketplace_ids
@@ -568,7 +568,7 @@ class WPLA_Amazon_SP_API {
             $feed_doc_id = $feed->getFeedDocumentId();
 
             // Upload feed contents to document
-            $feed_document = new SellingPartnerApi\Document($feed, $feed_type, $this->client );
+            $feed_document = new \WPLab\Amazon\SellingPartnerApi\Document($feed, $feed_type, $this->client );
             $feed_document->upload($feed_content);
 
             // ... call FeedsApi::createFeed() with $feedDocumentId
@@ -604,14 +604,16 @@ class WPLA_Amazon_SP_API {
             $result->success              = true;
 
             return $result;
-        } catch ( \SellingPartnerApi\ApiException $ex ) {
+        } catch ( \WPLab\Amazon\SellingPartnerApi\ApiException $ex ) {
             $error = new stdClass();
+			$error->success      = false;
             $error->ErrorMessage = $ex->getMessage();
             $error->ErrorCode    = $ex->getCode();
             return $error;
         } catch (Exception $ex) {
             // Also catch Exceptions because toXML and fromXML methods throw Exceptions on invalid XML strings
             $error = new stdClass();
+	        $error->success      = false;
             $error->ErrorMessage = $ex->getMessage();
             $error->ErrorCode    = $ex->getCode();
             $error->StatusCode   = $ex->getCode();
@@ -633,7 +635,7 @@ class WPLA_Amazon_SP_API {
 
         try {
             return $api->getFeed( $feed_id );
-        }  catch ( \SellingPartnerApi\ApiException $ex ) {
+        }  catch ( \WPLab\Amazon\SellingPartnerApi\ApiException $ex ) {
             $error = new stdClass();
             $error->ErrorMessage = $ex->getMessage();
             $error->ErrorCode    = $ex->getCode();
@@ -664,11 +666,11 @@ class WPLA_Amazon_SP_API {
 
             if ( is_wp_error( $request ) ) {
                 WPLA()->logger->error( 'Error downloading Feed Document: '. $request->get_error_message() );
-                throw new Exception( $request->get_error_message(), $request->get_error_code() );
+                throw new Exception( $request->get_error_message() );
             }
 
             return wp_remote_retrieve_body( $request );
-        }  catch ( \SellingPartnerApi\ApiException $ex ) {
+        }  catch ( \WPLab\Amazon\SellingPartnerApi\ApiException $ex ) {
             $error = new stdClass();
             $error->ErrorMessage = $ex->getMessage();
             $error->ErrorCode    = $ex->getCode();
@@ -699,7 +701,7 @@ class WPLA_Amazon_SP_API {
 
         try {
             return $api->getFeeds(  $feed_types, $marketplace_ids, $page_size, $processing_statuses, $created_since, $created_until, $next_token );
-        }  catch ( \SellingPartnerApi\ApiException $ex ) {
+        }  catch ( \WPLab\Amazon\SellingPartnerApi\ApiException $ex ) {
             $error = new stdClass();
             $error->ErrorMessage = $ex->getMessage();
             $error->ErrorCode    = $ex->getCode();
@@ -727,7 +729,7 @@ class WPLA_Amazon_SP_API {
         try {
             $api->cancelFeed($feed_id);
             return $this->getFeed($feed_id);
-        } catch (\SellingPartnerApi\ApiException $ex) {
+        } catch (\WPLab\Amazon\SellingPartnerApi\ApiException $ex) {
             $error = new stdClass();
             $error->ErrorMessage = $ex->getMessage();
             $error->ErrorCode = $ex->getCode();
@@ -757,7 +759,7 @@ class WPLA_Amazon_SP_API {
 
         try {
             return $api->getListingsItem( $this->account->merchant_id, $sku, [$this->account->marketplace_id], null, 'summaries,attributes,issues,offers,fulfillmentAvailability,procurement' );
-        } catch (\SellingPartnerApi\ApiException $ex) {
+        } catch (\WPLab\Amazon\SellingPartnerApi\ApiException $ex) {
             $error = new stdClass();
             $error->ErrorMessage = $ex->getMessage();
             $error->ErrorCode = $ex->getCode();
@@ -795,7 +797,7 @@ class WPLA_Amazon_SP_API {
                 $included_data,
                 null
             );
-        } catch (\SellingPartnerApi\ApiException $ex) {
+        } catch (\WPLab\Amazon\SellingPartnerApi\ApiException $ex) {
             $error = new stdClass();
             $error->ErrorMessage = $ex->getMessage();
             $error->ErrorCode = $ex->getCode();
@@ -915,7 +917,7 @@ class WPLA_Amazon_SP_API {
     }
 
     /**
-     * @param SellingPartnerApi\Model\CatalogItemsV20220401\Item $item
+     * @paramWPLab\Amazon\SellingPartnerApi\Model\CatalogItemsV20220401\Item $item
      * @param string $size L or S
      * @return string Primary Image URL
      */
@@ -940,8 +942,8 @@ class WPLA_Amazon_SP_API {
     }
 
     /**
-     * @param SellingPartnerApi\Model\CatalogItemsV20220401\Item $item
-     * @return SellingPartnerApi\Model\CatalogItemsV20220401\ItemImage[]
+     * @paramWPLab\Amazon\SellingPartnerApi\Model\CatalogItemsV20220401\Item $item
+     * @returnWPLab\Amazon\SellingPartnerApi\Model\CatalogItemsV20220401\ItemImage[]
      */
     public static function getImagesFromCatalog( $item ) {
         $images = [];
@@ -963,7 +965,7 @@ class WPLA_Amazon_SP_API {
 
     /**
      * Get the URL of the large image from an Amazon media URL
-     * @param \SellingPartnerApi\Model\CatalogItemsV20220401\ItemImage $image
+     * @param \WPLab\Amazon\SellingPartnerApi\Model\CatalogItemsV20220401\ItemImage $image
      */
     public static function getLargeImageUrl( $image ) {
         $url = $image->getLink();
@@ -982,7 +984,7 @@ class WPLA_Amazon_SP_API {
 
     /**
      * Get the URL of the small image from an Amazon media URL
-     * @param \SellingPartnerApi\Model\CatalogItemsV20220401\ItemImage $image
+     * @param \WPLab\Amazon\SellingPartnerApi\Model\CatalogItemsV20220401\ItemImage $image
      */
     public static function getSmallImageUrl( $image ) {
         $url = $image->getLink();
@@ -1002,7 +1004,7 @@ class WPLA_Amazon_SP_API {
     /**
      * Get all image urls for the catalog item
      *
-     * @param SellingPartnerApi\Model\CatalogItemsV20220401\Item $item
+     * @paramWPLab\Amazon\SellingPartnerApi\Model\CatalogItemsV20220401\Item $item
      * @return array
      */
     public static function getImageUrlsFromCatalog( $item ) {
@@ -1057,7 +1059,7 @@ class WPLA_Amazon_SP_API {
             }
 
             return $all_prices;
-        } catch ( \SellingPartnerApi\ApiException $ex ) {
+        } catch ( \WPLab\Amazon\SellingPartnerApi\ApiException $ex ) {
             $error = new stdClass();
             $error->ErrorMessage = $ex->getMessage();
             $error->ErrorCode    = $ex->getCode();
@@ -1121,7 +1123,7 @@ class WPLA_Amazon_SP_API {
             }
 
             return $all_offers;
-        } catch ( \SellingPartnerApi\ApiException $ex ) {
+        } catch ( \WPLab\Amazon\SellingPartnerApi\ApiException $ex ) {
             $error = new stdClass();
             $error->ErrorMessage = $ex->getMessage();
             $error->ErrorCode    = $ex->getCode();
@@ -1179,7 +1181,7 @@ class WPLA_Amazon_SP_API {
                 $next_token = $order_list->getNextToken();
 
                 while ( $next_token ) {
-                    $response   = $api->getOrders( $marketplace_ids, null, null, null, null, null, null, null, null, null, null, null, $next_token );
+                    $response   = $api->getOrders( $marketplace_ids, null, null, null, null, null, null, null, null, null, null, null, null, $next_token );
                     $order_list = $response->getPayload();
 
                     if ( $new_orders = $order_list->getOrders() ) {
@@ -1191,7 +1193,7 @@ class WPLA_Amazon_SP_API {
             }
 
             return $orders;
-        } catch ( \SellingPartnerApi\ApiException $ex ) {
+        } catch ( \WPLab\Amazon\SellingPartnerApi\ApiException $ex ) {
             $error = new stdClass();
             $error->ErrorMessage = $ex->getMessage();
             $error->ErrorCode    = $ex->getCode();
@@ -1233,71 +1235,92 @@ class WPLA_Amazon_SP_API {
             $marketplace_ids[] = $this->MarketplaceId; // fall back
         }
 
-        // handle custom number of days
-        if ( $days ) {
-            $last_updated_after = gmdate("Y-m-d\TH:i:s.\\0\\0\\0\\Z", time() - $days * 24 * 3600 );
-        }
+		$next_token = get_transient( 'wpla_get_orders_next_token' );
+		WPLA()->logger->debug( 'next_token from Transient: '. $next_token );
 
+	    // handle custom number of days
+	    if ( $days ) {
+		    $last_updated_after = gmdate("Y-m-d\TH:i:s.\\0\\0\\0\\Z", time() - $days * 24 * 3600 );
+	    } elseif ( $next_token ) {
+			$last_updated_after = null;
+		}
+
+
+		$orders = [];
         try {
             // sandbox call
             //$response   = $api->getOrders( $marketplace_ids, 'TEST_CASE_200', null, null );
-            $response   = $api->getOrders( $marketplace_ids, null, null, $last_updated_after );
+	        if ($last_updated_after) {
+		        $response = $api->getOrders($marketplace_ids, null, null, $last_updated_after);
+	        } elseif ($next_token) {
+		        $response = $api->getOrders($marketplace_ids, null, null, null, null, null, null, null, null, null, null, null, null, $next_token);
+	        } else {
+		        throw new Exception("Either last_updated_after or next_token must be provided.");
+	        }
 
-            // Commented out due to the response not including PII even if an RDT is used in the request
-            /*$response   = $api->getOrders(
-                $marketplace_ids, null, null, $last_updated_after,  null, null,
-                null, null, null, null, null, null, null,
-                null, null, null, null, ['buyerInfo', 'shippingAddress']
-            );*/
-            $order_list = $response->getPayload();
+            $order_list     = $response->getPayload();
+	        $initial_orders = $order_list->getOrders();
 
-            if ( $orders = $order_list->getOrders() ) {
+            if ( $initial_orders ) {
+	            $orders     = $initial_orders;
                 $next_token = $order_list->getNextToken();
 
                 while ( $next_token ) {
+	                set_transient( 'wpla_get_orders_next_token', $next_token, 600 );
+
+					if ( count( $orders ) > 100 ) {
+						break;
+					}
+
                     $response   = $api->getOrders(
                         $marketplace_ids, null, null, null,  null, null,
-                        null, null, null, null, null, null, $next_token
+                        null, null, null, null, null, null, null, $next_token
                     );
 
-                    // Commented out due to the response not including PII even if an RDT is used in the request
-                    /*$response   = $api->getOrders(
-                        $marketplace_ids, null, null, null,  null, null,
-                        null, null, null, null, null, null, $next_token,
-                        null, null, null, null, ['buyerInfo', 'shippingAddress']
-                    );*/
                     $order_list = $response->getPayload();
 
-                    if ( $new_orders = $order_list->getOrders() ) {
-                        $orders = array_merge( $orders, $new_orders );
-                    }
+					if ( $order_list ) {
+						$new_orders = $order_list->getOrders();
 
-                    $next_token = $order_list->getNextToken();
+						if ( $new_orders ) {
+							$orders = array_merge( $orders, $new_orders );
+						}
+
+						$next_token = $order_list->getNextToken();
+					} else {
+						$next_token = false;
+					}
                 }
             }
 
             return $orders;
-        } catch ( \SellingPartnerApi\ApiException $ex ) {
-            $error = new stdClass();
-            $error->ErrorMessage = $ex->getMessage();
-            $error->ErrorCode    = $ex->getCode();
-            $error->HeaderMeta   = $ex->getResponseHeaders();
-            $error->success      = false;
-
-            return $error;
+        } catch ( \WPLab\Amazon\SellingPartnerApi\ApiException $ex ) {
+	        return $this->handleGetOrdersException($ex, $orders);
         } catch ( Exception $ex ) {
-            $error = new stdClass();
-            $error->ErrorMessage = $ex->getMessage();
-            $error->ErrorCode    = $ex->getCode();
-            $error->StatusCode   = $ex->getCode();
-
-            $error->ErrorType    = 'Sender';
-            $error->success      = false;
-
-            return $error;
+	        return $this->handleGetOrdersException($ex, $orders);
         }
     }
 
+	protected function handleGetOrdersException( $ex, $orders ) {
+		if ($ex->getCode() == 429) {
+			return $orders;
+		} else {
+			$error = new stdClass();
+			$error->ErrorMessage = $ex->getMessage();
+			$error->ErrorCode = $ex->getCode();
+			$error->HeaderMeta = $ex->getResponseHeaders();
+			$error->success = false;
+
+			if ($ex instanceof \WPLab\Amazon\SellingPartnerApi\ApiException) {
+				$error->HeaderMeta = $ex->getResponseHeaders();
+			} else {
+				$error->StatusCode = $ex->getCode();
+				$error->ErrorType = 'Sender';
+			}
+
+			return $error;
+		}
+	}
 
     /*
      * @param string $order_id
@@ -1316,7 +1339,7 @@ class WPLA_Amazon_SP_API {
             }
 
             return [];
-        }  catch ( \SellingPartnerApi\ApiException $ex ) {
+        }  catch ( \WPLab\Amazon\SellingPartnerApi\ApiException $ex ) {
             $error = new stdClass();
             $error->ErrorMessage = $ex->getMessage();
             $error->ErrorCode    = $ex->getCode();
@@ -1351,6 +1374,10 @@ class WPLA_Amazon_SP_API {
             $response = $api->getOrderItems( $amazon_order_id );
             $list = $response->getPayload();
 
+			if ( is_null($list) ) {
+				throw new \WPLab\Amazon\SellingPartnerApi\ApiException('Order has no order items', 401 );
+			}
+
             $items = $list->getOrderItems();
             $next_token = $list->getNextToken();
 
@@ -1371,7 +1398,7 @@ class WPLA_Amazon_SP_API {
             }
 
             return $items;
-        } catch ( \SellingPartnerApi\ApiException $ex ) {
+        } catch ( \WPLab\Amazon\SellingPartnerApi\ApiException $ex ) {
             $error = new stdClass();
             $error->ErrorMessage = $ex->getMessage();
             $error->ErrorCode    = $ex->getCode();
@@ -1403,7 +1430,7 @@ class WPLA_Amazon_SP_API {
         try {
             $response = $api->getOrderBuyerInfo( $amazon_order_id );
             return $response->getPayload();
-        } catch ( \SellingPartnerApi\ApiException $ex ) {
+        } catch ( \WPLab\Amazon\SellingPartnerApi\ApiException $ex ) {
             $error = new stdClass();
             $error->ErrorMessage = $ex->getMessage();
             $error->ErrorCode    = $ex->getCode();
@@ -1431,7 +1458,7 @@ class WPLA_Amazon_SP_API {
         try {
             $response = $api->getOrderItemsBuyerInfo( $amazon_order_id, $next_token );
             return $response->getPayload();
-        } catch ( \SellingPartnerApi\ApiException $ex ) {
+        } catch ( \WPLab\Amazon\SellingPartnerApi\ApiException $ex ) {
             $error = new stdClass();
             $error->ErrorMessage = $ex->getMessage();
             $error->ErrorCode    = $ex->getCode();
@@ -1486,7 +1513,7 @@ class WPLA_Amazon_SP_API {
         try {
             $response = $api->getOrderAddress( $amazon_order_id );
             return $response->getPayload();
-        } catch ( \SellingPartnerApi\ApiException $ex ) {
+        } catch ( \WPLab\Amazon\SellingPartnerApi\ApiException $ex ) {
             $error = new stdClass();
             $error->ErrorMessage = $ex->getMessage();
             $error->ErrorCode    = $ex->getCode();
@@ -1542,7 +1569,7 @@ class WPLA_Amazon_SP_API {
             }
 
             return $reports;
-        } catch ( \SellingPartnerApi\ApiException $ex ) {
+        } catch ( \WPLab\Amazon\SellingPartnerApi\ApiException $ex ) {
             $error = new stdClass();
             $error->ErrorMessage = $ex->getMessage();
             $error->ErrorCode    = $ex->getCode();
@@ -1568,7 +1595,7 @@ class WPLA_Amazon_SP_API {
 
         try {
             return $api->getReport( $report_id );
-        } catch ( \SellingPartnerApi\ApiException $ex ) {
+        } catch ( \WPLab\Amazon\SellingPartnerApi\ApiException $ex ) {
             $error = new stdClass();
             $error->ErrorMessage = $ex->getMessage();
             $error->ErrorCode    = $ex->getCode();
@@ -1618,7 +1645,7 @@ class WPLA_Amazon_SP_API {
 
             return $decoded;
             //return gzdecode( wp_remote_retrieve_body( $response ) );
-        } catch ( \SellingPartnerApi\ApiException $ex ) {
+        } catch ( \WPLab\Amazon\SellingPartnerApi\ApiException $ex ) {
             $error = new stdClass();
             $error->ErrorMessage = $ex->getMessage();
             $error->ErrorCode    = $ex->getCode();
@@ -1659,7 +1686,7 @@ class WPLA_Amazon_SP_API {
         }
 
         /** TEST DATA */
-        /*$report_type      = \SellingPartnerApi\ReportType::GET_MERCHANT_LISTINGS_ALL_DATA;
+        /*$report_type      = \WPLab\Amazon\SellingPartnerApi\ReportType::GET_MERCHANT_LISTINGS_ALL_DATA;
         $spec = new Reports\CreateReportSpecification();
         $spec
             ->setMarketplaceIds( [ 'A1PA6795UKMFR9', 'ATVPDKIKX0DER' ] )
@@ -1670,7 +1697,7 @@ class WPLA_Amazon_SP_API {
         try {
             $response = $api->createReport( $spec );
             return $response->getReportId();
-        } catch ( \SellingPartnerApi\ApiException $ex ) {
+        } catch ( \WPLab\Amazon\SellingPartnerApi\ApiException $ex ) {
             $error = new stdClass();
             $error->ErrorMessage = $ex->getMessage();
             $error->ErrorCode    = $ex->getCode();
@@ -1692,7 +1719,7 @@ class WPLA_Amazon_SP_API {
         try {
             $api->cancelReport( $report_id );
             return $api->getReport( $report_id );
-        } catch ( \SellingPartnerApi\ApiException $ex ) {
+        } catch ( \WPLab\Amazon\SellingPartnerApi\ApiException $ex ) {
             $error = new stdClass();
             $error->ErrorMessage = $ex->getMessage();
             $error->ErrorCode    = $ex->getCode();
@@ -1716,11 +1743,11 @@ class WPLA_Amazon_SP_API {
     /**
      * @param MerchantFulfillment\GetEligibleShipmentServicesRequest $body
      * @return array|MerchantFulfillment\GetEligibleShipmentServicesResponse
-     * @throws \SellingPartnerApi\ApiException
+     * @throws \WPLab\Amazon\SellingPartnerApi\ApiException
      */
     public function getEligibleShipmentServices( $body ) {
         $this->initAPI();
-        $api = new \SellingPartnerApi\Api\MerchantFulfillmentV0Api( $this->config, $this->client );
+        $api = new \WPLab\Amazon\SellingPartnerApi\Api\MerchantFulfillmentV0Api( $this->config, $this->client );
 
 
         return $api->getEligibleShipmentServices( $body );

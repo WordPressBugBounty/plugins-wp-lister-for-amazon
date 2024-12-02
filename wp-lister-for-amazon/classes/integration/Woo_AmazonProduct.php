@@ -12,6 +12,12 @@ if ( class_exists('WC_Product') ) {
 
 	class WC_Product_Amazon extends WC_Product {
 
+		public $id;
+		public $asin;
+		public $sku;
+		public $post;
+		public $product_type;
+
 		/**
 		 * __construct function.
 		 *

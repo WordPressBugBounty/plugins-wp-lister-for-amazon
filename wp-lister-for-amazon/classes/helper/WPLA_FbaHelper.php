@@ -7,23 +7,33 @@ class WPLA_FbaHelper {
         // $allowed_order_statuses = apply_filters( 'wpla_mcf_enabled_order_statuses', array( 'wc-completed', 'wc-processing', 'wc-on-hold' ) );
         $allowed_order_statuses = apply_filters( 'wpla_mcf_enabled_order_statuses', array( 'wc-on-hold', 'wc-processing', 'processing', 'on-hold' ) ); // removed on-hold for now - until "hold" FBA action is implemented
 
-        // fetch orders - WC2.2+
-        $orders = get_posts( array(
-            'post_type'   => 'shop_order',
-            'post_status' => $allowed_order_statuses,
+	    if ( function_exists( 'wc_get_orders' ) ) {
+			$date_from = new DateTime('1 day ago');
+		    $orders = wc_get_orders([
+			    'type'  => 'shop_order',
+			    'status'    => $allowed_order_statuses,
+			    'limit' => -1,
+			    'date_after' => $date_from->format('Y-m-d H:i:s')
+		    ]);
+	    } else {
+		    // fetch orders - WC2.2+
+		    $orders = get_posts( array(
+			    'post_type'   => 'shop_order',
+			    'post_status' => $allowed_order_statuses,
 
-            'posts_per_page'   => -1,
-            'orderby'          => 'post_modified_gmt',
-            'order'            => 'ASC',
+			    'posts_per_page'   => -1,
+			    'orderby'          => 'post_modified_gmt',
+			    'order'            => 'ASC',
 
-            'date_query' => array(
-                array(
-                    'column' => 'post_modified_gmt',
-                    'after'  => '1 day ago',
-                ),
-            ),
+			    'date_query' => array(
+				    array(
+					    'column' => 'post_modified_gmt',
+					    'after'  => '1 day ago',
+				    ),
+			    ),
 
-        ) );
+		    ) );
+	    }
 
         return $orders;
     } // getRecentOrders()

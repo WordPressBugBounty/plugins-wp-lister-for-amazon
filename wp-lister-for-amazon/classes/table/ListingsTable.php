@@ -7,9 +7,14 @@
  */
 if(!class_exists('WP_List_Table')){
     require_once( ABSPATH . 'wp-admin/includes/class-wp-list-table.php' );
-
 }
 
+$old_offer_detail_class = WPLA_PATH .'/includes/amazon/vendor/jlevers/selling-partner-api/lib/Model/ProductPricingV0/OfferDetail.php';
+
+if ( file_exists( $old_offer_detail_class ) ) {
+	include_once WPLA_PATH .'/includes/amazon/vendor/jlevers/selling-partner-api/lib/Model/ProductPricingV0/OfferDetail.php';
+	include_once WPLA_PATH .'/includes/amazon/vendor/jlevers/selling-partner-api/lib/Model/ProductPricingV0/MoneyType.php';
+}
 
 /************************** CREATE A PACKAGE CLASS *****************************
  *******************************************************************************
@@ -565,7 +570,7 @@ class WPLA_ListingsTable extends WP_List_Table {
             $loffer_data = maybe_unserialize( $item['loffer_data'] );
             $ListingsConsidered = null;
             if ( is_array($loffer_data) ) {
-                /* @var \SellingPartnerApi\Model\ProductPricingV0\OfferDetail[] $loffer_data */
+                /* @var \WPLab\Amazon\SellingPartnerApi\Model\ProductPricingV0\OfferDetail[] $loffer_data */
                 foreach ($loffer_data as $price) {
                     if ( is_callable( array( $price, 'getListingPrice' ) ) ) {
                         $listing_price = $price->getListingPrice()->getAmount();

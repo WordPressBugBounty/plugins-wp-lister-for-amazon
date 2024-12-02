@@ -1,6 +1,7 @@
 <?php
 
-use WPLab\GuzzeHttp\Client;
+//use WPLab\Amazon\GuzzleHttp\Client;
+use WPLab\Amazon\GuzzleHttp\Client;
 
 class WPLA_Http_Client extends Client {
     const API_HOST = 'api.wplister.com';
@@ -16,7 +17,7 @@ class WPLA_Http_Client extends Client {
         $this->market_id = $market_id;
     }
 
-    public function send(\Psr\Http\Message\RequestInterface $request, array $options = []): \Psr\Http\Message\ResponseInterface {
+    public function send(\WPLab\Amazon\Psr\Http\Message\RequestInterface $request, array $options = []): \WPLab\Amazon\Psr\Http\Message\ResponseInterface {
         $request = $this->requestToProxy( $request );
         $clone = $request;
 
@@ -61,7 +62,7 @@ class WPLA_Http_Client extends Client {
             ));
 
             return $response;
-        } catch ( \WPLab\GuzzeHttp\Exception\ClientException $e ) {
+        } catch ( \WPLab\Amazon\GuzzleHttp\Exception\ClientException $e ) {
             $db_logger->updateLog( array(
                 'response'    => maybe_serialize( $e->getMessage() ),
                 'result'        => $e->getResponse()->getBody()->getContents(),
@@ -74,9 +75,9 @@ class WPLA_Http_Client extends Client {
 
     }
 
-    private function requestToProxy( \Psr\Http\Message\RequestInterface $request ) {
+    private function requestToProxy( WPLab\Amazon\Psr\Http\Message\RequestInterface $request ) {
         $uri = $request->getUri();
-        $endpoint = \WPLab\GuzzeHttp\Psr7\Uri::composeComponents( $uri->getScheme(), $uri->getAuthority(), $uri->getPath(), '', '' );
+        $endpoint = \WPLab\Amazon\GuzzleHttp\Psr7\Uri::composeComponents( $uri->getScheme(), $uri->getAuthority(), $uri->getPath(), '', '' );
         $query = $uri->getQuery();
 
         $wpla_api = new WPLA_Amazon_SP_API( $this->wpla_account_id );

@@ -344,9 +344,15 @@ class WPLA_ListingsPage extends WPLA_Page {
                     $message = '';
 
                     foreach ( $result as $asin => $offer_result ) {
+                        if ( !$offer_result ) {
+                            continue;
+                        }
                         $summary = $offer_result->getSummary();
                         $prices = $summary->getLowestPrices();
                         foreach ( $prices as $price ) {
+                            if ( ! $price ) {
+                                continue;
+                            }
                             $lowest_price = $price->getLandedPrice()->getAmount();
                             $condition    = $price->getCondition();
                             $subcondition = $condition;

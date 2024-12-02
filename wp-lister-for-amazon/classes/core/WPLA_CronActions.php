@@ -10,6 +10,7 @@ class WPLA_CronActions {
 
 	var $dblogger;
 	var $lockfile;
+	var $message;
 
 	public function __construct() {
 

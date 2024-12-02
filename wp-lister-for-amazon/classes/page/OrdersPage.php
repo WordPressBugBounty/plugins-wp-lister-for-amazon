@@ -4,6 +4,11 @@
  * 
  */
 
+if ( file_exists(WPLA_PATH .'/includes/amazon/vendor/jlevers/selling-partner-api/lib/Model/OrdersV0/Money.php') ) {
+	require_once WPLA_PATH .'/includes/amazon/vendor/jlevers/selling-partner-api/lib/Model/OrdersV0/Money.php';
+}
+
+
 class WPLA_OrdersPage extends WPLA_Page {
 
 	const slug = 'orders';
@@ -221,7 +226,7 @@ class WPLA_OrdersPage extends WPLA_Page {
 
     /**
      * Import order line items from Amazon
-     * @param \SellingPartnerApi\Model\OrdersV0\OrderItem[] $items
+     * @param \WPLab\Amazon\SellingPartnerApi\Model\OrdersV0\OrderItem[] $items
      * @param string $order_id
      */
 	public function importOrderItems( $items, $order_id ) {

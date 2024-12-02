@@ -437,7 +437,7 @@
 							</label>
 							<select id="wpl-repricing_use_lowest_offer" name="wpla_repricing_use_lowest_offer" class=" required-entry select">
 								<option value="0" <?php if ( $wpl_repricing_use_lowest_offer == '0' ): ?>selected="selected"<?php endif; ?>><?php echo __( 'Buy Box only', 'wp-lister-for-amazon' ); ?> (<?php _e('default', 'wp-lister-for-amazon' ); ?>)</option>
-								<option value="1" <?php if ( $wpl_repricing_use_lowest_offer == '1' ): ?>selected="selected"<?php endif; ?>><?php echo __( 'Boy Box and Lowest Offer', 'wp-lister-for-amazon' ); ?> (recommeded)</option>
+								<option value="1" <?php if ( $wpl_repricing_use_lowest_offer == '1' ): ?>selected="selected"<?php endif; ?>><?php echo __( 'Buy Box and Lowest Offer', 'wp-lister-for-amazon' ); ?> (recommeded)</option>
 							</select>
 							<p class="desc" style="display: block;">
 								<?php echo __( 'Select if you want the lowest offer to be regarded when you already have the Buy Box.', 'wp-lister-for-amazon' ); ?>

@@ -1,14 +1,14 @@
 <?php
 
-use WPLab\GuzzeHttp\Client;
-use WPLab\GuzzeHttp\Psr7;
-use SellingPartnerApi\Api\TokensV20210301Api as TokensApi;
-use SellingPartnerApi\Model\TokensV20210301 as Tokens;
-use SellingPartnerApi\AuthorizationSigner;
-use SellingPartnerApi\Configuration;
-use SellingPartnerApi\Credentials;
+use WPLab\Amazon\GuzzleHttp\Client;
+use WPLab\Amazon\GuzzleHttp\Psr7;
+use WPLab\Amazon\SellingPartnerApi\Api\TokensV20210301Api as TokensApi;
+use WPLab\Amazon\SellingPartnerApi\Model\TokensV20210301 as Tokens;
+use WPLab\Amazon\SellingPartnerApi\AuthorizationSigner;
+use WPLab\Amazon\SellingPartnerApi\Configuration;
+use WPLab\Amazon\SellingPartnerApi\Credentials;
 
-class WPLA_Amazon_SP_API_Authentication extends SellingPartnerApi\Authentication {
+class WPLA_Amazon_SP_API_Authentication extends \WPLab\Amazon\SellingPartnerApi\Authentication {
     private $awsCredentials;
 
     private $lwaClientId;
@@ -22,7 +22,7 @@ class WPLA_Amazon_SP_API_Authentication extends SellingPartnerApi\Authentication
 
     private $signingScope = null;
 
-    /** @var \WPLab\GuzzeHttp\ClientInterface */
+    /** @var \WPLab\Amazon\GuzzleHttp\ClientInterface */
     private $client = null;
 
     private $grantlessAwsCredentials = null;
@@ -41,7 +41,7 @@ class WPLA_Amazon_SP_API_Authentication extends SellingPartnerApi\Authentication
 
     private $awsToken;
 
-    /** @var \SellingPartnerApi\Api\TokensV20210301Api */
+    /** @var \WPLab\Amazon\SellingPartnerApi\Api\TokensV20210301Api */
     private $tokensApi = null;
 
     /** @var AuthorizationSignerContract */
@@ -89,7 +89,7 @@ class WPLA_Amazon_SP_API_Authentication extends SellingPartnerApi\Authentication
      * @param string $method The HTTP method of the restricted operation
      * @param ?array $dataElements The restricted data elements to request access to, if any.
      *      Only applies to getOrder, getOrders, and getOrderItems. Default empty array.
-     * @return \SellingPartnerApi\Credentials A Credentials object holding the RDT
+     * @return \WPLab\Amazon\SellingPartnerApi\Credentials A Credentials object holding the RDT
      */
     public function getRestrictedDataToken(string $path, string $method, ?array $dataElements = []): Credentials
     {
@@ -139,7 +139,7 @@ class WPLA_Amazon_SP_API_Authentication extends SellingPartnerApi\Authentication
 
     /**
      * @return array
-     * @throws \WPLab\GuzzeHttp\Exception\GuzzleException|\RuntimeException
+     * @throws \WPLab\Amazon\GuzzleHttp\Exception\GuzzleException|\RuntimeException
      */
     public function requestLWAToken(): array
     {
@@ -218,9 +218,9 @@ class WPLA_Amazon_SP_API_Authentication extends SellingPartnerApi\Authentication
 
     /**
      * ToDo: Find a way to override the need to supply AWS credentials
-     * @return \SellingPartnerApi\Credentials
+     * @return \WPLab\Amazon\SellingPartnerApi\Credentials
      */
-//    public function getAwsCredentials(): \SellingPartnerApi\Credentials {
+//    public function getAwsCredentials(): \WPLab\Amazon\SellingPartnerApi\Credentials {
 //        if ($this->needNewCredentials($this->awsCredentials)) {
 //            $this->newToken();
 //        }
@@ -240,13 +240,13 @@ class WPLA_Amazon_SP_API_Authentication extends SellingPartnerApi\Authentication
     /**
      * Requests will be signed by the proxy server
      *
-     * @param \Guzzle\Psr7\Request $request The request to sign
+     * @param WPLab\Amazon\Psr\Http\Message\RequestInterface $request The request to sign
      * @param ?string $scope If the request is to a grantless operation endpoint, the scope for the grantless token
      * @param ?string $restrictedPath The absolute (generic) path for the endpoint that the request is using if it's an endpoint that requires
      *      a restricted data token
-     * @return Psr7\Request The signed request
+     * @return WPLab\Amazon\Psr\Http\Message\RequestInterface The signed request
      */
-    public function signRequest(Psr7\Request $request, ?string $scope = null, ?string $restrictedPath = null, ?string $operation = null): Psr7\Request {
+    public function signRequest(WPLab\Amazon\Psr\Http\Message\RequestInterface $request, ?string $scope = null, ?string $restrictedPath = null, ?string $operation = null): WPLab\Amazon\Psr\Http\Message\RequestInterface {
         // This allows us to know if we're signing a grantless operation without passing $scope all over the place
         $this->signingScope = $scope;
 
@@ -313,7 +313,7 @@ class WPLA_Amazon_SP_API_Authentication extends SellingPartnerApi\Authentication
     /**
      * Get credentials for standard API operations.
      *
-     * @return \SellingPartnerApi\Credentials A set of access credentials for making calls to the SP API
+     * @return \WPLab\Amazon\SellingPartnerApi\Credentials A set of access credentials for making calls to the SP API
      */
     public function getAwsCredentials(): Credentials
     {

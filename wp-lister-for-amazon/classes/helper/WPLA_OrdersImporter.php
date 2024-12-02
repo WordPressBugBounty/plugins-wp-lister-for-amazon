@@ -15,7 +15,7 @@ class WPLA_OrdersImporter {
 
     /**
      * todo: break this into smaller methods
-     * @param SellingPartnerApi\Model\OrdersV0\Order $order
+     * @param WPLab\Amazon\SellingPartnerApi\Model\OrdersV0\Order $order
      * @param WPLA_AmazonAccount $account
      * @return bool|int|string|void|null
      */
@@ -64,7 +64,7 @@ class WPLA_OrdersImporter {
         /*
          * Only pull shipping address and buyer info on paid orders
          */
-        if ( !in_array( $order->getOrderStatus(), [\SellingPartnerApi\Model\OrdersV0\Order::ORDER_STATUS_PENDING, \SellingPartnerApi\Model\OrdersV0\Order::ORDER_STATUS_CANCELED ] ) ) {
+        if ( !in_array( $order->getOrderStatus(), [\WPLab\Amazon\SellingPartnerApi\Model\OrdersV0\Order::ORDER_STATUS_PENDING, \WPLab\Amazon\SellingPartnerApi\Model\OrdersV0\Order::ORDER_STATUS_CANCELED ] ) ) {
             $order_address  = $api->getOrderAddress( $order->getAmazonOrderId() );
             $buyer_info     = $api->getOrderBuyerInfo( $order->getAmazonOrderId() );
 
@@ -130,6 +130,15 @@ class WPLA_OrdersImporter {
 
         if ( $update_items ) {
             $items         = $this->api->getOrderItems( $order->getAmazonOrderId(), true );
+
+	        // check if ListOrderItems request is throttled
+	        // if true, skip ALL further requests / order processing until next cron run
+	        if ( is_object($items) && ( $items->ErrorCode == 429 || $items->ErrorCode == 400 ) ) {
+		        $this->throttling_is_active = true;
+		        wpla_show_message('GetOrderItems requests are throttled. Skipping further order processing until next run.','warn');
+		        return false;
+	        }
+
             $data['items'] = maybe_serialize( self::flattenOrderItem( $items ) );
         }
 
@@ -287,8 +296,8 @@ class WPLA_OrdersImporter {
 
     /**
      *  update listing sold quantity and status
-     * @param SellingPartnerApi\Model\OrdersV0\OrderItem $item
-     * @param SellingPartnerApi\Model\OrdersV0\Order $order
+     * @paramWPLab\Amazon\SellingPartnerApi\Model\OrdersV0\OrderItem $item
+     * @paramWPLab\Amazon\SellingPartnerApi\Model\OrdersV0\Order $order
      * @return bool
      */
 	function processListingItem( $item, $order ) {
@@ -479,7 +488,7 @@ class WPLA_OrdersImporter {
 	*/
 
     /**
-     * @param SellingPartnerApi\Model\OrdersV0\Order[] $orders
+     * @paramWPLab\Amazon\SellingPartnerApi\Model\OrdersV0\Order[] $orders
      * @param $account
      */
 	public function importOrders( $orders, $account ) {
@@ -507,7 +516,7 @@ class WPLA_OrdersImporter {
 	}
 
     /**
-     * @param \SellingPartnerApi\Model\OrdersV0\OrderItem[] $items
+     * @param \WPLab\Amazon\SellingPartnerApi\Model\OrdersV0\OrderItem[] $items
      * @param string $order_id
      */
 	public function importOrderItems( $items, $order_id ) {
@@ -547,7 +556,7 @@ class WPLA_OrdersImporter {
 	}
 
     /**
-     * @param SellingPartnerApi\Model\OrdersV0\OrderItem[] $items
+     * @paramWPLab\Amazon\SellingPartnerApi\Model\OrdersV0\OrderItem[] $items
      */
 	public static function flattenOrderItem( $items ) {
 	    $data_array = [];

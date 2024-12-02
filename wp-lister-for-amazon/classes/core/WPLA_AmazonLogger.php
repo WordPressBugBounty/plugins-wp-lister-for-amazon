@@ -100,7 +100,7 @@ class WPLA_AmazonLogger {
         $this->log($xmlMsg, $subject);
     }
 
-    public static function getCallNameFromRequest( \Psr\Http\Message\RequestInterface $request ) {
+    public static function getCallNameFromRequest( \WPLab\Amazon\Psr\Http\Message\RequestInterface $request ) {
 
         $query = $request->getUri()->getQuery();
         parse_str( $query, $query_array );

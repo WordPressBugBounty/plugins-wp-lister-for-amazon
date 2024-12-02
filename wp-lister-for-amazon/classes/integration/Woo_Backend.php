@@ -668,17 +668,10 @@ class WPLA_WooBackendIntegration extends WPLA_Core {
         }
 
         // if this is being called from WP All-Import, skip it #46625
-        $bt = debug_backtrace();
-        $files = wp_list_pluck( $bt, 'file' );
-        $wpai = false;
-        foreach ( $files as $file ) {
-            if ( strpos( $file, 'wpai-woocommerce-add-on' ) !== false ) {
-                $wpai = true;
-                break;
-            }
+        $skip_feeds = false;
+        if ( did_action( 'wp_all_import_before_make_product_simple' ) || did_action( 'wp_all_import_before_variable_product_import' ) ) {
+            $skip_feeds = true;
         }
-
-        $skip_feeds = ( $wpai ) ? true : false;
 
         if ( $product->is_type( 'variation' ) ) {
             $id = method_exists( $product, 'get_parent_id' ) ? $product->get_parent_id() : $product->get_parent();

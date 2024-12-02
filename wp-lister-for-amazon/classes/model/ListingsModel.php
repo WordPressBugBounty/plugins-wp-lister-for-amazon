@@ -349,6 +349,9 @@ class WPLA_ListingsModel extends WPLA_Model {
 
 
 		// sanitize input
+		if (!is_array($ids)) {
+			$ids = [$ids];
+		}
 		$id_list = implode( ',', esc_sql( $ids ) );
 		// $id_list == array();
 		// foreach ($ids as $id) {
@@ -754,7 +757,7 @@ class WPLA_ListingsModel extends WPLA_Model {
 
     /**
      * Process pricing information for products
-     * @param \SellingPartnerApi\Model\ProductPricingV0\GetOffersResult[] $result Result of WPLA_Amazon_SP_API::getItemOffers()
+     * @param \WPLab\Amazon\SellingPartnerApi\Model\ProductPricingV0\GetOffersResult[] $result Result of WPLA_Amazon_SP_API::getItemOffers()
      * @param int $account_id
      */
 	function processLowestOfferPricingResult( $result, $account_id ) {
@@ -771,7 +774,7 @@ class WPLA_ListingsModel extends WPLA_Model {
     /**
      * Update pricing information for single product
      * @param string $asin
-     * @param \SellingPartnerApi\Model\ProductPricingV0\CompetitivePriceType[] $prices
+     * @param \WPLab\Amazon\SellingPartnerApi\Model\ProductPricingV0\CompetitivePriceType[] $prices
      * @param int $account_id
      */
 	function updateBuyBoxPricingInfoForASIN( $asin, $prices, $account_id ) {
@@ -867,7 +870,7 @@ class WPLA_ListingsModel extends WPLA_Model {
 	/**
      * Update pricing information for single product
      * @param string $asin
-     * @param \SellingPartnerApi\Model\ProductPricingV0\GetOffersResult $offer_result
+     * @param \WPLab\Amazon\SellingPartnerApi\Model\ProductPricingV0\GetOffersResult $offer_result
      * @param int $account_id
      */
 	function updateLowestOfferPricingInfoForASIN( $asin, $offer_result, $account_id ) {
@@ -1292,7 +1295,7 @@ class WPLA_ListingsModel extends WPLA_Model {
 		$table = $wpdb->prefix . self::TABLENAME;
 
 		// update
-		$wpdb->update( $table, $data, $where );
+		return $wpdb->update( $table, $data, $where );
 	}
 
 	static public function updateBySkuAndAccount( $sku, $account_id, $data ) {

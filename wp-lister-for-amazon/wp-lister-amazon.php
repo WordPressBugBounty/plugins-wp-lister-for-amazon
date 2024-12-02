@@ -3,12 +3,12 @@
 Plugin Name: WP-Lister Lite for Amazon
 Plugin URI: https://www.wplab.com/plugins/wp-lister-for-amazon/
 Description: List your products on Amazon the easy way.
-Version: 2.6.17
+Version: 2.7.3
 Author: WP Lab
 Author URI: https://www.wplab.com/ 
-Max WP Version: 6.5.2
+Max WP Version: 6.7.1
 WC requires at least: 6.0.0
-WC tested up to: 8.8.3
+WC tested up to: 9.1.2
 Text Domain: wp-lister-for-amazon
 Domain Path: /languages/
 License: GPL2+
@@ -16,7 +16,7 @@ License: GPL2+
 
 if ( class_exists('WPLA_WPLister') ) die(sprintf( 'WP-Lister for Amazon %s is already installed and activated. Please deactivate any other version before you activate this one.', WPLA_VERSION ));
 
-define('WPLA_VERSION', '2.6.17' );
+define('WPLA_VERSION', '2.7.3' );
 define('WPLA_PATH', realpath( dirname(__FILE__) ) );
 define('WPLA_URL', plugins_url() . '/' . basename(dirname(__FILE__)) . '/' );
 
@@ -333,6 +333,10 @@ class WPLA_WPLister extends WPLA_BasePlugin {
         if ( $current_screen && !in_array( $current_screen->id, array( 'edit-product', 'product' ) ) && strpos( $current_screen->id, 'wpla' ) === false )  {
 		    return;
         }
+
+		if ( class_exists('\Elementor\Plugin' ) && (\Elementor\Plugin::$instance->editor->is_edit_mode() || \Elementor\Plugin::$instance->preview->is_preview_mode()) ) {
+			return;
+		}
 
 		// ProfileSelector
 		wp_register_script( 'wpla_profile_selector', self::$PLUGIN_URL.'js/classes/ProfileSelector.js', array( 'jquery' ), WPLA_VERSION );

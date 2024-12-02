@@ -107,8 +107,8 @@ class WPLA_AmazonFeed {
         // remove the underscore from the prefix and suffix
         $feed_type = trim( $feed_type, '_' );
 
-	    if ( defined( '\SellingPartnerApi\FeedType::' . $feed_type ) ) {
-	        return constant( '\SellingPartnerApi\FeedType::'. $feed_type );
+	    if ( defined( '\WPLab\Amazon\SellingPartnerApi\FeedType::' . $feed_type ) ) {
+	        return constant( '\WPLab\Amazon\SellingPartnerApi\FeedType::'. $feed_type );
         }
 
 	    // feed_type not found.
@@ -501,8 +501,9 @@ class WPLA_AmazonFeed {
             $decode_feed = true;
         }
 
-		if ( apply_filters( 'wpla_utf8_decode_feed_content', $decode_feed, $this ) ) {
-			$feed_content = utf8_decode( $feed_content );
+		if ( apply_filters( 'wpla_utf8_decode_feed_content', $decode_feed, $this ) && function_exists('mb_convert_encoding') ) {
+			$feed_content = mb_convert_encoding($feed_content, 'ISO-8859-1', 'UTF-8');
+			//$feed_content = utf8_decode( $feed_content );
 		}
 
         $feed_type = self::getFeedType( $this->FeedType );
@@ -733,7 +734,13 @@ class WPLA_AmazonFeed {
 
 				$listing_data['status']  = 'online';
 				$listing_data['history'] = '';
-				$lm->updateWhere( array( 'sku' => $row_sku, 'account_id' => $this->account_id ), $listing_data );
+				$result = $lm->updateWhere( array( 'sku' => $row_sku, 'account_id' => $this->account_id ), $listing_data );
+
+				if ( !$result ) {
+					WPLA()->logger->error( 'Error while updating listing. Retrying after 1s.');
+					sleep(1);
+					$lm->updateWhere( array( 'sku' => $row_sku, 'account_id' => $this->account_id ), $listing_data );
+				}
 				WPLA()->logger->info('changed status to online: '.$row_sku);
 
 				// if this listing is part of a non-variation profile, mark the parent listing as online so it doesn't
@@ -1141,7 +1148,7 @@ class WPLA_AmazonFeed {
 
     /**
      * Update the Feeds table with data from the Feeds API
-     * @param \SellingPartnerApi\Model\FeedsV20210630\Feed[] $feeds
+     * @param \WPLab\Amazon\SellingPartnerApi\Model\FeedsV20210630\Feed[] $feeds
      * @param $account
      * @return int
      */

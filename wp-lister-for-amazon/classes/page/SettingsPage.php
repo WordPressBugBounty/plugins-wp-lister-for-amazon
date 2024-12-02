@@ -848,6 +848,7 @@ class WPLA_SettingsPage extends WPLA_Page {
 	protected function saveBackgroundInventoryCheck() {
         $frequency = $this->getValueFromPost( 'inventory_check_frequency' );
         $email      = $this->getValueFromPost( 'inventory_check_notification_email' );
+        $current_frequency = get_option('wpla_inventory_check_frequency' );
 
         if ( !in_array( $frequency, array( 1, 3, 6, 12, 24 ) ) || WPLA_LIGHT ) {
             $frequency = 24;
@@ -860,6 +861,12 @@ class WPLA_SettingsPage extends WPLA_Page {
 
         self::updateOption( 'inventory_check_frequency', $frequency );
         self::updateOption( 'inventory_check_notification_email', $email );
+
+        if ( $frequency != $current_frequency ) {
+            self::updateOption( 'inventory_check_frequency_changed', true );
+        }
+
+
 
         ###
         # This doesn't work probably because it is being called too early in the stack. This has been moved to

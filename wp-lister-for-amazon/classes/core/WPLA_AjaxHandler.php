@@ -1,5 +1,5 @@
 <?php
-require_once WPLA_PATH . '/includes/amazon/vendor/autoload.php';
+require_once WPLA_PATH . '/includes/amazon/vendor-prefixed/autoload.php';
 
 class WPLA_AjaxHandler extends WPLA_Core {
 
@@ -79,6 +79,13 @@ class WPLA_AjaxHandler extends WPLA_Core {
 	// show pricing details for listing
 	public function ajax_wpla_view_pricing_info() {
 		if ( ! current_user_can('manage_amazon_listings') ) return;
+
+		$old_offer_detail_class = WPLA_PATH .'/includes/amazon/vendor/jlevers/selling-partner-api/lib/Model/ProductPricingV0/OfferDetail.php';
+
+		if ( file_exists( $old_offer_detail_class ) ) {
+			require_once WPLA_PATH .'/includes/amazon/vendor/jlevers/selling-partner-api/lib/Model/ProductPricingV0/OfferDetail.php';
+			require_once WPLA_PATH .'/includes/amazon/vendor/jlevers/selling-partner-api/lib/Model/ProductPricingV0/MoneyType.php';
+		}
 
 		$listing_id = wpla_clean($_REQUEST['id']);
 		if ( ! $listing_id ) return;
@@ -526,7 +533,7 @@ class WPLA_AjaxHandler extends WPLA_Core {
 			if ( $product ) {
                 $product_post = get_post( wpla_clean($_REQUEST['id']) );
 				$product_attributes	= WPLA_ProductWrapper::getAttributes( wpla_get_product_meta( $product, 'parent_id' ), true );
-				$query_type = wpla_clean($_REQUEST['query_select']) ?? get_option( 'wpla_default_matcher_selection', 'title' );
+				$query_type = wpla_clean($_REQUEST['query_select'] ?? get_option( 'wpla_default_matcher_selection', 'title' ));
 
 			    switch ($query_type) {
 			    	case 'title':
@@ -535,6 +542,7 @@ class WPLA_AjaxHandler extends WPLA_Core {
 			    		break;
 
 			    	case 'sku':
+				    case 'ean':
 			    		# product sku
 						$query = wpla_get_product_meta( $product, 'sku' );
 			    		break;
@@ -573,8 +581,8 @@ class WPLA_AjaxHandler extends WPLA_Core {
 
 					$api = new WPLA_Amazon_SP_API( $account->id );
 
-					if ( $query_type == 'sku' ) {
-					    $result = $api->searchCatalogItems( [], [$query], 'SKU', $account->merchant_id );
+					if ( $query_type == 'sku' || $query_type == 'ean' ) {
+					    $result = $api->searchCatalogItems( [], [$query], ['SKU','EAN'], $account->merchant_id );
                     } else {
                         $result = $api->searchCatalogItems( [$query] );
                     }
@@ -978,6 +986,7 @@ class WPLA_AjaxHandler extends WPLA_Core {
 				// echo "<pre>";print_r($product);echo"</pre>";die();
 
 				if ( !WPLA_Amazon_SP_API::isError( $result ) ) {
+					$success = true;
                     foreach ($result->getItems() as $i => $product) {
 
                         if (!empty($product->getAsin())) {

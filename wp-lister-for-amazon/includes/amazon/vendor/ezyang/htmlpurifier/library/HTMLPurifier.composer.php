@@ -1,4 +1,1 @@
-<?php
-if (!defined('HTMLPURIFIER_PREFIX')) {
-    define('HTMLPURIFIER_PREFIX', dirname(__FILE__));
-}
+<?php // This file was deleted by {@see https://github.com/BrianHenryIE/strauss}.

@@ -34,7 +34,7 @@ class WPLA_AmazonReport {
      * @param string $fallback_content_type The content type value to return if the feed type isn't found
      * @return array
      */
-    public static function getReportType( $report_type, $fallback_content_type = \SellingPartnerApi\ContentType::JSON ) {
+    public static function getReportType( $report_type, $fallback_content_type = \WPLab\Amazon\SellingPartnerApi\ContentType::JSON ) {
         // remove the underscore from the prefix and suffix
         $report_type = trim( $report_type, '_' );
 
@@ -314,10 +314,10 @@ class WPLA_AmazonReport {
 	}
 
     /**
-     * @param \SellingPartnerApi\Model\ReportsV20210630\Report $report
+     * @param \WPLab\Amazon\SellingPartnerApi\Model\ReportsV20210630\Report $report
      * @param $account
      */
-    public static function processOrderReportData( SellingPartnerApi\Model\ReportsV20210630\Report $report, $account, bool $is_new_request = false, bool $inventory_sync = false ) {
+    public static function processOrderReportData(WPLab\Amazon\SellingPartnerApi\Model\ReportsV20210630\Report $report, $account, bool $is_new_request = false, bool $inventory_sync = false ) {
         $reports_in_progress = self::countReportsInProgress( $is_new_request, $inventory_sync );
         $new_report = self::recordReport( $report, $account );
 
@@ -348,12 +348,12 @@ class WPLA_AmazonReport {
      * Record and process downloaded reports using the SP-API
      *
      *
-     * @param \SellingPartnerApi\Model\ReportsV20210630\Report $report
+     * @param \WPLab\Amazon\SellingPartnerApi\Model\ReportsV20210630\Report $report
      * @param WPLA_AmazonAccount $account
      * @param bool $is_new_request
      * @param bool $inventory_sync
      */
-	public static function processReport( SellingPartnerApi\Model\ReportsV20210630\Report $report, $account, bool $is_new_request = false, bool $inventory_sync = false ) {
+	public static function processReport(WPLab\Amazon\SellingPartnerApi\Model\ReportsV20210630\Report $report, $account, bool $is_new_request = false, bool $inventory_sync = false ) {
 	    $reports_in_progress = self::countReportsInProgress( $is_new_request, $inventory_sync );
         $new_report = self::recordReport( $report, $account );
 
@@ -439,7 +439,7 @@ class WPLA_AmazonReport {
 
 	}
 
-	private static function recordReport( SellingPartnerApi\Model\ReportsV20210630\Report $report, $account ) {
+	private static function recordReport(WPLab\Amazon\SellingPartnerApi\Model\ReportsV20210630\Report $report, $account ) {
         // check if report exists
         $existing_record = WPLA_AmazonReport::getReportByRequestId( $report->getReportId() );
         if ( $existing_record ) {

@@ -2,7 +2,7 @@
 
 namespace SellingPartnerApi\Tests;
 
-use WPLab\GuzzeHttp\Psr7\Request;
+use GuzzleHttp\Psr7\Request;
 use PHPUnit\Framework\TestCase;
 use SellingPartnerApi\Endpoint;
 use SellingPartnerApi\Credentials;

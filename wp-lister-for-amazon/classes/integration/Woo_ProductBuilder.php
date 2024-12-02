@@ -7,7 +7,7 @@ class WPLA_ProductBuilder {
 	var $images_hashmap = array();
 
     /**
-     * @param SellingPartnerApi\Model\CatalogItemsV20220401\Item $result
+     * @paramWPLab\Amazon\SellingPartnerApi\Model\CatalogItemsV20220401\Item $result
      * @param array $listing
      * @return int $post_id
      * @throws Exception
@@ -160,7 +160,7 @@ class WPLA_ProductBuilder {
 
     /**
      * @param array $item
-     * @param SellingPartnerApi\Model\CatalogItemsV20220401\Item $product_node
+     * @paramWPLab\Amazon\SellingPartnerApi\Model\CatalogItemsV20220401\Item $product_node
      * @param string $product_type
      * @param array $variations
      */
@@ -242,7 +242,7 @@ class WPLA_ProductBuilder {
     /**
      * Map a catalog item to get it ready for product creation
      *
-     * @param SellingPartnerApi\Model\CatalogItemsV20220401\Item $item
+     * @paramWPLab\Amazon\SellingPartnerApi\Model\CatalogItemsV20220401\Item $item
      * @param array $listing
      * @return array
      */
@@ -352,7 +352,7 @@ class WPLA_ProductBuilder {
     }
 
     /**
-     * @param SellingPartnerApi\Model\CatalogItemsV20220401\Item $item
+     * @paramWPLab\Amazon\SellingPartnerApi\Model\CatalogItemsV20220401\Item $item
      * @return string[]
      */
     public function getBulletsFromCatalog( $item ) {
@@ -368,7 +368,7 @@ class WPLA_ProductBuilder {
     }
 
     /**
-     * @param SellingPartnerApi\Model\CatalogItemsV20220401\Item $item
+     * @paramWPLab\Amazon\SellingPartnerApi\Model\CatalogItemsV20220401\Item $item
      * @param array $data
      * @return array
      */
@@ -396,7 +396,7 @@ class WPLA_ProductBuilder {
     }
 
     /**
-     * @param SellingPartnerApi\Model\CatalogItemsV20220401\Item $item
+     * @paramWPLab\Amazon\SellingPartnerApi\Model\CatalogItemsV20220401\Item $item
      * @param array $data
      * @return array
      */
@@ -415,7 +415,7 @@ class WPLA_ProductBuilder {
     }
 
     /**
-     * @param SellingPartnerApi\Model\CatalogItemsV20220401\Item $item
+     * @paramWPLab\Amazon\SellingPartnerApi\Model\CatalogItemsV20220401\Item $item
      * @param array $data
      * @return array
      */
@@ -480,7 +480,7 @@ class WPLA_ProductBuilder {
     }
 
     /**
-     * @param SellingPartnerApi\Model\CatalogItemsV20220401\Item $item
+     * @paramWPLab\Amazon\SellingPartnerApi\Model\CatalogItemsV20220401\Item $item
      * @return string Primary Image URL
      */
     private function getPrimaryImageFromCatalog( $item ) {
@@ -501,7 +501,7 @@ class WPLA_ProductBuilder {
     /**
      * Get all image urls for the catalog item
      *
-     * @param SellingPartnerApi\Model\CatalogItemsV20220401\Item $item
+     * @paramWPLab\Amazon\SellingPartnerApi\Model\CatalogItemsV20220401\Item $item
      * @return array
      */
     private function getImageUrlsFromCatalog( $item ) {
@@ -523,7 +523,7 @@ class WPLA_ProductBuilder {
 
     /**
      * Get the URL of the large image from an Amazon media URL
-     * @param \SellingPartnerApi\Model\CatalogItemsV20220401\ItemImage $image
+     * @param \WPLab\Amazon\SellingPartnerApi\Model\CatalogItemsV20220401\ItemImage $image
      */
     private function getLargeImageUrl( $image ) {
         $url = $image->getLink();
@@ -541,8 +541,8 @@ class WPLA_ProductBuilder {
     }
 
     /**
-     * @param SellingPartnerApi\Model\CatalogItemsV20220401\Item $item
-     * @return SellingPartnerApi\Model\CatalogItemsV20220401\ItemImagesByMarketplace
+     * @paramWPLab\Amazon\SellingPartnerApi\Model\CatalogItemsV20220401\Item $item
+     * @returnWPLab\Amazon\SellingPartnerApi\Model\CatalogItemsV20220401\ItemImagesByMarketplace
      */
     private function getImagesFromCatalog( $item ) {
         return $item->getImages()[0];
@@ -647,7 +647,7 @@ class WPLA_ProductBuilder {
 
     /**
      * @param array $listing
-     * @param \SellingPartnerApi\Model\CatalogItemsV20220401\Item $product_node
+     * @param \WPLab\Amazon\SellingPartnerApi\Model\CatalogItemsV20220401\Item $product_node
      * @param string $product_type
      * @param array $variations
      * @return mixed

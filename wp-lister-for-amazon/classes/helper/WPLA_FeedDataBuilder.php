@@ -1046,7 +1046,8 @@ class WPLA_FeedDataBuilder {
 
 		// process profile fields - if not empty
         // add an exception for the leadtime-to-ship column because it uses the value of the fulfillment-latency profile field #28997
-		if ( $column != 'leadtime-to-ship' && (! isset( $profile_fields[$column] ) || empty( $profile_fields[$column] ) ) ) {
+		// #66588 - Allow the value 0 from the profile to be submitted to Amazon
+		if ( $column != 'leadtime-to-ship' && (! isset( $profile_fields[$column] ) || $profile_fields[$column] == '' ) ) {
             WPLA()->logger->debug( 'empty profile field. returning.');
             return $value;
         }
@@ -1095,14 +1096,6 @@ class WPLA_FeedDataBuilder {
                     if ( $value && array_key_exists( $value, $custom_size_map[ $column ] ) ) {
                         $value = $custom_size_map[ $column ][ $value ];
                         WPLA()->logger->info( 'Found replacement for value. New value: '. $value );
-
-                        /**
-                         * Got a report from #50550 that this is causing feeds to fail
-                         * Same is true for #50656 - strtolower() causes an error
-                         * @todo Watch out for similar reports
-                         */
-                        // all size values need to be lowercase #49324
-                        //$value = strtolower( $value );
                     }
                 }
             }

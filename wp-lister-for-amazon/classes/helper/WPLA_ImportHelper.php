@@ -474,7 +474,7 @@ class WPLA_ImportHelper {
                 $stock_updated = false;
 
                 /**
-                 * Apparently, this report includes non-FBA listings too so we have to check the
+                 * Apparently, this report includes non-FBA listings too, so we have to check the
                  * afn-listing-exists value before proceeding #35204
                  * https://sellercentral.amazon.de/gp/help/external/help.html?itemID=200740930&language=en_US
                  *

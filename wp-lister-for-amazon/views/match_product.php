@@ -1,5 +1,5 @@
 <?php
-require_once WPLA_PATH . '/includes/amazon/vendor/autoload.php';
+require_once WPLA_PATH . '/includes/amazon/vendor-prefixed/autoload.php';
 
     $wpl_default_matcher_selection = get_option( 'wpla_default_matcher_selection', 'title' );
     if ( ! $wpl_query_select ) $wpl_query_select = $wpl_default_matcher_selection;
@@ -83,10 +83,11 @@ require_once WPLA_PATH . '/includes/amazon/vendor/autoload.php';
             <input type="hidden" name="id"       value="<?php echo esc_attr( $_REQUEST['id'] ) ?>" />
             <input type="text"   name="query"    value="<?php echo esc_attr( $wpl_query ) ?>" id="wpla_matcher_query_input" />
             <select id="wpla_matcher_query_select" name="query_select" class="select">
-                <option value="title" data-value="<?php echo htmlspecialchars( WPLA_ProductWrapper::getProductTitle( $wpl_post_id ) ) ?>" <?php if ( $wpl_query_select == 'title' ): ?>selected="selected"<?php endif; ?> ><?php echo __( 'Title', 'wp-lister-for-amazon' ); ?></option>
-                <option value="sku"   data-value="<?php echo htmlspecialchars( wpla_get_product_meta( $wpl_post_id, 'sku' ) ) ?>" <?php if ( $wpl_query_select == 'sku'   ): ?>selected="selected"<?php endif; ?> ><?php echo __( 'SKU', 'wp-lister-for-amazon' );   ?></option>
+                <option value="title" data-value="<?php echo htmlspecialchars( WPLA_ProductWrapper::getProductTitle( $wpl_post_id ) ) ?>" <?php selected( 'title', $wpl_query_select ); ?> ><?php echo __( 'Title', 'wp-lister-for-amazon' ); ?></option>
+                <option value="sku"   data-value="<?php echo htmlspecialchars( wpla_get_product_meta( $wpl_post_id, 'sku' ) ) ?>" <?php selected( 'sku', $wpl_query_select ); ?> ><?php echo __( 'SKU', 'wp-lister-for-amazon' );   ?></option>
+                <option value="ean"   data-value="" <?php selected( 'ean', $wpl_query_select ); ?> ><?php echo __( 'EAN', 'wp-lister-for-amazon' );   ?></option>
                 <?php foreach ( apply_filters( 'wpla_product_matches_query_fields', $wpl_query_product_attributes ) as $attribute_label => $attribute_value) : ?>
-                    <option value="<?php echo $attribute_label ?>" data-value="<?php echo htmlspecialchars( $attribute_value ) ?>" <?php if ( $wpl_query_select == $attribute_label ): ?>selected="selected"<?php endif; ?> ><?php echo $attribute_label ?></option>
+                    <option value="<?php echo $attribute_label ?>" data-value="<?php echo htmlspecialchars( $attribute_value ) ?>" <?php selected( $attribute_label, $wpl_query_select ); ?> ><?php echo $attribute_label ?></option>
                 <?php endforeach; ?>
             </select>
             <input type="submit" name="submit" value="<?php echo 'Search' ?>"   onclick="WPLA.ProductMatcher.submitQuery();return false;" class="button" />

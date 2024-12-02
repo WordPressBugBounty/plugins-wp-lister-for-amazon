@@ -13,7 +13,7 @@ class WPLA_ProductsImporter {
 	public $request_count = 0;
 
 	/**
-     * @var \SellingPartnerApi\Model\CatalogItemsV20220401\Item[]
+     * @var \WPLab\Amazon\SellingPartnerApi\Model\CatalogItemsV20220401\Item[]
      */
 	private $items_cache = [];
 	private $imported_variations = [];
@@ -250,7 +250,7 @@ class WPLA_ProductsImporter {
 
     /**
      * Analyze the Catalog Item to determine its product type
-     * @param SellingPartnerApi\Model\CatalogItemsV20220401\Item $item
+     * @paramWPLab\Amazon\SellingPartnerApi\Model\CatalogItemsV20220401\Item $item
      * @return string One of simple,parent or variation
      */
     private function getProductTypeFromCatalogItem( $item ) {
@@ -517,38 +517,24 @@ class WPLA_ProductsImporter {
 		$lm = new WPLA_ListingsModel();
 		$listing = $lm->getItem( $listing['id'], OBJECT);
 
-		// fetch pricing info
-		//$api     = new WPLA_AmazonAPI( $account->id );
-		//$result  = $api->getCompetitivePricingForId( array( $listing->asin ) );
-		//if ( empty($result) || empty($result->products) || ! is_array($result->products) ) return;
-
         $api        = new WPLA_Amazon_SP_API( $account->id );
         $results    = $api->getCompetitivePricing( [ $listing->asin ] );
-
-
 
         if ( WPLA_Amazon_SP_API::isError( $results ) ) {
             WPLA()->logger->error( 'GetCompetitivePricing error: '. $results->ErrorMessage );
             return;
         }
 
-        // find lowest New price
-        $lowest_price = PHP_INT_MAX;
-        $product      = current( reset( $results ) ); // get first product
+		$lowest_price = $this->getLowestPrice( $results );
 
-        if ( $product && $product->getCondition() == 'New' ) {
-            $lowest_price = $product->getPrice()->getLandedPrice()->getAmount();
-        }
-
-        if ( $lowest_price == PHP_INT_MAX ) return;
-
-        // update listing
-        $lm->updateListing( $listing->id, array( 'price' => $lowest_price ) );
-
+		if ( $lowest_price !== false ) {
+			// update listing
+			$lm->updateListing( $listing->id, array( 'price' => $lowest_price ) );
+		}
 	} // updateListingWithLowestPrice()
 
     /**
-     * @param \SellingPartnerApi\Model\CatalogItemsV20220401\Item $result
+     * @param \WPLab\Amazon\SellingPartnerApi\Model\CatalogItemsV20220401\Item $result
      * @param array $listing
      * @param $account
      * @return array
@@ -597,14 +583,18 @@ class WPLA_ProductsImporter {
 
 	/**
 	 * count max of variation attributes in a given parent product node
-	 * @param \SellingPartnerApi\Model\CatalogItemsV20220401\Item $product_node
+	 * @param \WPLab\Amazon\SellingPartnerApi\Model\CatalogItemsV20220401\Item $product_node
      * @return int
 	 **/
-	static public function countVariationChildNodes( \SellingPartnerApi\Model\CatalogItemsV20220401\Item $product_node ) {
+	static public function countVariationChildNodes( \WPLab\Amazon\SellingPartnerApi\Model\CatalogItemsV20220401\Item $product_node ) {
 		WPLA()->logger->info( "countVariationChildNodes()" );
 
-		$relationships = $product_node->getRelationships()[0]->getRelationships()[0];
-		$attributes    = $relationships->getVariationTheme()->getAttributes();
+		$relationships  = $product_node->getRelationships()[0]->getRelationships()[0];
+		$attributes     = [];
+
+		if ( $relationships->getVariationTheme() !== null ) {
+			$attributes = $relationships->getVariationTheme()->getAttributes();
+		}
 
 		// count max number of attributes
 		$number_of_attributes = count( $attributes );
@@ -615,7 +605,7 @@ class WPLA_ProductsImporter {
 	} // countVariationChildNodes( )
 
     /**
-     * @param \SellingPartnerApi\Model\CatalogItemsV20220401\Item $product_node
+     * @param \WPLab\Amazon\SellingPartnerApi\Model\CatalogItemsV20220401\Item $product_node
      * @param array $parent_listing
      * @param object $account
      * @return mixed
@@ -817,7 +807,7 @@ class WPLA_ProductsImporter {
 
     /**
      * @param object $var Variation data
-     * @param \SellingPartnerApi\Model\CatalogItemsV20220401\Item $product_node
+     * @param \WPLab\Amazon\SellingPartnerApi\Model\CatalogItemsV20220401\Item $product_node
      * @param object $parent_listing
      * @param object $account
      * @return int
@@ -858,8 +848,28 @@ class WPLA_ProductsImporter {
 		return $variation_listing_id;
 	} // insertVariationListing()
 
+	/**
+	 * Get the lowest price from a WPLA_Amazon_SP_API::getCompetitivePricing() response
+	 * @param ProductPricing\CompetitivePriceType[] $prices
+	 * @return float|bool
+	 */
+	private function getLowestPrice( $prices ) {
+		$lowest_price = PHP_INT_MAX;
+		$product = false;
 
+		if (is_array($prices) && !empty($prices)) {
+			$product = current(reset($prices));
+		}
 
+		if ( $product && $product->getCondition() == 'New' ) {
+			$lowest_price = $product->getPrice()->getLandedPrice()->getAmount();
+		}
 
+		if ( $lowest_price == PHP_INT_MAX ) {
+			return false;
+		}
+
+		return $lowest_price;
+	}
 
 } // class WPLA_ProductsImporter
