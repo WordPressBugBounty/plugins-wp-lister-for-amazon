@@ -324,7 +324,8 @@ class WPLA_StockLogTable extends WP_List_Table {
                                     ( product_id = '$query' ) OR
                                     ( caller LIKE '%$query%' ) OR
                                     ( method LIKE '%$query%' ) OR
-                                    ( pm.meta_key = '_amazon_product_id' AND pm.meta_value LIKE '$query%' ) 
+                                    ( pm.meta_key = '_amazon_product_id' AND pm.meta_value LIKE '$query%' ) OR 
+                                    ( pm.meta_key = '_wpla_asin' AND pm.meta_value LIKE '$query%' ) 
                                 )
                             ";
         }

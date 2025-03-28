@@ -508,7 +508,11 @@ class WPLA_AmazonReport {
 		$api = new WPLA_Amazon_SP_API( $this->account_id );
 		$this->data = $api->getReportDocumentBody( $this->GeneratedReportId );
 
-		$wpdb->update( $table, array('line_count' => substr_count( $this->data, "\n" ) ), array('id' => $this->id ) );
+		$count = 0;
+		if ( is_string( $this->data ) ) {
+			$count = substr_count( $this->data, "\n" );
+		}
+		$wpdb->update( $table, array('line_count' => $count ), array('id' => $this->id ) );
 		$wpdb->update( $table, array('data' => $this->data), array('id' => $this->id ) );
 		if ( $wpdb->last_error ) {
 			wpla_show_message( '<b>There was a problem storing the report content in the database.</b><br>MySQL said: ' . $wpdb->last_error, 'error' );

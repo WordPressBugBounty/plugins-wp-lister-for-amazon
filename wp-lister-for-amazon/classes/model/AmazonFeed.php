@@ -19,6 +19,9 @@ class WPLA_AmazonFeed {
 	var $results            = null;
 	var $types              = array();
 
+	var $errors;
+	var $warnings;
+
 	public $line_count;
 	public $FeedType;
 	public $FeedProcessingStatus;
@@ -628,7 +631,13 @@ class WPLA_AmazonFeed {
 		$result = $api->getFeedDocument( $this->FeedDocumentId );
 
 		if ( !WPLA_Amazon_SP_API::isError( $result ) ) {
-			$this->results = utf8_encode( $result ); // required for amazon.fr
+			if ( function_exists( 'mb_convert_encoding' ) ) {
+				// Using mb_convert_encoding
+				$result = mb_convert_encoding( $result, 'UTF-8', 'ISO-8859-1' );
+				//$this->results = utf8_encode( $result ); // required for amazon.fr
+			}
+
+			$this->results = $result;
 			$this->update();
 		}
 
@@ -680,7 +689,7 @@ class WPLA_AmazonFeed {
 	} // processSubmissionResult()
 
 	public function processListingDataResults( $feed_rows, $result_rows ) {
-
+		global $wpdb;
 		$lm = new WPLA_ListingsModel();
 
 		// index results by SKU
@@ -736,8 +745,9 @@ class WPLA_AmazonFeed {
 				$listing_data['history'] = '';
 				$result = $lm->updateWhere( array( 'sku' => $row_sku, 'account_id' => $this->account_id ), $listing_data );
 
-				if ( !$result ) {
+				if ( $result === false ) {
 					WPLA()->logger->error( 'Error while updating listing. Retrying after 1s.');
+					WPLA()->logger->error( $wpdb->last_error );
 					sleep(1);
 					$lm->updateWhere( array( 'sku' => $row_sku, 'account_id' => $this->account_id ), $listing_data );
 				}
@@ -948,6 +958,7 @@ class WPLA_AmazonFeed {
 				WPLA()->logger->info('changed status to Shipped: '.$row_order_id);
 				if ( $wc_order ) {
 				    $wc_order->update_meta_data( '_wpla_submission_result', 'success' );
+					$wc_order->save();
                 }
 				continue;
 
@@ -985,6 +996,7 @@ class WPLA_AmazonFeed {
 				// $om->updateWhere( array( 'order_id' => $row_order_id, 'account_id' => $this->account_id ), $order_data );				
 				if ( $wc_order ) {
 				    $wc_order->update_meta_data( '_wpla_submission_result', serialize( array( 'errors' => $errors, 'warnings' => $warnings ) ) );
+					$wc_order->save();
                 }
 
 				WPLA()->logger->info('changed status to FAILED: '.$row_order_id);
@@ -998,6 +1010,7 @@ class WPLA_AmazonFeed {
 				// $om->updateWhere( array( 'order_id' => $row_order_id, 'account_id' => $this->account_id ), $order_data );				
 				if ( $wc_order ) {
 				    $wc_order->update_meta_data( '_wpla_submission_result', serialize( array( 'errors' => $errors, 'warnings' => $warnings ) ) );
+					$wc_order->save();
                 }
 
 				WPLA()->logger->info('changed status to Shipped: '.$row_order_id);
@@ -1013,16 +1026,13 @@ class WPLA_AmazonFeed {
                 WPLA()->logger->info('changed status to Shipped: '.$row_order_id);
                 if ( $wc_order ) {
                     $wc_order->update_meta_data( '_wpla_submission_result', 'success' );
+	                $wc_order->save();
                 }
                 continue;
 
             }
 
 		} // foreach row
-
-        if ( $wc_order ) {
-            $wc_order->save();
-        }
 
 	} // processOrderFulfillmentResults()
 

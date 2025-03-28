@@ -3,7 +3,7 @@
  * provide the admin user interface to edit the _msrp_price post meta field
  */
 
-if ( ! class_exists( 'woocommerce_msrp_admin' ) && ! class_exists( 'WPL_MSRP_Addon' ) && ! class_exists( 'WPLE_MSRP_Addon' ) ) {
+if ( ! defined( 'WOOCOMMERCE_MSRP_VERSION' ) && ! class_exists( 'WPL_MSRP_Addon' ) && ! class_exists( 'WPLE_MSRP_Addon' ) ) {
 	class WPLA_MSRP_Addon {
 
 		/**

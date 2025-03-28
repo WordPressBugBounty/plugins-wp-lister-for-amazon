@@ -1156,7 +1156,7 @@ class WPLA_ProductBuilder {
 		$image_attachment_ids = array();
 		$attachment_id = $this->addProductImage( $post_id, $data['image'], $data['name'], $data['asin'] );
 		if ( $attachment_id ) $image_attachment_ids[] = $attachment_id;
-		if ( count($data['images']) ) {
+		if ( is_array( $data['images'] ) && count($data['images']) ) {
 		    $i = 0;
 		    foreach ( $data['images'] as $data_image ) {
 		        $i++;

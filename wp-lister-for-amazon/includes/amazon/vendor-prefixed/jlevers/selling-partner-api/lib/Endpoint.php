@@ -86,6 +86,8 @@ class Endpoint
             'A1F83G8C2ARO7P' => 'EU',
             // India.
             'A21TJRUUN4KGV' => 'EU',
+	        // Ireland.
+	        'A28R8C7NBKEWEA' => 'EU',
             // Italy.
             'APJ6JRA9NG5V4' => 'EU',
             // Netherlands.

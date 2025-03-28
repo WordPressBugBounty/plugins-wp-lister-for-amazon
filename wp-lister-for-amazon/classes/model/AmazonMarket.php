@@ -79,7 +79,7 @@ class WPLA_AmazonMarket {
 		$items = $wpdb->get_results("
 			SELECT *
 			FROM $table
-			ORDER BY sort_order ASC
+			ORDER BY sort_order ASC, title ASC
 		", OBJECT_K);
 
 		return $items;

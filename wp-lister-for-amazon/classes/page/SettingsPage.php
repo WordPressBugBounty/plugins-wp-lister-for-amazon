@@ -434,6 +434,7 @@ class WPLA_SettingsPage extends WPLA_Page {
 		self::updateOption( 'orders_sales_tax_action', 			$this->getValueFromPost( 'orders_sales_tax_action' ) );
 		self::updateOption( 'orders_sales_tax_rate_id', 			$this->getValueFromPost( 'orders_sales_tax_rate_id' ) );
 		self::updateOption( 'orders_force_prices_include_tax', 	$this->getValueFromPost( 'orders_force_prices_include_tax' ) );
+		self::updateOption( 'orders_force_deduct_shipping_tax', 	$this->getValueFromPost( 'orders_force_deduct_shipping_tax' ) );
 		self::updateOption( 'orders_default_payment_title', 	    $this->getValueFromPost( 'orders_default_payment_title' ) );
 		self::updateOption( 'orders_default_payment_method',	    $this->getValueFromPost( 'orders_default_payment_method' ) );
 		self::updateOption( 'orders_record_gift_wrap_items',	    $this->getValueFromPost( 'orders_record_gift_wrap_items' ) );

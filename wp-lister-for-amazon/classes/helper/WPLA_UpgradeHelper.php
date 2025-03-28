@@ -1296,6 +1296,29 @@ class WPLA_UpgradeHelper {
 			$wpdb->query($sql);
 		}
 
+		if ( 67 > $db_version ) {
+			$new_db_version = 67;
+
+			// add row to amazon_markets
+			$sql = "ALTER TABLE `{$wpdb->prefix}amazon_feeds`
+					CHANGE `results` `results` longtext NULL AFTER `FeedProcessingStatus`;
+			";
+			$wpdb->query($sql);
+		}
+
+		if ( 68 > $db_version ) {
+			$new_db_version = 68;
+
+			// add row to amazon_markets
+			$sql = "INSERT INTO `{$wpdb->prefix}amazon_markets` 
+				(`developer_id`, `title`, `code`, `url`, `marketplace_id`, `enabled`, `sort_order`, `group_title`)
+				VALUES
+				('','Ireland (Beta)','IE','amazon.ie', 'A28R8C7NBKEWEA',1,21,'Europe');
+			";
+			$wpdb->query($sql);
+
+			$wpdb->query("UPDATE {$wpdb->prefix}amazon_markets SET sort_order = 100 WHERE sort_order > 4" );
+		}
 
 		if ( $new_db_version > $db_version ) {
 			update_option('wpla_db_version', $new_db_version);
@@ -1358,7 +1381,7 @@ class WPLA_UpgradeHelper {
 				$charset = strtolower( $charset );
 				if ( 'utf8' !== $charset && 'utf8mb4' !== $charset && 'latin1' !== $charset && 'latin2' !== $charset ) {
 					// Don't upgrade tables that have non-utf8 and non-latin1 columns.
-					wpla_show_message("skipped column $column in table $table with charset: $charset",'error');
+					wpla_show_message("skipped column {$column->Field} in table $table with charset: $charset",'error');
 					return false;
 				}
 			}

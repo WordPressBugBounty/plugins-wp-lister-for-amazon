@@ -6,7 +6,7 @@ class WPLA_ReportProcessor {
     // process  FBA Amazon Fulfilled Shipments Report
     // - not called via ajax right now
     public static function processAmazonShipmentsReportPage( $report, $rows, $job, $task ) {
-        WPLA()->logger->debug('processAmazonShipmentsReportPage #'. $report->id);
+        WPLA()->logger->info('processAmazonShipmentsReportPage #'. $report->id);
         $wc_orders_processed = 0;
 
         // process rows
@@ -18,11 +18,11 @@ class WPLA_ReportProcessor {
             $is_mcf_order           = true;
             // if ( empty( $order_id ) ) continue;
             // if ( empty( $order_item_id ) ) continue;
-            WPLA()->logger->debug( 'order_id: '. $order_id );
+            WPLA()->logger->info( 'order_id: '. $order_id );
 
             // no merchant-order-id means this order was placed on Amazon - find WooCommerce order by reference
             if ( empty( $order_id ) ) {
-                WPLA()->logger->debug( 'order_id is empty. Attempting to load from the amazon-order-id');
+                WPLA()->logger->info( 'order_id is empty. Attempting to load from the amazon-order-id');
 
                 $amazon_order_id = $row['amazon-order-id'];
                 $is_mcf_order    = false;
@@ -30,10 +30,10 @@ class WPLA_ReportProcessor {
                 $om    = new WPLA_OrdersModel();
                 $order = $om->getOrderByOrderID( $amazon_order_id );
                 if ( $order ) $order_id = $order->post_id;
-                WPLA()->logger->debug( 'order_id from amazon order: '. $order_id );
+                WPLA()->logger->info( 'order_id from amazon order: '. $order_id );
             };
             if ( empty( $order_id ) ) {
-                WPLA()->logger->debug( 'order_id still empty. skipping');
+                WPLA()->logger->info( 'order_id still empty. skipping');
                 continue;
             }
 
@@ -50,7 +50,7 @@ class WPLA_ReportProcessor {
             }
 
             if ( ! $_order ) {
-                WPLA()->logger->debug( 'could not find order. skipping');
+                WPLA()->logger->info( 'could not find order. skipping');
                 continue;
             }
 
@@ -78,9 +78,23 @@ class WPLA_ReportProcessor {
             $_order->update_meta_data( '_custom_tracking_provider',        $carrier );
             $_order->update_meta_data( '_tracking_provider',               '' ); // known providers - would require mapping ('usps' <=> 'USPS')
 
+            $meta = array(
+		        array(
+			        'tracking_id'   => '',
+			        'custom_tracking_provider' => '',
+			        'tracking_provider' => $carrier,
+			        'tracking_number'   => $tracking_number,
+			        'tracking_product_code' => '',
+			        'date_shipped' => strtotime( $shipment_date )
+		        )
+	        );
+	        $_order->update_meta_data( '_wc_shipment_tracking_items', $meta );
+
+
+
             $wc_orders_processed++;
 
-            WPLA()->logger->debug( 'added tracking data to order #'. $order_id );
+            WPLA()->logger->info( 'added tracking data to order #'. $order_id );
 
             // skip further processing for non-MCF orders - no need to to update orders placed on Amazon
             if ( ! $is_mcf_order ) {
@@ -127,7 +141,7 @@ class WPLA_ReportProcessor {
 
         $header  = null;
         $data    = array();
-        $csvData = str_getcsv( $input, "\n", '' );
+        $csvData = str_getcsv( $input, "\n", '"' );
         // $line = 0;
 
         // echo "<pre>";print_r($csvData);echo"</pre>";die();

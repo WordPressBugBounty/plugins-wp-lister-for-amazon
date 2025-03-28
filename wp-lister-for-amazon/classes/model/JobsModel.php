@@ -4,6 +4,7 @@ class WPLA_JobsModel extends WPLA_Model {
 
 	public $key = '';
 	public $item = '';
+	public $tablename;
 
 	function __construct( $job = null )	{
 

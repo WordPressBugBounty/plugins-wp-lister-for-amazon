@@ -33,7 +33,11 @@ class WPLA_RepricingHelper {
 
             // make sure there is a max_price but no lowest price
             if ( ! $item->post_id    ) continue;
-            if ( ! $item->min_price  ) continue;
+
+	        WPLA()->logger->info( 'resetProductsToMaxPrice # '. $item->post_id );
+	        WPLA()->logger->info( 'lowest_price: '. $item->lowest_price );
+
+	        if ( ! $item->min_price  ) continue;
             if ( ! $item->max_price  ) continue;
             //if ( $item->lowest_price ) continue; // This is preventing the prices to be set to the max price - need to watch this #58265
             // re-enabling this check as WPLA uses this to determine if a listing has buybox and/or competitors #59261
@@ -41,6 +45,7 @@ class WPLA_RepricingHelper {
 
             // target price is max price
             $target_price = $item->max_price;
+	        WPLA()->logger->info( 'Target price reset to max price: '. $item->max_price );
             if ( $verbose ) wpla_show_message( $item->sku.': No BuyBox price, no competitor - falling back to Max Price: '.$target_price );
 
             // update price

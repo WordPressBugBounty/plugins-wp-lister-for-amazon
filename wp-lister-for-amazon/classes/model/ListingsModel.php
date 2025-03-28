@@ -1224,9 +1224,9 @@ class WPLA_ListingsModel extends WPLA_Model {
 		$data['fba_fcid'] 			= $fba_fcid;
 		// $data['listing_title'] 	= utf8_encode( $csv['item-name'] );
 		$data['listing_title'] 		= self::convertToUTF8( $csv['item-name'] );
-		$data['description']		= isset($csv['item-description']) ? utf8_encode( $csv['item-description'] ) : '';
+		$data['description']		= $csv['item-description'] ?? '';
 		$data['date_published']		= gmdate('Y-m-d H:i:s', strtotime( $open_date ) );
-		$data['source']             = isset($csv['source']) ? $csv['source'] : 'imported';
+		$data['source']             = $csv['source'] ?? 'imported';
 
 		// store report_row for later reference - and convert all text columns to UTF8
 		$csv['item-name'] 			= self::convertToUTF8(  $csv['item-name'] );
@@ -1238,7 +1238,6 @@ class WPLA_ListingsModel extends WPLA_Model {
 	} // mapMerchantReportItemCSVToDB()
 
 	static function convertToUTF8( $string ) {
-
         if ( !seems_utf8( $string ) && function_exists( 'mb_convert_encoding' ) ) {
             // Reverted this change as it was causing character encoding issues with Umlauts #55411
             $string = mb_convert_encoding( $string, 'UTF-8', 'ISO-8859-1' );
@@ -1248,7 +1247,8 @@ class WPLA_ListingsModel extends WPLA_Model {
             return $string;
         }
 
-        return self::detectUTF8( $string ) ? $string : utf8_encode( $string );
+        //return self::detectUTF8( $string ) ? $string : utf8_encode( $string );
+		return $string;
 	}
 
 	static function detectUTF8( $string ) {
