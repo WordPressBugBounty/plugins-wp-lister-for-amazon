@@ -54,6 +54,13 @@ Yes, there are. Please check out our growing knowledgebase at <https://www.wplab
 
 == Changelog ==
 
+= 2.7.6 - 2025-04-01 =
+Fix: Added the Marketplace ID for IE
+Fix: Replaced the deprecated utf8_decode() function
+Fix: Error when running the UTF8 table conversion tool
+Fix: Calling wc_update_product_stock() twice using the same stock quantity
+Fix: Check for errors from the WPLA_Amazon_SP_API::getReport() call
+
 = 2.7.5.1 - 2025-03-21 =
 Hotfix: Fatal error when creating the WC Order due to the Aelia Currency Switcher integration
 

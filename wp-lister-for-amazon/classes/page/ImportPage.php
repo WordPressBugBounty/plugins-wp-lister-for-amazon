@@ -262,18 +262,25 @@ class WPLA_ImportPage extends WPLA_Page {
 			$report_id = $api->createReport( $report_type );
 
             if ( isset( $report_id->ErrorMessage ) ) {
-                $this->showMessage( sprintf( __( 'There was a problem requesting the report for account %s.', 'wp-lister-for-amazon' ), $account->title ) .'<br>Error: '. $reports->Error->Message, 1 );
+                $this->showMessage( sprintf( __( 'There was a problem requesting the report for account %s.', 'wp-lister-for-amazon' ), $account->title ) .'<br>Error: '. $report_id->ErrorMessage , 1 );
                 continue;
             }
 
 			if ( $report_id )  {
                 $report = $api->getReport( $report_id );
-				// process the result
-                WPLA_AmazonReport::processReport( $report, $account );
-				// $this->processReportsRequestList( $reports, $account );
-				//WPLA_AmazonReport::processReportsRequestList( $reports, $account );
 
-				$this->showMessage( sprintf( __( 'Report requested for account %s.', 'wp-lister-for-amazon' ), $account->title ) );
+				if ( !empty( $report->errors ) && isset( $report->errors[0]->message ) ) {
+					$this->showMessage( sprintf( __( 'There was a problem requesting the report for account %s.', 'wp-lister-for-amazon' ), $account->title ) .'<br>Error: '. $report->errors[0]->message, 1 );
+				} elseif ( isset( $report->ErrorMessage ) ) {
+					$this->showMessage( sprintf( __( 'There was a problem requesting the report for account %s.', 'wp-lister-for-amazon' ), $account->title ) .'<br>Error: '. $report->ErrorMessage, 1 );
+				} else {
+					// process the result
+					WPLA_AmazonReport::processReport( $report, $account );
+					// $this->processReportsRequestList( $reports, $account );
+					//WPLA_AmazonReport::processReportsRequestList( $reports, $account );
+
+					$this->showMessage( sprintf( __( 'Report requested for account %s.', 'wp-lister-for-amazon' ), $account->title ) );
+				}
 
 			} else {
 				$this->showMessage( sprintf( __( 'There was a problem requesting the report for account %s.', 'wp-lister-for-amazon' ), $account->title ), 1 );

@@ -437,7 +437,9 @@ class WPLA_CronActions {
 			foreach ( $ReportRequestIds as $report_id ) {
 			    $report = $api->getReport( $report_id );
 
-                if ( isset( $report->ErrorMessage ) ) {
+				if ( !empty( $report->errors ) && isset( $report->errors[0]->message ) ) {
+					$this->showMessage( sprintf( __( 'There was a problem requesting the report for account %s.', 'wp-lister-for-amazon' ), $account->title ) .'<br>Error: '. $report->errors[0]->message, 1 );
+				} elseif ( isset( $report->ErrorMessage ) ) {
                     $msg = sprintf( __( 'There was a problem fetching report #%s for account %s.', 'wp-lister-for-amazon' ), $report_id, $account->title ) .' - Error: '. $report->ErrorMessage;
                     WPLA()->logger->error( $msg );
 
@@ -631,8 +633,15 @@ class WPLA_CronActions {
                 WPLA()->logger->error( sprintf( __( 'There was a problem requesting the report for account %s.', 'wp-lister-for-amazon' ), $account->title ) .'<br>Error: '. $report_id->ErrorMessage );
             } else {
                 $report = $api->getReport( $report_id );
-                WPLA_AmazonReport::processReport( $report, $account, true );
-                WPLA()->logger->info( sprintf( __( 'Report requested for account %s.', 'wp-lister-for-amazon' ), $account->title ) );
+
+	            if ( !empty( $report->errors ) && isset( $report->errors[0]->message ) ) {
+		            $this->showMessage( sprintf( __( 'There was a problem requesting the report for account %s.', 'wp-lister-for-amazon' ), $account->title ) .'<br>Error: '. $report->errors[0]->message, 1 );
+	            } elseif ( isset( $report->ErrorMessage ) ) {
+		            $this->showMessage( sprintf( __( 'There was a problem requesting the report for account %s.', 'wp-lister-for-amazon' ), $account->title ) .'<br>Error: '. $report->ErrorMessage, 1 );
+	            } else {
+		            WPLA_AmazonReport::processReport( $report, $account, true );
+		            WPLA()->logger->info( sprintf( __( 'Report requested for account %s.', 'wp-lister-for-amazon' ), $account->title ) );
+	            }
             }
 
 		} // foreach account
@@ -656,8 +665,16 @@ class WPLA_CronActions {
                 WPLA()->logger->error( sprintf( __( 'There was a problem requesting the report for account %s.', 'wp-lister-for-amazon' ), $account->title ) .'<br>Error: '. $report_id->ErrorMessage );
             } else {
                 $report = $api->getReport( $report_id );
-                WPLA_AmazonReport::processReport( $report, $account, true );
-                WPLA()->logger->info( sprintf( __( 'Report requested for account %s.', 'wp-lister-for-amazon' ), $account->title ) );
+
+	            if ( !empty( $report->errors ) && isset( $report->errors[0]->message ) ) {
+		            $this->showMessage( sprintf( __( 'There was a problem requesting the report for account %s.', 'wp-lister-for-amazon' ), $account->title ) .'<br>Error: '. $report->errors[0]->message, 1 );
+	            } elseif ( isset( $report->ErrorMessage ) ) {
+		            $this->showMessage( sprintf( __( 'There was a problem requesting the report for account %s.', 'wp-lister-for-amazon' ), $account->title ) .'<br>Error: '. $report->ErrorMessage, 1 );
+	            } else {
+		            WPLA_AmazonReport::processReport( $report, $account, true );
+		            WPLA()->logger->info( sprintf( __( 'Report requested for account %s.', 'wp-lister-for-amazon' ), $account->title ) );
+	            }
+
             }
 
 		} // foreach account
@@ -681,8 +698,16 @@ class WPLA_CronActions {
                 WPLA()->logger->error( sprintf( __( 'There was a problem requesting the report for account %s.', 'wp-lister-for-amazon' ), $account->title ) .'<br>Error: '. $report_id->ErrorMessage );
             } else {
                 $report = $api->getReport( $report_id );
-                WPLA_AmazonReport::processReport( $report, $account, true );
-                WPLA()->logger->info( sprintf( __( 'Report requested for account %s.', 'wp-lister-for-amazon' ), $account->title ) );
+
+	            if ( !empty( $report->errors ) && isset( $report->errors[0]->message ) ) {
+		            $this->showMessage( sprintf( __( 'There was a problem requesting the report for account %s.', 'wp-lister-for-amazon' ), $account->title ) .'<br>Error: '. $report->errors[0]->message, 1 );
+	            } elseif ( isset( $report->ErrorMessage ) ) {
+		            $this->showMessage( sprintf( __( 'There was a problem requesting the report for account %s.', 'wp-lister-for-amazon' ), $account->title ) .'<br>Error: '. $report->ErrorMessage, 1 );
+	            } else {
+		            WPLA_AmazonReport::processReport( $report, $account, true );
+		            WPLA()->logger->info( sprintf( __( 'Report requested for account %s.', 'wp-lister-for-amazon' ), $account->title ) );
+	            }
+
             }
 
 		} // foreach account
@@ -705,8 +730,16 @@ class WPLA_CronActions {
                 WPLA()->logger->error( sprintf( __( 'There was a problem requesting the report for account %s.', 'wp-lister-for-amazon' ), $account->title ) .'<br>Error: '. $report_id->ErrorMessage );
             } else {
                 $report = $api->getReport( $report_id );
-                WPLA_AmazonReport::processOrderReportData( $report, $account, true );
-                WPLA()->logger->info( sprintf( __( 'Report requested for account %s.', 'wp-lister-for-amazon' ), $account->title ) );
+
+	            if ( !empty( $report->errors ) && isset( $report->errors[0]->message ) ) {
+		            $this->showMessage( sprintf( __( 'There was a problem requesting the report for account %s.', 'wp-lister-for-amazon' ), $account->title ) .'<br>Error: '. $report->errors[0]->message, 1 );
+	            } elseif ( isset( $report->ErrorMessage ) ) {
+		            $this->showMessage( sprintf( __( 'There was a problem requesting the report for account %s.', 'wp-lister-for-amazon' ), $account->title ) .'<br>Error: '. $report->ErrorMessage, 1 );
+	            } else {
+		            WPLA_AmazonReport::processOrderReportData( $report, $account, true );
+		            WPLA()->logger->info( sprintf( __( 'Report requested for account %s.', 'wp-lister-for-amazon' ), $account->title ) );
+	            }
+
             }
 
         } // foreach account

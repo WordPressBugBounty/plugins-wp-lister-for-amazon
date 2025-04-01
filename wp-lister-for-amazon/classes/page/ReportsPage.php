@@ -147,9 +147,16 @@ class WPLA_ReportsPage extends WPLA_Page {
                     $this->showMessage( sprintf( __( 'There was a problem requesting the report for account %s.', 'wp-lister-for-amazon' ), $account->title ) .'<br>Error: '. $report_id->ErrorMessage, 1 );
                 } else {
                     $report = $api->getReport( $report_id );
-                    WPLA_AmazonReport::processReport( $report, $account, true );
 
-                    $this->showMessage( sprintf( __( 'Report requested for account %s.', 'wp-lister-for-amazon' ), $account->title ) );
+	                if ( !empty( $report->errors ) && isset( $report->errors[0]->message ) ) {
+		                $this->showMessage( sprintf( __( 'There was a problem requesting the report for account %s.', 'wp-lister-for-amazon' ), $account->title ) .'<br>Error: '. $report->errors[0]->message, 1 );
+	                } elseif ( isset( $report->ErrorMessage ) ) {
+		                $this->showMessage( sprintf( __( 'There was a problem requesting the report for account %s.', 'wp-lister-for-amazon' ), $account->title ) .'<br>Error: '. $report->ErrorMessage, 1 );
+	                } else {
+		                WPLA_AmazonReport::processReport( $report, $account, true );
+
+		                $this->showMessage( sprintf( __( 'Report requested for account %s.', 'wp-lister-for-amazon' ), $account->title ) );
+	                }
                 }
 
 			}
@@ -190,16 +197,17 @@ class WPLA_ReportsPage extends WPLA_Page {
             $account = new WPLA_AmazonAccount( $report->account_id );
             $response = $api->getReport( $report->ReportRequestId );
 
+	        if ( !empty( $response->errors ) && isset( $response->errors[0]->message ) ) {
+		        $this->showMessage( sprintf( __( 'There was a problem requesting the report for account %s.', 'wp-lister-for-amazon' ), $account->title ) .'<br>Error: '. $response->errors[0]->message, 1 );
+	        } elseif ( isset( $response->ErrorMessage ) ) {
+		        $this->showMessage( sprintf( __( 'There was a problem requesting the report for account %s.', 'wp-lister-for-amazon' ), $account->title ) .'<br>Error: '. $response->ErrorMessage, 1 );
+	        } else {
+		        WPLA_AmazonReport::processOrderReportData( $response, $account, false, false );
 
-            if ( isset( $response->ErrorMessage ) ) {
-                $this->showMessage( sprintf( __( 'There was a problem requesting the report for account %s.', 'wp-lister-for-amazon' ), $account->title ) .'<br>Error: '. $response->ErrorMessage, 1 );
-            } else {
-                WPLA_AmazonReport::processOrderReportData( $response, $account, false, false );
-
-                // Get a new instance again to pull the new values stored by WPLA_AmazonReport::processReport()
-                $report = new WPLA_AmazonReport( $report_id );
-                $report->loadFromAmazon();
-            }
+		        // Get a new instance again to pull the new values stored by WPLA_AmazonReport::processReport()
+		        $report = new WPLA_AmazonReport( $report_id );
+		        $report->loadFromAmazon();
+	        }
 
             // $api = new WPLA_AmazonAPI( $report->account_id );
             // $api->getReport( $report->GeneratedReportId );
@@ -276,7 +284,9 @@ class WPLA_ReportsPage extends WPLA_Page {
             $response = $api->getReport( $report->ReportRequestId );
             //$response = $api->getReport( 'ID323' );
 
-            if ( isset( $response->ErrorMessage ) ) {
+			if ( !empty( $response->errors ) && isset( $response->errors[0]->message ) ) {
+				$this->showMessage( sprintf( __( 'There was a problem requesting the report for account %s.', 'wp-lister-for-amazon' ), $account->title ) .'<br>Error: '. $response->errors[0]->message, 1 );
+			} elseif ( isset( $response->ErrorMessage ) ) {
                 $this->showMessage( sprintf( __( 'There was a problem requesting the report for account %s.', 'wp-lister-for-amazon' ), $account->title ) .'<br>Error: '. $response->ErrorMessage, 1 );
             } else {
                 WPLA_AmazonReport::processReport( $response, $account, false, false );
