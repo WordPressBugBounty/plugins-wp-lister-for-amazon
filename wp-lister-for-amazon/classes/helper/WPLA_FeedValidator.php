@@ -6,7 +6,7 @@ class WPLA_FeedValidator {
 	static function checkPreparedProducts( $return_array = false ) {
 
 		// check all prepared products
-		$problems = self::checkAllProductsWithStatus( 'prepared' );
+		$problems = self::checkAllProductsWithStatus( WPLA_ListingsModel::STATUS_PREPARED );
 
 		if ( $return_array )
 			return $problems;

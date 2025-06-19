@@ -1,4 +1,7 @@
 <?php
+
+use WPLab\Amazon\Models\AmazonProductTypesModel;
+
 require_once WPLA_PATH . '/includes/amazon/vendor-prefixed/autoload.php';
 
 class WPLA_AjaxHandler extends WPLA_Core {
@@ -12,6 +15,19 @@ class WPLA_AjaxHandler extends WPLA_Core {
 
 		// called from category tree
 		add_action('wp_ajax_wpla_get_amazon_categories_tree',  		array( &$this, 'ajax_get_amazon_categories_tree' ) );
+
+		// get product type attributes
+		add_action('wp_ajax_wpla_load_product_types',                   array( $this, 'ajax_load_product_types' ) );
+		add_action('wp_ajax_wpla_load_marketplace_product_types',       array( $this, 'ajax_load_marketplace_product_types' ) );
+		add_action('wp_ajax_wpla_search_product_types',                 array( $this, 'ajax_search_product_types' ) );
+		add_action('wp_ajax_wpla_install_product_type',                 array( $this, 'ajax_install_product_type' ) );
+		add_action('wp_ajax_wpla_remove_product_type',                  array( $this, 'ajax_remove_product_type' ) );
+		add_action('wp_ajax_wpla_get_marketplaces_html',                array( $this, 'ajax_get_marketplaces_for_account' ) );
+		add_action('wp_ajax_wpla_get_product_type_attributes',          array( $this, 'ajax_get_product_type_attributes' ) );
+		add_action('wp_ajax_wpla_get_product_type_attributes_html',     array( $this, 'ajax_get_product_type_attributes_html' ) );
+		add_action('wp_ajax_wpla_convert_product_feed_template',        array( $this, 'ajax_wpla_convert_product_feed_template' ) );
+		add_action('wp_ajax_wpla_product_type_metabox_html',            array( $this, 'ajax_wpla_product_type_metabox_html' ) );
+
 
 		// logfile viewer
 		add_action('wp_ajax_wpla_tail_log', 						array( &$this, 'ajax_wpla_tail_log' ) );
@@ -582,9 +598,9 @@ class WPLA_AjaxHandler extends WPLA_Core {
 					$api = new WPLA_Amazon_SP_API( $account->id );
 
 					if ( $query_type == 'sku' || $query_type == 'ean' ) {
-					    $result = $api->searchCatalogItems( [], [$query], ['SKU','EAN'], $account->merchant_id );
+					    $result = $api->searchCatalogItems( '', $query, 'SKU,EAN', $account->merchant_id );
                     } else {
-                        $result = $api->searchCatalogItems( [$query] );
+                        $result = $api->searchCatalogItems( $query );
                     }
 
 					if ( !WPLA_Amazon_SP_API::isError( $result ) ) {
@@ -638,6 +654,7 @@ class WPLA_AjaxHandler extends WPLA_Core {
 
 	// fetch lowest prices for product matches
 	public function populateMatchesWithLowestPrices( $products, $account ) {
+		if ( ! current_user_can('manage_amazon_listings') ) return $products;
 
 		// build array of ASINs
 		$listing_ASINs = array();
@@ -846,7 +863,10 @@ class WPLA_AjaxHandler extends WPLA_Core {
 
 	// load browse tree data
 	public function ajax_get_amazon_categories_tree() {
-		if ( ! current_user_can('manage_amazon_listings') ) return;
+		if ( ! current_user_can('manage_amazon_listings') ) {
+			http_response_code(400);
+			return;
+		}
 
 		$path           = wpla_clean($_POST['dir']);	// example: /0/20081/37903/ - /0/ means root
 		$parent_node_id = basename( $path );
@@ -901,6 +921,308 @@ class WPLA_AjaxHandler extends WPLA_Core {
 			echo "</ul>";
 		}
 		exit();
+	}
+
+	public function ajax_load_product_types() {
+		if ( ! current_user_can('manage_amazon_listings') ) {
+			http_response_code(401);
+			exit;
+		}
+
+		$account_id = intval( $_REQUEST['account'] );
+		$product_types = AmazonProductTypesModel::getTypesGroupedByMarketplace( $account_id );
+
+		echo json_encode( $product_types );
+		exit;
+	}
+
+	public function ajax_load_marketplace_product_types() {
+		if ( ! current_user_can('manage_amazon_listings') ) {
+			http_response_code(401);
+			exit;
+		}
+
+		$marketplace = wpla_clean( $_REQUEST['marketplace'] );
+		$product_types = AmazonProductTypesModel::getByMarketplace( $marketplace );
+
+		echo json_encode( $product_types );
+		exit;
+	}
+
+	public function ajax_search_product_types() {
+		if ( ! current_user_can('manage_amazon_listings') ) {
+			http_response_code(401);
+			exit;
+		}
+
+		$marketplace = $_GET['marketplace'];
+		$keywords = $_GET['keywords'];
+
+		$account_id = \WPLA_AmazonAccount::getAccountWithMarketplace( $marketplace );
+
+		if ( !$account_id ) {
+			$account_id = get_option( 'wpla_default_account_id', 1 );
+		}
+
+
+		try {
+			$api = new WPLA_Amazon_SP_API($account_id);
+			$result = $api->searchDefinitionsProductTypes( [$marketplace], $keywords );
+		} catch ( Exception $e ) {
+			$result = [];
+		}
+
+		echo json_encode( $result );
+		exit;
+	}
+
+	public function ajax_install_product_type() {
+		if ( ! current_user_can('manage_amazon_listings') ) {
+			http_response_code(401);
+			exit;
+		}
+
+		$marketplace    = wc_clean( $_POST['marketplace'] );
+		$product_type_id = wc_clean( $_POST['product_type'] );
+		$name           = wc_clean( $_POST['name'] );
+
+		$type_obj       = new AmazonProductTypesModel();
+		$product_type   = $type_obj->getDefinitionsProductType( $product_type_id, $marketplace );
+
+		if ( is_wp_error( $product_type ) ) {
+			$result = [
+				'success' => false,
+				'message'   => $product_type->get_error_message()
+			];
+		} else {
+			$product_type->setDisplayName( $name );
+			$product_type->save();
+
+			$result = ['success' => true, 'id' => $product_type->getId()];
+		}
+
+		echo json_encode( $result );
+		exit;
+	}
+
+	public function ajax_remove_product_type() {
+		if (! wp_verify_nonce( $_POST['nonce'], 'wpla-delete-product-type') ) {
+			die( json_encode(['success' => true]) );
+		}
+
+		if ( ! current_user_can('manage_amazon_listings') ) {
+			http_response_code(401);
+			exit;
+		}
+
+		$id             = wc_clean( $_POST['id'] ?? 0);
+		$marketplace    = wc_clean( $_POST['marketplace'] ?? '' );
+		$product_type   = wc_clean( $_POST['product_type'] ?? '' );
+
+		$type_obj       = new AmazonProductTypesModel();
+
+		if ( $id ) {
+			$type_obj->deleteById( $id );
+		} else {
+			$type_obj->deleteByProductType( $product_type, $marketplace );
+		}
+
+		$result = ['success' => true];
+
+		echo json_encode( $result );
+		exit;
+	}
+
+	public function ajax_get_marketplaces_for_account() {
+		if ( ! current_user_can('manage_amazon_listings') ) {
+			http_response_code(401);
+			exit;
+		}
+
+		$account_id = intval( $_REQUEST['account'] );
+		$options = [];
+
+		$product_types = AmazonProductTypesModel::getTypesAsDropdownOptions( $account_id );
+		$marketplaces = array_keys( $product_types );
+
+		foreach( $marketplaces as $marketplace_id ) {
+			$options[] = [
+				'value' => $marketplace_id,
+				'text' => WPLA_AmazonMarket::getNamebyMarketplaceId( $marketplace_id )
+			];
+		}
+
+		echo json_encode( $options );
+		exit;
+	}
+
+	public function ajax_get_product_type_attributes() {
+		if ( ! current_user_can('manage_amazon_listings') ) {
+			http_response_code(401);
+			exit;
+		}
+
+		$product_type = $_REQUEST['product_type'];
+		$marketplace = $_REQUEST['marketplace'];
+
+		if ( empty( $product_type ) || empty( $marketplace ) ) {
+			header( "HTTP/1.1 404 Not Found");
+			die( json_encode( ['error' => 'Could not load the product type requested.'] ) );
+		}
+
+		try {
+			$type_obj = new AmazonProductTypesModel();
+			$schema = $type_obj->getDefinitionsProductType( $product_type, $marketplace, false );
+			echo json_encode( $schema );
+		} catch ( Exception $e ) {
+			header( "HTTP/1.1 400 Bad Request");
+			die( json_encode( ['error' => 'Could not load the product type requested.'] ) );
+		}
+
+		exit;
+	}
+
+	public function ajax_get_product_type_attributes_html() {
+		if ( ! current_user_can('manage_amazon_listings') ) {
+			http_response_code(401);
+			exit;
+		}
+
+		$product_type = $_REQUEST['product_type'];
+		$marketplace  = $_REQUEST['marketplace'];
+		$account_id   = $_REQUEST['account_id'] ?? null;
+		$profile_id   = $_REQUEST['profile_id'] ?? 0;
+		$product_id   = $_REQUEST['product_id'] ?? 0;
+
+		if ( empty( $product_type ) || empty( $marketplace ) ) {
+			header( "HTTP/1.1 404 Not Found");
+			die( json_encode( ['error' => 'Could not load the product type requested.'] ) );
+		}
+
+		try {
+			$type_obj       = new AmazonProductTypesModel();
+			$profile        = new WPLA_AmazonProfile( $profile_id );
+			
+			$product_type   = $type_obj->getDefinitionsProductType( $product_type, $marketplace, false, $account_id );
+
+			$converter = new \WPLab\Amazon\Helper\ProfileProductTypeConverter( $profile );
+			$profile = $converter->convertFields();
+
+			if ( $product_type ) {
+				// check if account is registered brand
+				$account = ! empty($profile->id) ? new WPLA_AmazonAccount( $profile->account_id ) : false;
+				$is_reg_brand = $account ? $account->is_reg_brand : false;
+
+				// build settings form
+				$data = [
+					'profile_field_data'    => maybe_unserialize( $profile->fields ),
+					'product_attributes'    => WPLA_ProductWrapper::getAttributeTaxonomies(),
+					'product_type'          => $product_type,
+					'product_id'            => $product_id,
+					'profile'               => $profile,
+					'account'               => $account,
+					'is_reg_brand'          => $is_reg_brand
+				];
+
+				$data = apply_filters( 'wpla_profile_product_type_data', $data, $profile, $product_type );
+
+				@WPLA_Page::do_display( 'profile/product_type_attributes_form', $data );
+				exit();
+
+			} else {
+				echo "Product type could not be loaded.";
+			}
+
+			exit;
+		} catch ( Exception $e ) {
+			header( "HTTP/1.1 400 Bad Request");
+			die( json_encode( ['error' => 'Could not load the product type requested.'] ) );
+		}
+	}
+
+	public function ajax_wpla_convert_product_feed_template() {
+		if ( ! current_user_can('manage_amazon_listings') ) {
+			http_response_code(401);
+			exit;
+		}
+
+		$product_id     = intval( $_REQUEST['product'] );
+		$from_tpl_id    = intval( $_REQUEST['from'] );
+		$product_type   = wpla_clean( $_REQUEST['product_type'] );
+
+		if ( !$from_tpl_id ) {
+			die( json_encode( [
+				'success'   => 0,
+				'message'   => 'Source feed template could not be loaded.'
+			] ) );
+		}
+
+		// Get the Marketplace ID
+		$tpl = new WPLA_AmazonFeedTemplate( $from_tpl_id );
+		$marketplace = new WPLA_AmazonMarket( $tpl->site_id );
+
+		// if the product type is not installed, install it
+		$product_types_mdl = new AmazonProductTypesModel();
+
+		$existing = $product_types_mdl->getProductType( $product_type, $marketplace->marketplace_id );
+
+		if ( ! $existing ) {
+			// Look for Product Type recommendations to replace the current feed template
+			$converter = new WPLab\Amazon\Helper\ProfileProductTypeConverter();
+			$product_type_recs = $converter->getRecommendedProductTypeFromTemplate( $from_tpl_id );
+			$display_name = $product_type;
+
+			foreach ( $product_type_recs as $rec ) {
+				if ( $rec['product_type'] == $product_type ) {
+					$display_name = $rec['display_name'];
+					break;
+				}
+			}
+
+			$attribute = $product_types_mdl->getDefinitionsProductType( $product_type, $marketplace->marketplace_id, false );
+
+			if ( is_wp_error( $attribute ) ) {
+				die(json_encode([
+					'success' => false,
+					'message' => $attribute->get_error_message()
+				]));
+			} else {
+				$attribute->setDisplayName( $display_name );
+				$attribute->save();
+
+				//$result = ['success' => true, 'id' => $attribute->getId()];
+			}
+		}
+
+		$custom_fields_old = get_post_meta( $product_id, '_wpla_custom_feed_columns', true );
+		$converter = new \WPLab\Amazon\Helper\ProfileProductTypeConverter();
+		$custom_fields = $converter->convertFromArray( $custom_fields_old );
+
+		update_post_meta( $product_id, '_wpla_custom_feed_columns_old', $custom_fields_old );
+		update_post_meta( $product_id, '_wpla_custom_feed_columns', $custom_fields );
+		update_post_meta( $product_id, '_wpla_custom_product_type', $product_type );
+		update_post_meta( $product_id, '_wpla_custom_marketplace_id', $marketplace->marketplace_id );
+
+		die(json_encode([
+			'success' => 1
+		]));
+	}
+
+	public function ajax_wpla_product_type_metabox_html() {
+		if ( ! current_user_can('manage_amazon_listings') ) {
+			http_response_code(401);
+			exit;
+		}
+
+		$product_id     = intval( $_REQUEST['product'] );
+
+		ob_start();
+		$post = get_post( $product_id );
+		$metabox = new WPLA_Product_Feed_MetaBox();
+		$metabox->displayProductTypeSelector($post);
+		$content = ob_get_clean();
+
+		die($content);
 	}
 
 	function getChildrenOfCategory( $id ) {
@@ -966,6 +1288,83 @@ class WPLA_AjaxHandler extends WPLA_Core {
 		// handle job name
 		switch ( $task['task'] ) {
 
+			// New way of fetching ASINs, or checking for issues on newly submitted listings
+			case 'getListing':
+				// init
+				$lm      = new WPLA_ListingsModel();
+				$listing = $lm->getItem( $task['id'] );
+				$account = WPLA_AmazonAccount::getAccount( $listing['account_id'] );
+
+				$api = new WPLA_Amazon_SP_API( $account->id );
+				//$result = $api->getListingsItem( $task['sku'] );
+				$result = $api->getListingsItem( $task['sku'] );
+
+				if ( !WPLA_Amazon_SP_API::isError( $result ) ) {
+					$success = true;
+
+					if ( $result->getIssues() ) {
+						$history = [
+							'errors' => [],
+							'warnings' => []
+						];
+						foreach ( $result->getIssues() as $issue ) {
+							$error = [
+								'error-code'    => $issue->getCode(),
+								'error-message' => $issue->getMessage(),
+								'error-type'    => $issue->getSeverity()
+							];
+
+							if ( $issue->getSeverity() == 'ERROR' ) {
+								$success = false;
+								$history['errors'][] = $error;
+							} elseif ( $issue->getSeverity() == 'WARNING' ) {
+								$history['warnings'][] = $error;
+							}
+						}
+
+						$data = [
+							'status' => WPLA_ListingsModel::STATUS_FAILED,
+							'history' => serialize( $history )
+						];
+						$lm->updateListing( $listing['id'], $data );
+
+					}
+
+					if ( $success ) {
+						$found_asin = false;
+						foreach ( $result->getSummaries() as $summary ) {
+							if ( $summary->getAsin() ) {
+								$found_asin = true;
+								$lm->updateWhere(array('id' => $listing['id']), array('asin' => $summary->getAsin(), 'status' => WPLA_ListingsModel::STATUS_ONLINE));
+								WPLA()->logger->info('new ASIN for listing #' . $listing['id'] . ': ' . $summary->getAsin());
+								break;
+							}
+						}
+
+						if ( !$found_asin ) {
+							$errors = 'No issues found but no ASIN was found either. Please try again later.';
+							$success = false;
+						}
+					} else {
+						$listings_url = admin_url( 'admin.php?page=wpla&listing_status=failed' );
+						$errors = sprintf(__('There were issues found for the listing %s. Check the <a href="%s">Failed listings page</a> for more information.', 'wp-lister-for-amazon'), $listing['sku'], $listings_url);
+					}
+				} else {
+					$errors = sprintf(__('There was a problem fetching product details for %s.', 'wp-lister-for-amazon'), $listing['sku']);
+					$errors .= ' ' . $result->ErrorMessage;
+					$success = false;
+				}
+
+				// build response
+				$response = new stdClass();
+				$response->job  	= $job;
+				$response->task 	= $task;
+				$response->errors   = empty( $errors ) ? array() : array( array( 'HtmlMessage' => $errors ) );
+				$response->success  = $success;
+
+				$this->returnJSON( $response );
+				exit();
+
 			// update listing from Amazon (current used for new listings without ASIN)
 			case 'updateProduct':
 
@@ -975,22 +1374,15 @@ class WPLA_AjaxHandler extends WPLA_Core {
 				$account = WPLA_AmazonAccount::getAccount( $listing['account_id'] );
 
 				$api = new WPLA_Amazon_SP_API( $account->id );
-				$result = $api->searchCatalogItemsByIdentifier( [$listing['sku']], 'SKU' );
-
-				//$api     = new WPLA_AmazonAPI( $account->id );
-
-				// get product attributes
-				// $product = $api->getProduct( $listing['asin'] );
-				//$result = $api->getMatchingProductForId( $listing['sku'], 'SellerSKU' );
-				// echo "<pre>";print_r($product);echo"</pre>";#die();
-				// echo "<pre>";print_r($product);echo"</pre>";die();
+				//$result = $api->getListingsItem( $task['sku'] );
+				$result = $api->searchCatalogItemsByIdentifier( $task['sku'], 'SKU' );
 
 				if ( !WPLA_Amazon_SP_API::isError( $result ) ) {
-					$success = true;
+					$success = false;
+					//$result->getAttributes();
                     foreach ($result->getItems() as $i => $product) {
 
                         if (!empty($product->getAsin())) {
-
                             // update listing attributes
                             $listing_id = $listing['id'];
                             // $lm->updateItemAttributes( $product, $listing_id );
@@ -1004,13 +1396,18 @@ class WPLA_AjaxHandler extends WPLA_Core {
 
                             $success = true;
                             $errors = '';
+							break;
 
                         } else {
-                            $errors = sprintf(__('There was a problem fetching product details for %s.', 'wp-lister-for-amazon'), $listing['asin']);
+                            $errors = sprintf(__('There was a problem fetching product details for %s.', 'wp-lister-for-amazon'), $listing['sku']);
                             $errors .= ' ' . $result->ErrorMessage;
-                            $success = false;
                         }
                     }
+
+					if ( !$success ) {
+						$errors = sprintf(__('There was a problem fetching product details for %s.', 'wp-lister-for-amazon'), $listing['sku']);
+						$errors .= ' <b>No listings found.</b>';
+					}
                 } else {
                     $errors = sprintf(__('There was a problem fetching product details for %s.', 'wp-lister-for-amazon'), $listing['asin']);
                     $errors .= ' ' . $result->ErrorMessage;
@@ -1177,6 +1574,29 @@ class WPLA_AjaxHandler extends WPLA_Core {
 				$this->returnJSON( $response );
 				exit();
 
+			case 'applyProfileWithNoStatusChange':
+				$profile_new = $task['profile_id'];
+				$profile_src = $task['profile_src'];
+				$item        = $task['item'];
+				$profile     = new WPLA_AmazonProfile( $profile_new );
+
+				$lm     = new WPLA_ListingsModel();
+
+				// apply profile to items
+				//$lm->applyProfileToListings( $profile, $items, false );
+				$lm->applyProfileToItem( $profile, $item, false );
+
+				// build response
+				$response = new stdClass();
+				$response->job  	= $job;
+				$response->task 	= $task;
+				$response->errors   = array();
+				// $response->errors   = array( array( 'HtmlMessage' => ' Profile was applied to '.sizeof($items).' items ') );
+				$response->success  = true;
+
+				$this->returnJSON( $response );
+				exit();
+
             case 'applyProfileDelayed':
 
                 $profile_id = $task['profile_id'];
@@ -1223,7 +1643,10 @@ class WPLA_AjaxHandler extends WPLA_Core {
 
 		// check nonce and permissions
 	    check_admin_referer( 'wpla_ajax_nonce' );
-		if ( ! current_user_can('manage_amazon_listings') ) return;
+		if ( ! current_user_can('manage_amazon_listings') ) {
+			http_response_code(401);
+			exit;
+		}
 
 		// quit if no job name provided
 		if ( ! isset( $_REQUEST['job'] ) ) return false;
@@ -1243,6 +1666,46 @@ class WPLA_AjaxHandler extends WPLA_Core {
 		// handle job name
 		switch ( $jobname ) {
 
+			case 'moveListingsToProfile':
+				$profile_from = intval( $_REQUEST['from'] );
+				$profile_to = intval( $_REQUEST['to'] );
+
+				// get items using given profile
+				$items  = $lm->findAllListingsByColumn( $profile_from, 'profile_id' );
+				$total_items = sizeof($items);
+				$tasks       = array();
+
+				// echo "<pre>profile_id: ";echo $profile_id;echo"</pre>";
+				// echo "<pre>total: ";echo $total_items;echo"</pre>";die();
+				foreach ( $items as $item ) {
+					// add task - load user specific details
+					$tasks[] = array(
+						'task'        => 'applyProfileWithNoStatusChange',
+						'displayName' => sprintf('Applying profile to item %s (#%d) ', $item->sku, $item->id ),
+						'profile_id'  => $profile_to,
+						'profile_src' => $profile_from,
+						'item'        => $item->id
+					);
+
+				}
+
+				// build response
+				$response = new stdClass();
+				$response->tasklist    = $tasks;
+				$response->total_tasks = count( $tasks );
+				$response->error       = '';
+				$response->success     = true;
+
+				// create new job
+				$newJob = new stdClass();
+				$newJob->jobname = $jobname;
+				$newJob->tasklist = $tasks;
+				$job = new WPLA_JobsModel( $newJob );
+				$response->job_key = $job->key;
+
+				$this->returnJSON( $response );
+				exit();
+
 			case 'updateProductsWithoutASIN':
 
 				// get prepared items
@@ -1250,7 +1713,7 @@ class WPLA_AjaxHandler extends WPLA_Core {
 		        $items = $sm->getAllOnlineWithoutASIN();
 
 		        // create job from items and send response
-		        $response = $this->_create_bulk_listing_job( 'updateProduct', $items, $jobname );
+		        $response = $this->_create_bulk_listing_job( 'getListing', $items, $jobname );
 				$this->returnJSON( $response );
 				exit();
 
@@ -1433,7 +1896,10 @@ class WPLA_AjaxHandler extends WPLA_Core {
 
 		// check nonce and permissions
 	    check_admin_referer( 'wpla_ajax_nonce' );
-		if ( ! current_user_can('manage_amazon_listings') ) return;
+		if ( ! current_user_can('manage_amazon_listings') ) {
+			http_response_code(401);
+			exit;
+		}
 
 		// quit if no job name provided
 		if ( ! isset( $_REQUEST['job'] ) ) return false;
@@ -1443,8 +1909,9 @@ class WPLA_AjaxHandler extends WPLA_Core {
 		$job->completeJob();
 
 		// build response
+		$name = $job->item['job_name'] ?? '';
 		$response = new stdClass();
-		$response->msg    = $job->item['job_name'].' comleted';
+		$response->msg    = $name.' completed';
 		$response->error    = '';
 		$response->success  = true;
 		$response->job_key = $job->key;

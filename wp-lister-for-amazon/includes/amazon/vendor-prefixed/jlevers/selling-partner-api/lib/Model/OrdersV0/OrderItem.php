@@ -8,7 +8,7 @@
  * @package  SellingPartnerApi
  *
  * @license BSD-3-Clause
- * Modified by __root__ on 08-May-2024 using {@see https://github.com/BrianHenryIE/strauss}.
+ * Modified by __root__ on 07-January-2025 using {@see https://github.com/BrianHenryIE/strauss}.
  */
 
 /**
@@ -279,13 +279,16 @@ class OrderItem extends BaseModel implements ModelInterface, ArrayAccess, \JsonS
 
     const DEEMED_RESELLER_CATEGORY_IOSS = 'IOSS';
     const DEEMED_RESELLER_CATEGORY_UOSS = 'UOSS';
-    const DEEMED_RESELLER_CATEGORY_SG_VOEC = 'SG_VOEC';
-    const DEEMED_RESELLER_CATEGORY_GB_VOEC = 'GB_VOEC';
-    const DEEMED_RESELLER_CATEGORY_NO_VOEC = 'NO_VOEC';
     const DEEMED_RESELLER_CATEGORY_CA_MPF = 'CA_MPF';
     const DEEMED_RESELLER_CATEGORY_AU_VOEC = 'AU_VOEC';
-    const DEEMED_RESELLER_CATEGORY_NZ_VOEC = 'NZ_VOEC';
+    const DEEMED_RESELLER_CATEGORY_GB_VOEC = 'GB_VOEC';
     const DEEMED_RESELLER_CATEGORY_JE_VOEC = 'JE_VOEC';
+    const DEEMED_RESELLER_CATEGORY_KZ_VOEC = 'KZ_VOEC';
+    const DEEMED_RESELLER_CATEGORY_MY_VOEC = 'MY_VOEC';
+    const DEEMED_RESELLER_CATEGORY_NO_VOEC = 'NO_VOEC';
+    const DEEMED_RESELLER_CATEGORY_NG_VOEC = 'NG_VOEC';
+    const DEEMED_RESELLER_CATEGORY_NZ_VOEC = 'NZ_VOEC';
+    const DEEMED_RESELLER_CATEGORY_SG_VOEC = 'SG_VOEC';
     const DEEMED_RESELLER_CATEGORY_CH_SUPPLIER_IMPORT = 'CH_SUPPLIER_IMPORT';
     
     
@@ -300,13 +303,16 @@ class OrderItem extends BaseModel implements ModelInterface, ArrayAccess, \JsonS
         $baseVals = [
             self::DEEMED_RESELLER_CATEGORY_IOSS,
             self::DEEMED_RESELLER_CATEGORY_UOSS,
-            self::DEEMED_RESELLER_CATEGORY_SG_VOEC,
-            self::DEEMED_RESELLER_CATEGORY_GB_VOEC,
-            self::DEEMED_RESELLER_CATEGORY_NO_VOEC,
-            self::DEEMED_RESELLER_CATEGORY_CA_MPF,
             self::DEEMED_RESELLER_CATEGORY_AU_VOEC,
-            self::DEEMED_RESELLER_CATEGORY_NZ_VOEC,
+            self::DEEMED_RESELLER_CATEGORY_CA_MPF,
+            self::DEEMED_RESELLER_CATEGORY_GB_VOEC,
             self::DEEMED_RESELLER_CATEGORY_JE_VOEC,
+            self::DEEMED_RESELLER_CATEGORY_KZ_VOEC,
+            self::DEEMED_RESELLER_CATEGORY_MY_VOEC,
+            self::DEEMED_RESELLER_CATEGORY_NO_VOEC,
+            self::DEEMED_RESELLER_CATEGORY_NG_VOEC,
+            self::DEEMED_RESELLER_CATEGORY_NZ_VOEC,
+            self::DEEMED_RESELLER_CATEGORY_SG_VOEC,
             self::DEEMED_RESELLER_CATEGORY_CH_SUPPLIER_IMPORT,
         ];
 

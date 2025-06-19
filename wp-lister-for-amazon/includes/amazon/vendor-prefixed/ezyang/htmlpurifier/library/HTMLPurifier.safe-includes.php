@@ -10,7 +10,7 @@
  * Changes to include_path are not necessary.
  *
  * @license LGPL-2.1-or-later
- * Modified by __root__ on 08-May-2024 using {@see https://github.com/BrianHenryIE/strauss}.
+ * Modified by __root__ on 07-January-2025 using {@see https://github.com/BrianHenryIE/strauss}.
  */
 
 $__dir = dirname(__FILE__);
@@ -98,6 +98,7 @@ require_once $__dir . '/WPLab_Amazon_HTMLPurifier/AttrDef/CSS/Length.php';
 require_once $__dir . '/WPLab_Amazon_HTMLPurifier/AttrDef/CSS/ListStyle.php';
 require_once $__dir . '/WPLab_Amazon_HTMLPurifier/AttrDef/CSS/Multiple.php';
 require_once $__dir . '/WPLab_Amazon_HTMLPurifier/AttrDef/CSS/Percentage.php';
+require_once $__dir . '/WPLab_Amazon_HTMLPurifier/AttrDef/CSS/Ratio.php';
 require_once $__dir . '/WPLab_Amazon_HTMLPurifier/AttrDef/CSS/TextDecoration.php';
 require_once $__dir . '/WPLab_Amazon_HTMLPurifier/AttrDef/CSS/URI.php';
 require_once $__dir . '/WPLab_Amazon_HTMLPurifier/AttrDef/HTML/Bool.php';

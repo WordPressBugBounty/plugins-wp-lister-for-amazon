@@ -74,6 +74,7 @@
                         <option value="_GET_FBA_MYI_UNSUPPRESSED_INVENTORY_DATA_"	<?php if ( $wpla_report_type == '_GET_FBA_MYI_UNSUPPRESSED_INVENTORY_DATA_' ): 	?>selected="selected"<?php endif; ?>><?php echo 'FBA Manage Inventory Report' ?></option>
 						<option value="_GET_AMAZON_FULFILLED_SHIPMENTS_DATA_GENERAL_" 		<?php if ( $wpla_report_type == '_GET_AMAZON_FULFILLED_SHIPMENTS_DATA_GENERAL_' ): 		?>selected="selected"<?php endif; ?>><?php echo 'FBA Amazon Fulfilled Shipments Report' ?></option>
 						<option value="GET_FLAT_FILE_ORDER_REPORT_DATA_INVOICING" 		<?php if ( $wpla_report_type == 'GET_FLAT_FILE_ORDER_REPORT_DATA_INVOICING' ): 		?>selected="selected"<?php endif; ?>><?php echo 'Flat File Order Report (Invoicing)' ?></option>
+						<option value="GET_FLAT_FILE_VAT_INVOICE_DATA_REPORT" 		<?php if ( $wpla_report_type == 'GET_FLAT_FILE_VAT_INVOICE_DATA_REPORT' ): 		?>selected="selected"<?php endif; ?>><?php echo 'Flat File VAT Invoice Data Report (VIDR)' ?></option>
 						<option value="_GET_FBA_FULFILLMENT_INVENTORY_HEALTH_DATA_"	<?php if ( $wpla_report_type == '_GET_FBA_FULFILLMENT_INVENTORY_HEALTH_DATA_' ):?>selected="selected"<?php endif; ?>><?php echo 'FBA Inventory Health Report' ?></option>
 					</optgroup>
 					<optgroup label="<?php echo __( 'Currently Unsupported Report Types', 'wp-lister-for-amazon' ) ?>">

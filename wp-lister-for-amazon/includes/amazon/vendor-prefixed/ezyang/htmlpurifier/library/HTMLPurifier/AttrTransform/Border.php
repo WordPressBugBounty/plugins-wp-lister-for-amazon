@@ -4,7 +4,7 @@
  * Pre-transform that changes deprecated border attribute to CSS.
  *
  * @license LGPL-2.1-or-later
- * Modified by __root__ on 08-May-2024 using {@see https://github.com/BrianHenryIE/strauss}.
+ * Modified by __root__ on 07-January-2025 using {@see https://github.com/BrianHenryIE/strauss}.
  */
 class WPLab_Amazon_HTMLPurifier_AttrTransform_Border extends WPLab_Amazon_HTMLPurifier_AttrTransform
 {

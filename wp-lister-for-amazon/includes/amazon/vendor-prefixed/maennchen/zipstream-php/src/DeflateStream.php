@@ -2,31 +2,75 @@
 /**
  * @license MIT
  *
- * Modified by __root__ on 08-May-2024 using {@see https://github.com/BrianHenryIE/strauss}.
+ * Modified by __root__ on 07-January-2025 using {@see https://github.com/BrianHenryIE/strauss}.
  */
 
 declare(strict_types=1);
 
 namespace WPLab\Amazon\ZipStream;
 
-/**
- * @deprecated
- */
 class DeflateStream extends Stream
 {
-    public function __construct($stream)
+    protected $filter;
+
+    /**
+     * @var Option\File
+     */
+    protected $options;
+
+    /**
+     * Rewind stream
+     *
+     * @return void
+     */
+    public function rewind(): void
     {
-        parent::__construct($stream);
-        trigger_error('Class ' . __CLASS__ . ' is deprecated, delation will be handled internally instead', E_USER_DEPRECATED);
+        // deflate filter needs to be removed before rewind
+        if ($this->filter) {
+            $this->removeDeflateFilter();
+            $this->seek(0);
+            $this->addDeflateFilter($this->options);
+        } else {
+            rewind($this->stream);
+        }
     }
 
+    /**
+     * Remove the deflate filter
+     *
+     * @return void
+     */
     public function removeDeflateFilter(): void
     {
-        trigger_error('Method ' . __METHOD__ . ' is deprecated', E_USER_DEPRECATED);
+        if (!$this->filter) {
+            return;
+        }
+        stream_filter_remove($this->filter);
+        $this->filter = null;
     }
 
+    /**
+     * Add a deflate filter
+     *
+     * @param Option\File $options
+     * @return void
+     */
     public function addDeflateFilter(Option\File $options): void
     {
-        trigger_error('Method ' . __METHOD__ . ' is deprecated', E_USER_DEPRECATED);
+        $this->options = $options;
+        // parameter 4 for stream_filter_append expects array
+        // so we convert the option object in an array
+        $optionsArr = [
+            'comment' => $options->getComment(),
+            'method' => $options->getMethod(),
+            'deflateLevel' => $options->getDeflateLevel(),
+            'time' => $options->getTime(),
+        ];
+        $this->filter = stream_filter_append(
+            $this->stream,
+            'zlib.deflate',
+            STREAM_FILTER_READ,
+            $optionsArr
+        );
     }
 }

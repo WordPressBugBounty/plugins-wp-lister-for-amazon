@@ -87,7 +87,7 @@ class WPLA_AmazonAccount {
 	}
 
 	// get single account
-	static function getAccount( $id )	{
+	public static function getAccount( $id )	{
 		global $wpdb;
 		$table = $wpdb->prefix . self::TABLENAME;
 		
@@ -103,7 +103,7 @@ class WPLA_AmazonAccount {
 	}
 
 	// get all accounts
-	static function getAll( $include_inactive = false ) {
+	public static function getAll( $include_inactive = false ) {
 		global $wpdb;
 		$table = $wpdb->prefix . self::TABLENAME;
 
@@ -118,8 +118,19 @@ class WPLA_AmazonAccount {
 		return $items;
 	}
 
+	public static function getAccountWithMarketplace( $marketplace_id ) {
+		global $wpdb;
+
+		return $wpdb->get_var( $wpdb->prepare(
+			"SELECT id FROM {$wpdb->prefix}amazon_accounts 
+			WHERE active = 1 
+			AND marketplace_id = %s",
+			$marketplace_id
+		) );
+	}
+
 	// get account title
-	static function getAccountTitle( $id )	{
+	public static function getAccountTitle( $id )	{
 		global $wpdb;
 		$table = $wpdb->prefix . self::TABLENAME;
 		
@@ -236,6 +247,13 @@ class WPLA_AmazonAccount {
 		    $wpdb->update( $wpdb->prefix . self::TABLENAME, ['allowed_markets' => maybe_serialize( $result->allowed_markets ) ], ['id' => $this->id] );
 //			$this->allowed_markets = maybe_serialize( $result->allowed_markets );
 //			$this->update();
+
+			/*$markets = array_keys( $result->allowed_markets );
+
+			foreach ( $markets as $market_id ) {
+				WPLA_AmazonProductType::downloadForMarketplace( [$market_id] );
+			}*/
+
 		} elseif ( $result->ErrorMessage ) {
 			wpla_show_message( $result->ErrorMessage, 'error' );
 		}

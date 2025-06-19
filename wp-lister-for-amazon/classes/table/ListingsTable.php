@@ -544,6 +544,12 @@ class WPLA_ListingsTable extends WP_List_Table {
     }
 
     function column_loffer_price($item){
+	    $old_offer_detail_class = WPLA_PATH .'/includes/amazon/vendor/jlevers/selling-partner-api/lib/Model/ProductPricingV0/OfferDetail.php';
+
+	    if ( file_exists( $old_offer_detail_class ) ) {
+		    require_once WPLA_PATH .'/includes/amazon/vendor/jlevers/selling-partner-api/lib/Model/ProductPricingV0/OfferDetail.php';
+		    require_once WPLA_PATH .'/includes/amazon/vendor/jlevers/selling-partner-api/lib/Model/ProductPricingV0/MoneyType.php';
+	    }
 
         $loffer_price = $item['loffer_price'] ? $this->number_format( $item['loffer_price'], 2 ) : '&mdash;';
         // $last_updated = $item['pricing_date'] ? human_time_diff( strtotime($item['pricing_date'].' UTC') ) . ' ago' : '';
@@ -1122,6 +1128,7 @@ class WPLA_ListingsTable extends WP_List_Table {
             'wpla_change_profile'      => __( 'Change profile', 'wp-lister-for-amazon' ),
             'wpla_lock'                => __( 'Lock listings', 'wp-lister-for-amazon' ),
             'wpla_unlock'              => __( 'Unlock listings', 'wp-lister-for-amazon' ),
+            'wpla_listing_check'       => __( 'Check for listing issues', 'wp-lister-for-amazon' ),
             'wpla_trash_listing'       => __( 'Remove from Amazon', 'wp-lister-for-amazon' ),
             'wpla_delete'              => __( 'Delete from database', 'wp-lister-for-amazon' ),
             'wpla_get_lowest_offers'   => __( 'Get lowest offer listings', 'wp-lister-for-amazon' ) . ' (beta)',

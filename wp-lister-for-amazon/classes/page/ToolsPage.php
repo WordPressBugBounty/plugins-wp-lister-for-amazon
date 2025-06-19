@@ -37,7 +37,8 @@ class WPLA_ToolsPage extends WPLA_Page {
 		if ( $active_tab == 'repricing' ) $title_prefix = 'Repricing - '; 
 		if ( $active_tab == 'inventory' ) $title_prefix = 'Inventory - '; 
 		if ( $active_tab == 'skugen'    ) $title_prefix = 'SKU - '; 
-		if ( $active_tab == 'stock_log' ) $title_prefix = 'Stock - '; 
+		if ( $active_tab == 'profile-converter'    ) $title_prefix = 'Profile Converter - ';
+		if ( $active_tab == 'stock_log' ) $title_prefix = 'Stock - ';
 
 		add_submenu_page( self::ParentMenuId, $this->getSubmenuPageTitle( $title_prefix . 'Tools' ), __( 'Tools', 'wp-lister-for-amazon' ), 
 						  self::ParentPermissions, $this->getSubmenuId( 'tools' ), array( &$this, 'onDisplayToolsPage' ) );
@@ -55,7 +56,11 @@ class WPLA_ToolsPage extends WPLA_Page {
 		if ( $active_tab == 'skugen' ) { 
 			return WPLA()->pages['skugen']->displaySkuGenPage();
 		}
-		if ( $active_tab == 'stock_log' ) { 
+		if ( $active_tab == 'profile-converter' ) {
+			return WPLA()->pages['profile_converter']->displayPage();
+		}
+
+		if ( $active_tab == 'stock_log' ) {
 			return WPLA()->pages['stocklog']->displayStockLogPage();
 		}
 

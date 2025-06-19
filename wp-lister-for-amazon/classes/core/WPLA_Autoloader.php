@@ -21,6 +21,8 @@ class WPLA_Autoloader {
 		'WPLA_AjaxHandler'        => '/classes/core/WPLA_AjaxHandler.php',
 		'WPLA_CronActions'        => '/classes/core/WPLA_CronActions.php',
 		'WPLA_AdminMessages'      => '/classes/core/WPLA_AdminMessages.php',
+		'WPLab\Amazon\Core\AmazonProductType'  => '/classes/core/AmazonProductType.php',
+
 		// 'WPLA_Functions'          => '/classes/core/WPLA_Functions.php',
 
 		// abstract		
@@ -48,7 +50,11 @@ class WPLA_Autoloader {
 		'WPLA_FbaHelper'          => '/classes/helper/WPLA_FbaHelper.php',
 		'WPLA_CountryHelper'      => '/classes/helper/WPLA_CountryHelper.php',
 		'WPLA_DateTimeHelper'     => '/classes/helper/WPLA_DateTimeHelper.php',
-		
+
+		'WPLab\Amazon\Helper\JsonFeedDataBuilder'           => '/classes/helper/JsonFeedDataBuilder.php',
+		'WPLab\Amazon\Helper\AmazonSchemaFormGenerator'     => '/classes/helper/AmazonSchemaFormGenerator.php',
+		'WPLab\Amazon\Helper\ProfileProductTypeConverter'   => '/classes/helper/ProfileProductTypeConverter.php',
+
 		// models		
 		'WPLA_AmazonMarket'       => '/classes/model/AmazonMarket.php',
 		'WPLA_AmazonAccount'      => '/classes/model/AmazonAccount.php',
@@ -59,7 +65,9 @@ class WPLA_Autoloader {
 		'WPLA_ListingsModel'      => '/classes/model/ListingsModel.php',
 		'WPLA_OrdersModel'        => '/classes/model/OrdersModel.php',
 		'WPLA_JobsModel'          => '/classes/model/JobsModel.php',
-		
+
+		'WPLab\Amazon\Models\AmazonProductTypesModel' => '/classes/model/AmazonProductTypes.php',
+
 		// tables		
 		'WPLA_ListingsTable'      => '/classes/table/ListingsTable.php',
 		'WPLA_OrdersTable'        => '/classes/table/OrdersTable.php',
@@ -71,7 +79,7 @@ class WPLA_Autoloader {
 		'WPLA_RepricingTable'     => '/classes/table/RepricingTable.php',
 		'WPLA_SkuGenTable'        => '/classes/table/SkuGenTable.php',
 		'WPLA_StockLogTable'      => '/classes/table/StockLogTable.php',
-		
+		'WPLab\Amazon\Tables\ProductTypesTable'     => '/classes/table/ProductTypesTable.php',
 		// pages		
 		'WPLA_AccountsPage'       => '/classes/page/AccountsPage.php',
 		'WPLA_ListingsPage'       => '/classes/page/ListingsPage.php',
@@ -87,6 +95,7 @@ class WPLA_Autoloader {
 		'WPLA_SkuGenPage'         => '/classes/page/SkuGenPage.php',
 		'WPLA_StockLogPage'       => '/classes/page/StockLogPage.php',
 		'WPLA_HelpPage'           => '/classes/page/HelpPage.php',
+		'WPLab\Amazon\Pages\ProfileConverterPage' => '/classes/page/ProfileConverterPage.php',
 		
 		// integration		
 		'WPLA_WooBackendIntegration'  => '/classes/integration/Woo_Backend.php',

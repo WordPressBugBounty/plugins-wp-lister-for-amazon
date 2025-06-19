@@ -2,7 +2,7 @@
 /**
  * @license MIT
  *
- * Modified by __root__ on 08-May-2024 using {@see https://github.com/BrianHenryIE/strauss}.
+ * Modified by __root__ on 07-January-2025 using {@see https://github.com/BrianHenryIE/strauss}.
  */
 
 declare(strict_types=1);
@@ -32,8 +32,8 @@ interface PromiseInterface
      * @param callable $onRejected  Invoked when the promise is rejected.
      */
     public function then(
-        callable $onFulfilled = null,
-        callable $onRejected = null
+        ?callable $onFulfilled = null,
+        ?callable $onRejected = null
     ): PromiseInterface;
 
     /**

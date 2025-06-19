@@ -12,7 +12,7 @@
  *       filtering solution.
  *
  * @license LGPL-2.1-or-later
- * Modified by __root__ on 08-May-2024 using {@see https://github.com/BrianHenryIE/strauss}.
+ * Modified by __root__ on 07-January-2025 using {@see https://github.com/BrianHenryIE/strauss}.
  */
 class WPLab_Amazon_HTMLPurifier_AttrDef_CSS extends WPLab_Amazon_HTMLPurifier_AttrDef
 {
@@ -30,6 +30,13 @@ class WPLab_Amazon_HTMLPurifier_AttrDef_CSS extends WPLab_Amazon_HTMLPurifier_At
         $definition = $config->getCSSDefinition();
         $allow_duplicates = $config->get("CSS.AllowDuplicates");
 
+        $universal_attrdef = new WPLab_Amazon_HTMLPurifier_AttrDef_Enum(
+            array(
+                'initial',
+                'inherit',
+                'unset',
+            )
+        );
 
         // According to the CSS2.1 spec, the places where a
         // non-delimiting semicolon can appear are in strings
@@ -99,16 +106,13 @@ class WPLab_Amazon_HTMLPurifier_AttrDef_CSS extends WPLab_Amazon_HTMLPurifier_At
             if (!$ok) {
                 continue;
             }
-            // inefficient call, since the validator will do this again
-            if (strtolower(trim($value)) !== 'inherit') {
-                // inherit works for everything (but only on the base property)
+            $result = $universal_attrdef->validate($value, $config, $context);
+            if ($result === false) {
                 $result = $definition->info[$property]->validate(
                     $value,
                     $config,
                     $context
                 );
-            } else {
-                $result = 'inherit';
             }
             if ($result === false) {
                 continue;

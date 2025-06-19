@@ -8,7 +8,7 @@
  * @package  SellingPartnerApi
  *
  * @license BSD-3-Clause
- * Modified by __root__ on 08-May-2024 using {@see https://github.com/BrianHenryIE/strauss}.
+ * Modified by __root__ on 07-January-2025 using {@see https://github.com/BrianHenryIE/strauss}.
  */
 
 /**
@@ -53,6 +53,7 @@ class CurrencyCode
     const GBP = 'GBP';
     const EUR = 'EUR';
     const PLN = 'PLN';
+    const JPY = 'JPY';
     
     /**
      * Gets allowable values of the enum
@@ -66,6 +67,7 @@ class CurrencyCode
             self::GBP,
             self::EUR,
             self::PLN,
+            self::JPY,
         ];
         // This is necessary because Amazon does not consistently capitalize their
         // enum values, so we do case-insensitive enum value validation in ObjectSerializer

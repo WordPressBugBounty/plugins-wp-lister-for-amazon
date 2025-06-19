@@ -1320,6 +1320,38 @@ class WPLA_UpgradeHelper {
 			$wpdb->query("UPDATE {$wpdb->prefix}amazon_markets SET sort_order = 100 WHERE sort_order > 4" );
 		}
 
+		if ( 69 > $db_version ) {
+			$new_db_version = 69;
+			
+			$sql = "CREATE TABLE IF NOT EXISTS `{$wpdb->prefix}amazon_product_types` (
+				  `id` bigint(11) NOT NULL AUTO_INCREMENT PRIMARY KEY,
+				  `marketplace_id` varchar(25) NOT NULL,
+				  `product_type` varchar(100) NOT NULL,
+				  `display_name` varchar(150) NOT NULL,
+				  `version` varchar(100) NOT NULL,
+				  `property_groups` longtext NOT NULL,
+				  `schema` longtext NOT NULL
+				);";
+			$wpdb->query($sql);
+
+			$sql = "ALTER TABLE `{$wpdb->prefix}amazon_product_types`
+				ADD INDEX `marketplace_id` (`marketplace_id`),
+				ADD INDEX `display_name` (`display_name`),
+				ADD INDEX `product_type` (`product_type`);";
+
+			$wpdb->query($sql);
+
+			$sql = "ALTER TABLE `{$wpdb->prefix}amazon_profiles`
+					ADD `product_type` varchar(100) COLLATE 'utf8mb3_general_ci' NULL AFTER `tpl_id`,
+					ADD `marketplace_id` varchar(15) COLLATE 'utf8mb3_general_ci' NULL AFTER `tpl_id`;";
+			$wpdb->query($sql);
+
+			$sql = "ALTER TABLE `{$wpdb->prefix}amazon_feeds`
+					ADD `product_type` varchar(100) COLLATE 'utf8mb3_general_ci' NULL AFTER `FeedType`;";
+			$wpdb->query($sql);
+
+		}
+
 		if ( $new_db_version > $db_version ) {
 			update_option('wpla_db_version', $new_db_version);
 			$msg  = __( 'WP-Lister database was upgraded to version', 'wp-lister-for-amazon' ) .' '. $new_db_version . '.';
@@ -1379,7 +1411,7 @@ class WPLA_UpgradeHelper {
 			if ( $column->Collation ) {
 				list( $charset ) = explode( '_', $column->Collation );
 				$charset = strtolower( $charset );
-				if ( 'utf8' !== $charset && 'utf8mb4' !== $charset && 'latin1' !== $charset && 'latin2' !== $charset ) {
+				if ( 'armscii8' !== $charset && 'utf8mb3' !== $charset && 'utf8' !== $charset && 'utf8mb4' !== $charset && 'latin1' !== $charset && 'latin2' !== $charset ) {
 					// Don't upgrade tables that have non-utf8 and non-latin1 columns.
 					wpla_show_message("skipped column {$column->Field} in table $table with charset: $charset",'error');
 					return false;

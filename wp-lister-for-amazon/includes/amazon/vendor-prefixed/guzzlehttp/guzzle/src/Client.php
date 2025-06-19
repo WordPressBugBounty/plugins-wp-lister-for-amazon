@@ -2,7 +2,7 @@
 /**
  * @license MIT
  *
- * Modified by __root__ on 08-May-2024 using {@see https://github.com/BrianHenryIE/strauss}.
+ * Modified by __root__ on 07-January-2025 using {@see https://github.com/BrianHenryIE/strauss}.
  */
 
 namespace WPLab\Amazon\GuzzleHttp;
@@ -57,7 +57,7 @@ class Client implements ClientInterface, \WPLab\Amazon\Psr\Http\Client\ClientInt
      *
      * @param array $config Client configuration settings.
      *
-     * @see \WPLab\Amazon\GuzzleHttp\RequestOptions for a list of available request options.
+     * @see RequestOptions for a list of available request options.
      */
     public function __construct(array $config = [])
     {
@@ -207,7 +207,7 @@ class Client implements ClientInterface, \WPLab\Amazon\Psr\Http\Client\ClientInt
      *
      * @deprecated Client::getConfig will be removed in guzzlehttp/guzzle:8.0.
      */
-    public function getConfig(string $option = null)
+    public function getConfig(?string $option = null)
     {
         return $option === null
             ? $this->config

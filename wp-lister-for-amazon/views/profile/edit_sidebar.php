@@ -90,6 +90,7 @@
                                         ?>
                                             <input type="hidden" name="wpla_delay_profile_application" value="yes" />
                                         <?php endif; ?>
+
                                         <?php wp_nonce_field( 'wpla_save_profile' ); ?>
 										<input type="hidden" name="action" value="wpla_save_profile" />
 										<input type="hidden" name="wpla_profile_id" value="<?php echo $wpl_profile->id ?>" />

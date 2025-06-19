@@ -2,7 +2,7 @@
 Contributors: wp-lab
 Tags: amazon, woocommerce, integration, products, import, export
 Requires at least: 4.2
-Tested up to: 6.7.2
+Tested up to: 6.8.1
 Stable tag: trunk
 License: GPLv2 or later
 License URI: http://www.gnu.org/licenses/gpl-2.0.html
@@ -53,6 +53,29 @@ You can report security bugs through the Patchstack Vulnerability Disclosure Pro
 Yes, there are. Please check out our growing knowledgebase at <https://www.wplab.com/plugins/wp-lister-for-amazon/faq/>
 
 == Changelog ==
+
+= 2.8 - 2025-06-19 =
+New: Implementation of the Product Types API to replace the Flat File Feed templates
+New: Added a Template Converter tool that converts and maps the fields used by Feed Templates to match their Product Types counterpart
+New: putListingsItem to publish new listings to Amazon
+Fix: Changed calls triggered by the plugins_loaded to the init event to prevent getting the _load_textdomain_just_in_time warning
+Fix: Added the missing South Africa Marketplace ID
+Fix: Error when fetching the buyer's name and email during the order import process
+Fix: Use GuzzleHttp to download feed and report documents
+Fix: Max Feed Size setting not getting honored
+Fix: Error when trying to match listings
+Fix: Various code warnings
+Fix: Pass the Merchant ID to fetch the Merchant Shipping Templates available to the seller
+Fix: Failed API calls in GetOrders due to a network issue are not always getting retried
+Fix: Only assign currency to the order if there is an OrderTotal property to prevent fatal errors
+Fix: Warnings in the Edit Order page about accessing the ID directly
+Fix: Error thrown when initAPI() is called without an account
+Dev: Sandbox account flag not rendering properly
+Dev: New filter `wpla_order_builder_skip_zero_priced_items`
+Dev: Grouped ActionScheduler jobs
+Dev: Replaced fgetcsv for better performance
+Dev: Added back the missing non-prefixed SP-API classes required by the OrderBuilder class
+Dev: Removed unnecessary files
 
 = 2.7.6 - 2025-04-01 =
 Fix: Added the Marketplace ID for IE
@@ -142,8 +165,15 @@ Fix: More compatibility issue with WC_Order::get_stock_reduced()
 Fix: Order fulfillment feed status update to prevent missed order updates
 Dev: Security fix
 
+= 2.7.0-beta1 - 2024-07-01 =
+* New: Support for Product Matching using EAN
+* Fix: Warning when checking if product update came from WP All Import
+* Fix: More deprecated code warnings
+* Dev: Updated all package libraries
+* Dev: Prefixed all classes with WPLab_Amazon
+
 = 2.6.16 - 2024-05-23 =
-Hotfix: Feeds stuck in the Pending status
+* Hotfix: Feeds stuck in the Pending status
 
 = 2.6.15 - 2024-05-23 =
 * Fix: Deprecated code warnings

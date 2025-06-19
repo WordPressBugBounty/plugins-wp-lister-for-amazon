@@ -2,7 +2,7 @@
 /**
  * @license MIT
  *
- * Modified by __root__ on 08-May-2024 using {@see https://github.com/BrianHenryIE/strauss}.
+ * Modified by __root__ on 07-January-2025 using {@see https://github.com/BrianHenryIE/strauss}.
  */
 
 namespace WPLab\Amazon\GuzzleHttp;
@@ -73,7 +73,7 @@ class MessageFormatter implements MessageFormatterInterface
      * @param ResponseInterface|null $response Response that was received
      * @param \Throwable|null        $error    Exception that was received
      */
-    public function format(RequestInterface $request, ResponseInterface $response = null, \Throwable $error = null): string
+    public function format(RequestInterface $request, ?ResponseInterface $response = null, ?\Throwable $error = null): string
     {
         $cache = [];
 

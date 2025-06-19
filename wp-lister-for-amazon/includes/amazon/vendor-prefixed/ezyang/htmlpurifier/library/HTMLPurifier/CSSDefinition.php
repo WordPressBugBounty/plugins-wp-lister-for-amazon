@@ -5,7 +5,7 @@
  * @see WPLab_Amazon_HTMLPurifier_HTMLDefinition
  *
  * @license LGPL-2.1-or-later
- * Modified by __root__ on 08-May-2024 using {@see https://github.com/BrianHenryIE/strauss}.
+ * Modified by __root__ on 07-January-2025 using {@see https://github.com/BrianHenryIE/strauss}.
  */
 class WPLab_Amazon_HTMLPurifier_CSSDefinition extends WPLab_Amazon_HTMLPurifier_Definition
 {
@@ -119,8 +119,6 @@ class WPLab_Amazon_HTMLPurifier_CSSDefinition extends WPLab_Amazon_HTMLPurifier_
                         'auto',
                         'cover',
                         'contain',
-                        'initial',
-                        'inherit',
                     ]
                 ),
                 new WPLab_Amazon_HTMLPurifier_AttrDef_CSS_Percentage(),
@@ -239,21 +237,20 @@ class WPLab_Amazon_HTMLPurifier_CSSDefinition extends WPLab_Amazon_HTMLPurifier_
             [
                 new WPLab_Amazon_HTMLPurifier_AttrDef_CSS_Length('0'),
                 new WPLab_Amazon_HTMLPurifier_AttrDef_CSS_Percentage(true),
-                new WPLab_Amazon_HTMLPurifier_AttrDef_Enum(['auto', 'initial', 'inherit'])
+                new WPLab_Amazon_HTMLPurifier_AttrDef_Enum(['auto'])
             ]
         );
         $trusted_min_wh = new WPLab_Amazon_HTMLPurifier_AttrDef_CSS_Composite(
             [
                 new WPLab_Amazon_HTMLPurifier_AttrDef_CSS_Length('0'),
                 new WPLab_Amazon_HTMLPurifier_AttrDef_CSS_Percentage(true),
-                new WPLab_Amazon_HTMLPurifier_AttrDef_Enum(['initial', 'inherit'])
             ]
         );
         $trusted_max_wh = new WPLab_Amazon_HTMLPurifier_AttrDef_CSS_Composite(
             [
                 new WPLab_Amazon_HTMLPurifier_AttrDef_CSS_Length('0'),
                 new WPLab_Amazon_HTMLPurifier_AttrDef_CSS_Percentage(true),
-                new WPLab_Amazon_HTMLPurifier_AttrDef_Enum(['none', 'initial', 'inherit'])
+                new WPLab_Amazon_HTMLPurifier_AttrDef_Enum(['none'])
             ]
         );
         $max = $config->get('CSS.MaxImgLength');
@@ -281,12 +278,7 @@ class WPLab_Amazon_HTMLPurifier_CSSDefinition extends WPLab_Amazon_HTMLPurifier_
                 new WPLab_Amazon_HTMLPurifier_AttrDef_Switch(
                     'img',
                     // For img tags:
-                    new WPLab_Amazon_HTMLPurifier_AttrDef_CSS_Composite(
-                        [
-                            new WPLab_Amazon_HTMLPurifier_AttrDef_CSS_Length('0', $max),
-                            new WPLab_Amazon_HTMLPurifier_AttrDef_Enum(['initial', 'inherit'])
-                        ]
-                    ),
+                    new WPLab_Amazon_HTMLPurifier_AttrDef_CSS_Length('0', $max),
                     // For everyone else:
                     $trusted_min_wh
                 );
@@ -300,22 +292,29 @@ class WPLab_Amazon_HTMLPurifier_CSSDefinition extends WPLab_Amazon_HTMLPurifier_
                     new WPLab_Amazon_HTMLPurifier_AttrDef_CSS_Composite(
                         [
                             new WPLab_Amazon_HTMLPurifier_AttrDef_CSS_Length('0', $max),
-                            new WPLab_Amazon_HTMLPurifier_AttrDef_Enum(['none', 'initial', 'inherit'])
+                            new WPLab_Amazon_HTMLPurifier_AttrDef_Enum(['none'])
                         ]
                     ),
                     // For everyone else:
                     $trusted_max_wh
                 );
 
+        $this->info['aspect-ratio'] = new WPLab_Amazon_HTMLPurifier_AttrDef_CSS_Multiple(
+            new WPLab_Amazon_HTMLPurifier_AttrDef_CSS_Composite([
+                new WPLab_Amazon_HTMLPurifier_AttrDef_CSS_Ratio(),
+                new WPLab_Amazon_HTMLPurifier_AttrDef_Enum(['auto']),
+            ])
+        );
+
         // text-decoration and related shorthands
         $this->info['text-decoration'] = new WPLab_Amazon_HTMLPurifier_AttrDef_CSS_TextDecoration();
 
         $this->info['text-decoration-line'] = new WPLab_Amazon_HTMLPurifier_AttrDef_Enum(
-            ['none', 'underline', 'overline', 'line-through', 'initial', 'inherit']
+            ['none', 'underline', 'overline', 'line-through']
         );
 
         $this->info['text-decoration-style'] = new WPLab_Amazon_HTMLPurifier_AttrDef_Enum(
-            ['solid', 'double', 'dotted', 'dashed', 'wavy', 'initial', 'inherit']
+            ['solid', 'double', 'dotted', 'dashed', 'wavy']
         );
 
         $this->info['text-decoration-color'] = new WPLab_Amazon_HTMLPurifier_AttrDef_CSS_Color();
@@ -323,7 +322,7 @@ class WPLab_Amazon_HTMLPurifier_CSSDefinition extends WPLab_Amazon_HTMLPurifier_
         $this->info['text-decoration-thickness'] = new WPLab_Amazon_HTMLPurifier_AttrDef_CSS_Composite([
             new WPLab_Amazon_HTMLPurifier_AttrDef_CSS_Length(),
             new WPLab_Amazon_HTMLPurifier_AttrDef_CSS_Percentage(),
-            new WPLab_Amazon_HTMLPurifier_AttrDef_Enum(['auto', 'from-font', 'initial', 'inherit'])
+            new WPLab_Amazon_HTMLPurifier_AttrDef_Enum(['auto', 'from-font'])
         ]);
 
         $this->info['font-family'] = new WPLab_Amazon_HTMLPurifier_AttrDef_CSS_FontFamily();

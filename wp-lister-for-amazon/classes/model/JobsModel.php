@@ -66,6 +66,7 @@ class WPLA_JobsModel extends WPLA_Model {
 		", $key
 		), ARRAY_A);		
 
+		$item['tasklist'] = $item['tasklist'] ?? '';
 		$item['tasklist'] = $this->decodeObject( $item['tasklist'], true );
 
 		$this->key = $key;

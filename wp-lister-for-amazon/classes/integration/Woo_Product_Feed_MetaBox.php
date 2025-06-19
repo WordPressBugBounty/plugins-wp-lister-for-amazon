@@ -7,25 +7,57 @@ class WPLA_Product_Feed_MetaBox {
 
 	function __construct() {
 
-		add_action( 'add_meta_boxes', array( &$this, 'add_meta_boxes' ) );
+		add_action( 'add_meta_boxes', array( &$this, 'add_meta_boxes' ), 10, 2 );
 		add_action( 'woocommerce_process_product_meta', array( &$this, 'save_meta_box' ), 0, 2 );
 
         // add_action( 'wp_ajax_wpla_update_custom_feed_columns', 	array( &$this, 'wpla_update_custom_feed_columns' ) ); 
-
+        add_action('admin_enqueue_scripts', array( $this, 'enqueue_scripts' ) );
 	}
 
-	function add_meta_boxes() {
+    function enqueue_scripts() {
+        $screen = get_current_screen();
 
+        if ( $screen && $screen->id != 'product' ) {
+            return;
+        }
+
+        $post_id = $_REQUEST['post'] ?? 0;
+
+	    wp_register_script( 'wpla_product_metabox', WPLA_URL.'js/classes/ProductTypesMetabox.js', array( 'jquery', 'jqueryFileTree' ), time() );
+	    wp_localize_script( 'wpla_product_metabox', 'wpla_product_metabox', [
+		    'post_id'               => $post_id,
+            'nonce'                 => wp_create_nonce( 'wpla_ajax_nonce' ),
+		    'current_tpl_id'        => get_post_meta( $post_id, '_wpla_custom_feed_tpl_id' , true ),
+            'current_product_type'  => get_post_meta( $post_id, '_wpla_custom_product_type' , true ),
+            'current_marketplace'   => get_post_meta( $post_id, '_wpla_custom_marketplace_id' , true ),
+	    ] );
+        wp_enqueue_script( 'wpla_product_metabox' );
+
+
+	    //add_action( 'wp_print_scripts', array( $this, 'print_scripts' ) );
+    }
+
+    function print_scripts() {
+        global $post;
+        //$post_id = $_REQUEST['post'] ?? 0;
+
+
+	    $this->add_inline_css();
+
+    }
+
+	function add_meta_boxes( $type, $post= null ) {
 		$title = __( 'Amazon Feed Attributes', 'wp-lister-for-amazon' );
+        $post_id = method_exists( $post, 'get_id' ) ? $post->get_id() : $post->ID;
+        if ( !$this->usesFeedTemplate( $post_id ) ) {
+	        $title = __( 'Amazon Product Type', 'wp-lister-for-amazon' );
+        }
+
 		add_meta_box( 'wpla-amazon-feed_columns', $title, array( &$this, 'meta_box_feed_columns' ), 'product', 'normal', 'default');
 
 	}
 
 	function meta_box_feed_columns( $post ) {
-
-		$this->add_inline_js( $post );
-		$this->add_inline_css();
-
 		$this->display_feed_template_selector( $post );
 
         // get custom feed_columns as array of attachment_ids
@@ -35,12 +67,122 @@ class WPLA_Product_Feed_MetaBox {
 
 	} // meta_box_feed_columns()
 
+    public function displayProductTypeRecommendations( $recommendations, $installed ) {
+        ?>
+        <div id="product_type_recommendations">
+            <p>
+                Important: Amazon is discontinuing Custom Feed Templates. Please select the recommended Product Type, and WP-Lister will attempt to map your existing attributes to the new format.
+            </p>
+            <p>
+                If you don't see a suitable Product Type for this listing, go to <a href="admin.php?page=wpla-settings&tab=product_types">Product Types</a>, then search for and install the appropriate one.
+            </p>
+
+            <label for="wpl-text-product_type" class="text_label">
+		        <?php echo __( 'New Product Type', 'wp-lister-for-amazon' ); ?>
+            </label>
+            <select id="wpl_new_product_type" name="wpla_new_product_type" class="required-entry select" style="width:55%;">
+            <?php if (! empty( $recommendations ) ) : ?>
+                <optgroup label="<?php _e('Recommended Replacements', 'wp-lister-for-amazon' ); ?>">
+            <?php
+            foreach ( $recommendations as $recommendation ):
+            ?>
+                    <option value="<?php esc_attr_e( $recommendation->getProductType() ); ?>"><?php _e( $recommendation->getDisplayName() ); ?></option>
+            <?php
+            endforeach;
+            ?>
+                </optgroup>
+            <?php endif; ?>
+            <?php if (! empty( $installed ) ) : ?>
+                <optgroup label="<?php _e('Installed Product Types', 'wp-lister-for-amazon' ); ?>">
+                    <?php
+                    foreach ( $installed as $product_type ):
+                        ?>
+                        <option value="<?php esc_attr_e( $product_type->getProductType() ); ?>"><?php _e( $product_type->getDisplayName() ); ?></option>
+                    <?php
+                    endforeach;
+                    ?>
+                </optgroup>
+            <?php endif; ?>
+            </select>
+            <button class="button-secondary" type="button" id="convert_feed_template"><?php _e('Convert'); ?></button>
+        </div>
+        <hr/>
+        <?php
+	    $this->add_inline_css();
+    }
+
+    public function displayProductTypeSelector( $post ) {
+	    $custom_product_type    = get_post_meta( $post->ID, '_wpla_custom_product_type', true );
+	    $custom_marketplace_id  = get_post_meta( $post->ID, '_wpla_custom_marketplace_id', true );
+        $product_types_array = [];
+
+        if ( $custom_marketplace_id ) {
+	        $product_types_array = \WPLab\Amazon\Models\AmazonProductTypesModel::getByMarketplace( $custom_marketplace_id );
+        }
+
+        ?>
+        <label for="wpl_marketplace_id" class="text_label">
+		    <?php echo __( 'Marketplace', 'wp-lister-for-amazon' ); ?>
+        </label>
+        <select id="wpl_marketplace_id" name="wpla_marketplace_id" class="required-entry select">
+            <option value=""> -- use profile setting -- </option>
+		    <?php
+            $marketplaces = WPLA_AmazonMarket::getAllFromAccounts();
+
+		    foreach ( $marketplaces as $marketplace_id => $marketplace ):
+			    ?>
+                <option <?php selected( $custom_marketplace_id, $marketplace_id); ?> value="<?php echo esc_attr($marketplace_id); ?>"><?php echo $marketplace; ?></option>
+		    <?php endforeach; ?>
+        </select>
+
+        <label for="wpl_product_type" class="text_label">
+		    <?php echo __( 'Product Type', 'wp-lister-for-amazon' ); ?>
+		    <?php wpla_tooltip('') ?>
+        </label>
+        <select id="wpl_product_type" name="wpla_product_type" class="required-entry select select2" data-tags="false" style="width: 65%;">
+            <option value=""> -- use profile setting -- </option>
+            <?php foreach ( $product_types_array as $type ): ?>
+            <option value="<?php esc_attr_e( $type->product_type ); ?>" <?php selected( $custom_product_type, $type->product_type ); ?>><?php echo $type->display_name; ?></option>
+            <?php endforeach; ?>
+        </select>
+        <br class="clear" />
+        <p class="desc">
+		    <?php _e('You can add additional Product Types at <a href="admin.php?page=wpla-settings&tab=product_types">Amazon » Settings » Product Types</a>.', 'wp-lister-amazon' ); ?>
+        </p>
+
+        <div id="PropertiesDataBox">
+            <hr>
+            <!-- <h3 class="hndle"><span><?php echo __( 'Listing Properties', 'wp-lister-for-amazon' ); ?></span></h3> -->
+            <div class="x-inside" id="wpla_feed_data_wrapper">
+            </div>
+        </div>
+        <?php
+	    $this->add_inline_css();
+    }
 
 	function display_feed_template_selector( $post ) {
+        // Show the old selector only if there's a tpl ID and no Product Type selected. Otherwise, show the new form
+		$custom_feed_tpl_id     = get_post_meta( $post->ID, '_wpla_custom_feed_tpl_id' , true );
+        $custom_product_type    = get_post_meta( $post->ID, '_wpla_custom_product_type', true );
+
+        if ( !$custom_feed_tpl_id || $custom_product_type ) {
+            return $this->displayProductTypeSelector( $post );
+        }
+
+        // Look for Product Type recommendations to replace the current feed template
+        $converter = new WPLab\Amazon\Helper\ProfileProductTypeConverter();
+        $product_type_recs = $converter->getRecommendedProductTypeFromTemplate( $custom_feed_tpl_id );
+
+		$marketplace_id = $converter->getFeedTemplateMarketplace( $custom_feed_tpl_id );
+		$mdl    = new \WPLab\Amazon\Models\AmazonProductTypesModel();
+		$filtered  = $mdl->getFiltered([
+            'marketplace_id' => $marketplace_id
+		]);
+        $installed = $filtered['items'];
 
 		// get templates
-		$templates          = WPLA_AmazonFeedTemplate::getAll();
-		$custom_feed_tpl_id = get_post_meta( $post->ID, '_wpla_custom_feed_tpl_id' , true );
+		$templates = WPLA_AmazonFeedTemplate::getAll();
+
 
 		// separate ListingLoader templates
 		$category_templates = array();
@@ -59,6 +201,10 @@ class WPLA_Product_Feed_MetaBox {
 		// compatibility with profile code
 		$wpl_category_templates = $category_templates;
 		$wpl_liloader_templates = $liloader_templates;
+
+        //if ( !empty($product_type_recs) ) {
+            $this->displayProductTypeRecommendations( $product_type_recs, $installed );
+        //}
 
 		?>
 							<label for="wpl-text-tpl_id" class="text_label">
@@ -108,8 +254,8 @@ class WPLA_Product_Feed_MetaBox {
 					</div>
 
 		<?php
+        $this->print_scripts();
 	} // display_feed_template_selector()
-
 
 	function add_inline_css() {
 		?>
@@ -133,7 +279,7 @@ class WPLA_Product_Feed_MetaBox {
 				#wpla-amazon-feed_columns select.select {
 					width: 65%;
 					margin-bottom: 5px;
-					padding: 3px 8px;
+					/*padding: 3px 8px;*/
 				}
 				#feed-template-data {
 					width: 100%;
@@ -163,6 +309,33 @@ class WPLA_Product_Feed_MetaBox {
 					margin: -2px;
 				}
 
+                #feed-template-data {
+                    width: 100%;
+                    margin-top: 1em;
+                }
+
+                #feed-template-data th {
+                    text-align: left;
+                }
+
+                #feed-template-data th h4 {
+                    margin-bottom: 0;
+                }
+
+                #feed-template-data input, #feed-template-data select {
+                    width: 90%;
+                }
+
+                #feed-template-searchbar {
+                    padding-bottom: 0.5em;
+                    border-bottom: 1px solid #eee;
+                }
+
+                .select2-container {
+                    box-sizing: border-box;
+                    display: inline-block;
+                    margin-bottom: 5px !important;
+                }
 
 			</style>
 		<?php
@@ -171,103 +344,6 @@ class WPLA_Product_Feed_MetaBox {
 
 	function add_inline_js( $post ) {
 
-		$nonce = wp_create_nonce( 'wpla_ajax_nonce' );
-        wc_enqueue_js("
-
-			// load template data
-			function loadTemplateData() {
-				var tpl_id = jQuery('#wpl-text-tpl_id')[0].value;
-				var post_id = '{$post->ID}';
-
-				// jQuery('#wpla_feed_data_wrapper').slideUp(500);
-				// jQuery('#FeedDataBox .loadingMsg').slideDown(500);
-				jQuery('#wpla_feed_data_wrapper').html('<p><i>loading feed template...</i></p>');
-
-		        // fetch category conditions
-		        var params = {
-		            action: 'wpla_load_template_data_for_product',
-		            tpl_id: tpl_id,
-		            post_id: post_id,
-		            _wpnonce: '{$nonce}'
-		        };
-
-		        var jqxhr = jQuery('#wpla_feed_data_wrapper').load( ajaxurl, params, function( response, status, xhr ) {
-					if ( status == 'error' ) {
-				    	var msg = 'Sorry but there was an error: ';
-				    	jQuery( '#error' ).html( msg + xhr.status + ' ' + xhr.statusText );
-				  	} else {
-			
-						// init tooltips
-						jQuery('#FeedDataBox .help_tip').tipTip({
-					    	'attribute' : 'data-tip',
-					    	'maxWidth' : '250px',
-					    	'fadeIn' : 50,
-					    	'fadeOut' : 50,
-					    	'delay' : 200
-					    });
-
-				  	}
-				});
-		        // console.log('jqxhr',jqxhr);
-
-			}
-
-
-			// init 
-			jQuery( document ).ready( function () {
-				
-				jQuery('#wpl-text-tpl_id').change(function() {
-					if ( jQuery('#wpl-text-tpl_id').val() != '' ) {
-						loadTemplateData();
-					}
-				});
-				jQuery('#wpl-text-tpl_id').change();
-
-
-
-				// jqueryFileTree - amazon categories / browse tree guide
-			    jQuery('#amazon_categories_tree_container').fileTree({
-			        root: '/0/',
-			        script: ajaxurl+'?action=wpla_get_amazon_categories_tree',
-			        expandSpeed: 400,
-			        collapseSpeed: 400,
-			        loadMessage: 'loading browse tree guide...',
-			        multiFolder: false
-			    }, function(catpath) {
-
-					// console.log('catpath: ',catpath);
-
-					// get cat id from full path
-			        var cat_id = catpath.split('/').pop(); // get last item - like php basename()
-
-			        var cat_array = catpath.split('/');
-			        if ( cat_array[ cat_array.length - 1 ] == '' ) {
-			        	cat_id = cat_array[ cat_array.length - 2 ];
-			        }
-
-			        // get name of selected category
-			        // var cat_name = '';
-
-			        // var pathname = wpl_getCategoryPathName( catpath.split('/') );
-			        // var pathname = catpath;
-					// console.log('cat_id: ',cat_id);
-
-					// insert shortcode / value
-					wpla_insert_selected_browse_node( cat_id );
-
-			        // update fields
-			        // jQuery('#amazon_category_id_'+wpla_selecting_cat).prop( 'value', cat_id );
-			        // jQuery('#amazon_category_name_'+wpla_selecting_cat).html( pathname );
-			        
-			        // close thickbox
-			        // tb_remove();
-
-
-			    });
-	
-			});	
-
-	    ");
 	} // add_inline_js()
 
 
@@ -286,6 +362,11 @@ class WPLA_Product_Feed_MetaBox {
                 update_post_meta( $post_id, '_wpla_custom_feed_columns', $tpl_columns );
             }
 		}
+
+        if ( isset( $_POST['wpla_product_type'] ) ) {
+	        update_post_meta( $post_id, '_wpla_custom_product_type',    wpla_clean( $_POST['wpla_product_type'] ) );
+	        update_post_meta( $post_id, '_wpla_custom_marketplace_id',  wpla_clean( $_POST['wpla_marketplace_id'] ) );
+        }
 
 	} // save_meta_box()
 
@@ -312,6 +393,10 @@ class WPLA_Product_Feed_MetaBox {
     public function returnJSON( $data ) {
         header('content-type: application/json; charset=utf-8');
         echo json_encode( $data );
+    }
+
+    private function usesFeedTemplate( $product_id ) {
+	    return (bool)get_post_meta( $product_id, '_wpla_custom_feed_tpl_id' , true );
     }
 
 

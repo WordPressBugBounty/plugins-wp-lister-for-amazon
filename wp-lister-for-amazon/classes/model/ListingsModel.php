@@ -13,8 +13,27 @@ class WPLA_ListingsModel extends WPLA_Model {
 	var $updated_count = 0;
 	var $imported_count = 0;
 
+	public $warnings;
+	public $errors;
+
 	public $tablename;
 	public $total_items;
+
+	const STATUS_PREPARED = 'prepared';
+	const STATUS_ONLINE = 'online';
+	const STATUS_CHANGED = 'changed';
+	const STATUS_FAILED = 'failed';
+	const STATUS_MATCHED = 'matched';
+	const STATUS_SUBMITTED = 'submitted';
+	const STATUS_SOLD = 'sold';
+	const STATUS_IMPORTED = 'imported';
+	const STATUS_ARCHIVED = 'archived';
+	const STATUS_TRASH = 'trash';
+	const STATUS_TRASHED = 'trashed';
+
+
+	const PUBLISH_QUEUE_KEY  = 'wpla_amazon_publish_queue';
+	const PUBLISH_QUEUE_CRON = 'wpla_process_publish_queue_runner';
 
 	static $_summary_cache = null;
 
@@ -39,7 +58,7 @@ class WPLA_ListingsModel extends WPLA_Model {
         // filter listing_status
 		$listing_status = isset($_REQUEST['listing_status']) ? esc_sql( wpla_clean($_REQUEST['listing_status']) ) : '';
 		if ( $listing_status == 'no_asin' ) {
-			$where_sql = "WHERE status = 'online'
+			$where_sql = "WHERE ( status = 'online' OR status = 'submitted' )
 				  			AND ( asin = '' OR asin IS NULL )
 				  			AND (product_type <> 'variable' OR product_type IS NULL)";
 		// } elseif ( $listing_status == 'is_in_stock' ) {
@@ -1351,9 +1370,9 @@ class WPLA_ListingsModel extends WPLA_Model {
 			FROM $table
 			WHERE account_id = %d
 			AND locked = 0
-			  AND ( status = 'changed'
-			   OR 	status = 'prepared'
-			   OR   status = 'matched' )
+			  AND ( status = '". self::STATUS_CHANGED ."'
+			   OR 	status = '". self::STATUS_PREPARED ."'
+			   OR   status = '". self::STATUS_MATCHED ."' )
 			ORDER BY profile_id, id DESC
 		", $account_id
 		), ARRAY_A);
@@ -1395,8 +1414,6 @@ class WPLA_ListingsModel extends WPLA_Model {
         // This line tells MySQL to allow going over that limit #43398
         $wpdb->query( 'SET SESSION SQL_BIG_SELECTS=1' );
 
-        $max_feed_size = get_option( 'wpla_max_feed_size', 1000 );
-
         /**
          * @todo This query is causing timeouts on big DBs due to the LEFT JOIN on wp_posts directive #57303
          */
@@ -1423,15 +1440,14 @@ class WPLA_ListingsModel extends WPLA_Model {
             {$drafts_join}
 			WHERE l.account_id = %d
 		      AND l.locked = 0
-			  AND l.status IN ('changed', 'prepared', 'matched')
+			  AND l.status IN ('". self::STATUS_CHANGED ."', '". self::STATUS_PREPARED ."', '". self::STATUS_MATCHED ."')
 			  {$drafts_filter}
 			ORDER BY l.profile_id, l.id DESC
-			LIMIT {$max_feed_size}
 		", $account_id
 		), ARRAY_A);
 
 		// get all profiles
-		$all_profiles_results = $wpdb->get_results("SELECT profile_id, tpl_id FROM {$wpdb->prefix}amazon_profiles", ARRAY_A);
+		$all_profiles_results = $wpdb->get_results("SELECT profile_id, tpl_id FROM {$wpdb->prefix}amazon_profiles WHERE tpl_id IS NOT NULL", ARRAY_A);
 		$template_ids = [];
 		foreach ( $all_profiles_results as $profile_row ) {
 			$template_ids[ $profile_row['profile_id'] ] = $profile_row['tpl_id'];
@@ -1446,7 +1462,7 @@ class WPLA_ListingsModel extends WPLA_Model {
 		return $items;
 	}
 
-	function getPendingProductsForAccount_GroupedByTemplateType( $account_id ) {
+	public function getPendingProductsForAccount_GroupedByTemplateType( $account_id ) {
 
 		$items = $this->getAllPendingProductsForAccount_TemplateType( $account_id );
 
@@ -1459,6 +1475,51 @@ class WPLA_ListingsModel extends WPLA_Model {
 		}
 
 		return $grouped_items;
+	}
+
+	public function getPendingProductsForAccountByProductType( $account_id ) {
+		global $wpdb;
+
+		// get all profiles using Product Types
+		$profile_ids    = $wpdb->get_col("SELECT profile_id FROM {$wpdb->prefix}amazon_profiles WHERE marketplace_id IS NOT NULL AND product_type IS NOT NULL");
+		$max_feed_size  = get_option( 'wpla_max_feed_size', 1000 );
+
+		if ( empty( $profile_ids ) ) {
+			$profile_ids = [];
+		}
+		$profile_ids[] = 0;
+
+		$profile_ids_str = implode(',', $profile_ids);
+
+		$sql = "
+			SELECT DISTINCT l.* 
+			FROM 
+				{$wpdb->prefix}amazon_listings l
+			WHERE l.account_id = {$account_id}
+		      AND l.locked = 0
+			  AND l.status IN ('". self::STATUS_CHANGED ."', '". self::STATUS_PREPARED ."', '". self::STATUS_MATCHED ."')
+			  AND l.profile_id IN ({$profile_ids_str})
+			ORDER BY l.profile_id, l.id DESC
+			LIMIT {$max_feed_size}
+		";
+
+		$items = $wpdb->get_results( $sql, ARRAY_A);
+
+		// remove listings that have no product type
+		foreach ( $items as $idx => $item ) {
+			if ( $item['profile_id'] != 0 ) {
+				continue;
+			}
+
+			$id = $item['parent_id'] ?: $item['post_id'];
+			$product_type = get_post_meta( $id, '_wpla_custom_product_type', true );
+
+			if ( empty( $product_type ) ) {
+				unset( $items[ $idx ] );
+			}
+		}
+
+		return $items;
 	}
 
 	// get products for Price and Quantity feed
@@ -1607,8 +1668,9 @@ class WPLA_ListingsModel extends WPLA_Model {
 		$items = $wpdb->get_results("
 			SELECT *
 			FROM $table
-			WHERE status = 'online'
-			  AND ( asin = '' OR asin IS NULL )
+			WHERE 1=1
+			AND ( status = 'online' OR status = 'submitted' )
+		    AND ( asin = '' OR asin IS NULL )
 			  $where_sql
 			  $limit_sql
 		", $format);
@@ -1797,31 +1859,31 @@ class WPLA_ListingsModel extends WPLA_Model {
 			switch ( $listing_status ) {
 
 				// prepared and sold listings keep their status
-				case 'matched':		// matched items
-				case 'prepared':	// new items
+				case self::STATUS_MATCHED:		// matched items
+				case self::STATUS_PREPARED:	// new items
 				// case 'submitted':
-				case 'sold':
+				case self::STATUS_SOLD:
 					$new_status = $listing_status;
 					break;
 
-				case 'online':
-				case 'submitted':	// allow another feed to be submitted, even when there is a submitted feed already
+				case self::STATUS_ONLINE:
+				case self::STATUS_SUBMITTED:	// allow another feed to be submitted, even when there is a submitted feed already
 									// (make sure the latest changes are submitted - even if a feed is "stuck" as submitted for some reason)
-					$new_status = 'changed';
+					$new_status = self::STATUS_CHANGED;
 					break;
 
-				case 'failed':
+				case self::STATUS_FAILED:
 					// listings with ASIN exist, so they are marked as changed to be updated
 					// listings without ASIN were submitted as new products, so they are marked as prepared
 					// matched listings are marked as matched again...
-					$new_status = $item->asin ? 'changed' : 'prepared';
-					if ( $item->source == 'matched' ) $new_status = 'matched';
-					if ( $item->source == 'foreign_import' ) $new_status = 'matched';
+					$new_status = $item->asin ? self::STATUS_CHANGED : self::STATUS_PREPARED;
+					if ( $item->source == 'matched' ) $new_status = self::STATUS_MATCHED;
+					if ( $item->source == 'foreign_import' ) $new_status = self::STATUS_MATCHED;
 					break;
 
 				default:
 					# code...
-					$new_status = 'changed';
+					$new_status = self::STATUS_CHANGED;
 			}
 
 			// collect listing data
@@ -1850,7 +1912,7 @@ class WPLA_ListingsModel extends WPLA_Model {
 
 			self::updateCustomListingTitle( $post_id );
 
-			if ( $new_status == 'changed' ) $there_were_changes = true;
+			if ( $new_status == self::STATUS_CHANGED ) $there_were_changes = true;
 
 		} // each listing
 
@@ -1864,25 +1926,27 @@ class WPLA_ListingsModel extends WPLA_Model {
 
 	public function resubmitItem( $id ) {
 		$listing = $this->getItem( $id );
-		if ( ! in_array( $listing['status'], array('online','failed','submitted') ) ) return;
+		if ( ! in_array( $listing['status'], array( self::STATUS_ONLINE, self::STATUS_FAILED, self::STATUS_SUBMITTED) ) ) {
+			return;
+		}
 
-		if ( 'online' == $listing['status'] ) {
+		if ( self::STATUS_ONLINE == $listing['status'] ) {
 			// set status to changed for items which are already online
-			$new_status = 'changed';
-		} elseif ( 'submitted' == $listing['status'] ) {
+			$new_status = self::STATUS_CHANGED;
+		} elseif ( self::STATUS_SUBMITTED == $listing['status'] ) {
 			// set status to changed to re-submit stuck item
-			$new_status = 'changed';
+			$new_status = self::STATUS_CHANGED;
 		} elseif ( $listing['asin'] ) {
 			// items with ASIN are updated
-			$new_status = 'matched';
+			$new_status = self::STATUS_MATCHED;
 		} else {
 			// items without ASIN are new
-			$new_status = 'prepared';
+			$new_status = self::STATUS_PREPARED;
 		}
 
 		// update status
 		$this->updateWhere( array( 'id' => $id ), array( 'status' => $new_status ) );
-
+		$this->enqueueForPublish( $id );
 	}
 
 	public function setLockedStatus( $id, $locked = true ) {
@@ -1933,6 +1997,86 @@ class WPLA_ListingsModel extends WPLA_Model {
 		$response->warnings       = $this->warnings;
 
 		return $response;
+	}
+
+	public function enqueuePreparedListings() {
+		$prepared = $this->getWhere( 'status', self::STATUS_PREPARED );
+		$profiles = [];
+		foreach ( $prepared as $item ) {
+			$product_type = false;
+
+			if ( $item->profile_id ) {
+				if ( isset( $profiles[ $item->profile_id] ) ) {
+					$profile = $profiles[ $item->profile_id ];
+				} else {
+					$profile = new WPLA_AmazonProfile( $item->profile_id );
+					$profiles[ $item->profile_id ] = $profile;
+				}
+
+				$product_type = $profile->product_type;
+			} else {
+				$product_type = get_post_meta( $item->post_id, '_wpla_custom_product_type', true );
+			}
+
+			if ( !$product_type ) {
+				continue;
+			}
+
+			$this->enqueueForPublish( $item->id );
+		}
+	}
+
+	/**
+	 * Enqueue a listing for batch publishing.
+	 *
+	 * Adds the given listing ID to the publish queue (stored as a WP option) if it's not already present,
+	 * and schedules the publish runner to process the queue one second later if it isn't already scheduled.
+	 *
+	 * @param int $listing_id The unique identifier of the listing to enqueue.
+	 * @return void
+	 */
+	public function enqueueForPublish( $listing_id ) {
+		$queue = get_option( self::PUBLISH_QUEUE_KEY, array() );
+		if ( ! in_array( intval($listing_id), $queue ) ) {
+			$queue[] = intval($listing_id);
+			update_option( self::PUBLISH_QUEUE_KEY, $queue, false );
+		}
+
+		// Turn it on
+		if ( ! as_next_scheduled_action( self::PUBLISH_QUEUE_CRON ) ) {
+			as_schedule_single_action( time()+1, self::PUBLISH_QUEUE_CRON, [], 'WPLA' );
+		}
+	}
+
+	/**
+	 * Schedule a one‐off Action Scheduler job to process the publishing queue.
+	 *
+	 * Checks if there are any items in the publish queue, and if so, schedules
+	 * a single Action Scheduler task (in the "WPLA" group) to fire one second
+	 * from now, provided one is not already pending.
+	 *
+	 * @return void
+	 */
+	public static function maybeSchedulePublishingCron() {
+		if ( WPLA_Setup::isStagingSite() ) {
+			return;
+		}
+
+		$queue = get_option( self::PUBLISH_QUEUE_KEY, array() );
+
+		if ( !empty( $queue ) && !as_next_scheduled_action( self::PUBLISH_QUEUE_CRON, [], 'WPLA' ) ) {
+			as_schedule_single_action( time()+1, self::PUBLISH_QUEUE_CRON, [], 'WPLA' );
+		}
+	}
+
+	public static function removeListingFromPublishingQueue( $listing_id ) {
+		$queue = get_option( self::PUBLISH_QUEUE_KEY, array() );
+		$idx   = array_search( intval($listing_id), $queue );
+
+		if ( $idx !== false ) {
+			unset( $queue[ $idx ] );
+			update_option( self::PUBLISH_QUEUE_KEY, $queue, false );
+		}
 	}
 
 	public function prepareProductForListing( $post_id, $profile_id, $update_pending_feeds = true ) {
@@ -1990,7 +2134,7 @@ class WPLA_ListingsModel extends WPLA_Model {
 		$data['quantity']      = WPLA_ProductWrapper::getStock( $post_id );
 		$data['sku']           = WPLA_ProductWrapper::getSKU( $post_id );
 		$data['date_created']  = gmdate( 'Y-m-d H:i:s', time() );
-		$data['status']        = 'prepared';
+		$data['status']        = self::STATUS_PREPARED;
 		$data['source']        = 'woo';
 		$data['profile_id']    = $profile->profile_id;
 		$data['account_id']    = $profile->account_id;
@@ -2093,7 +2237,7 @@ class WPLA_ListingsModel extends WPLA_Model {
 			$data['quantity']      = WPLA_ProductWrapper::getStock( $variation_id );
 			$data['sku']           = WPLA_ProductWrapper::getSKU( $variation_id );
 			$data['date_created']  = gmdate( 'Y-m-d H:i:s', time() );
-			$data['status']        = 'prepared';
+			$data['status']        = self::STATUS_PREPARED;
 			$data['source']        = 'woo';
 			$data['profile_id']    = $profile->profile_id;
 			$data['account_id']    = $profile->account_id;
@@ -2244,7 +2388,7 @@ class WPLA_ListingsModel extends WPLA_Model {
         // $data['sku']           = WPLA_ProductWrapper::getSKU( $variation_id );
         $data['sku']           = $sku;
         $data['date_created']  = gmdate( 'Y-m-d H:i:s', time() );
-        $data['status']        = 'prepared';
+        $data['status']        = self::STATUS_PREPARED;
         $data['source']        = 'woo';
         $data['profile_id']    = $parent_listing->profile_id;
         $data['account_id']    = $parent_listing->account_id;
@@ -2333,7 +2477,7 @@ class WPLA_ListingsModel extends WPLA_Model {
             $profile = new WPLA_AmazonProfile( $listing->profile_id );
             if ( $profile->details['variations_mode'] == 'flat' && $product->is_type( 'variation' ) ) {
                 // set the parent's listing status to "online" so it's displayed as "variable" instead of "prepared"
-                self::updateWhere( ['post_id' => $listing->parent_id], ['status' => 'online']);
+                self::updateWhere( ['post_id' => $listing->parent_id], ['status' => self::STATUS_ONLINE]);
             }
         }
     }
@@ -2357,7 +2501,7 @@ class WPLA_ListingsModel extends WPLA_Model {
 	} // getVariationThemeForPostID()
 
 
-	public function applyProfileToItem( $profile, $item ) {
+	public function applyProfileToItem( $profile, $item, $update_status = true ) {
 		global $wpdb;
 
 		// allow to pass a listing_id instead of item object
@@ -2402,26 +2546,28 @@ class WPLA_ListingsModel extends WPLA_Model {
 		} // if variable product
 
 
-		// default new status is 'changed'
-		$data['status'] = 'changed';
-		if ( $status == 'failed' ) 			$data['status'] = 'changed';
-		if ( $status == 'online' ) 			$data['status'] = 'changed';
+		if ( $update_status ) {
+			// default new status is 'changed'
+			$data['status'] = self::STATUS_CHANGED;
+			if ( $status == self::STATUS_FAILED ) 			$data['status'] = self::STATUS_CHANGED;
+			if ( $status == self::STATUS_ONLINE ) 			$data['status'] = self::STATUS_CHANGED;
 
-		// except for matched or imported products
-		if ( $status == 'matched' ) 		$data['status'] = $status;
-		if ( $status == 'imported' ) 		$data['status'] = $status;
-		if ( $status == 'prepared' ) 		$data['status'] = $status;
+			// except for matched or imported products
+			if ( $status == self::STATUS_MATCHED ) 		    $data['status'] = $status;
+			if ( $status == self::STATUS_IMPORTED ) 		$data['status'] = $status;
+			if ( $status == self::STATUS_PREPARED ) 		$data['status'] = $status;
 
-		// submitted items stay 'submitted' and archived items stay archived
-		if ( $status == 'submitted' ) 		$data['status'] = $status;
-		if ( $status == 'archived' ) 		$data['status'] = $status;
-		if ( $status == 'trash' ) 			$data['status'] = $status;
-		if ( $status == 'trashed' ) 		$data['status'] = $status;
+			// submitted items stay 'submitted' and archived items stay archived
+			if ( $status == self::STATUS_SUBMITTED ) 		$data['status'] = $status;
+			if ( $status == self::STATUS_ARCHIVED ) 		$data['status'] = $status;
+			if ( $status == self::STATUS_TRASH ) 			$data['status'] = $status;
+			if ( $status == self::STATUS_TRASHED ) 		    $data['status'] = $status;
 
-		// debug
-		if ( $status != $data['status'] ) {
-			WPLA()->logger->info('applyProfileToItem('.$id.') old status: '.$status );
-			WPLA()->logger->info('applyProfileToItem('.$id.') new status: '.$data['status'] );
+			// debug
+			if ( $status != $data['status'] ) {
+				WPLA()->logger->info('applyProfileToItem('.$id.') old status: '.$status );
+				WPLA()->logger->info('applyProfileToItem('.$id.') new status: '.$data['status'] );
+			}
 		}
 
 		// update auctions table
@@ -2435,11 +2581,11 @@ class WPLA_ListingsModel extends WPLA_Model {
 
 	} // applyProfileToItem()
 
-	public function applyProfileToListings( $profile, $items ) {
+	public function applyProfileToListings( $profile, $items, $update_status = true ) {
 
 		// apply profile to all items
 		foreach( $items as $item ) {
-			$this->applyProfileToItem( $profile, $item );
+			$this->applyProfileToItem( $profile, $item, $update_status );
 		}
 
 		return $items;

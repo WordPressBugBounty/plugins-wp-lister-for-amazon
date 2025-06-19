@@ -7,7 +7,7 @@
  * @package  SellingPartnerApi
  *
  * @license BSD-3-Clause
- * Modified by __root__ on 08-May-2024 using {@see https://github.com/BrianHenryIE/strauss}.
+ * Modified by __root__ on 07-January-2025 using {@see https://github.com/BrianHenryIE/strauss}.
  */
 
 /**
@@ -1381,7 +1381,7 @@ class ListingsV20210801Api extends BaseApi
      *
      * @param  string $seller_id A selling partner identifier, such as a merchant account or vendor code. (required)
      * @param  string $sku A selling partner provided identifier for an Amazon listing. (required)
-     * @param  string[] $marketplace_ids A comma-delimited list of Amazon marketplace identifiers for the request. (required)
+     * @param  string $marketplace_ids A comma-delimited list of Amazon marketplace identifiers for the request. (required)
      * @param  \WPLab\Amazon\SellingPartnerApi\Model\ListingsV20210801\ListingsItemPutRequest $body The request body schema for the putListingsItem operation. (required)
      * @param  string $issue_locale A locale for localization of issues. When not provided, the default language code of the first marketplace is used. Examples: \"en_US\", \"fr_CA\", \"fr_FR\". Localized messages default to \"en_US\" when a localization is not available in the specified locale. (optional)
      *
@@ -1415,20 +1415,20 @@ class ListingsV20210801Api extends BaseApi
             $request
         );
 
-        $this->writeDebug($signedRequest);
-        $this->writeDebug((string) $signedRequest->getBody());
+        //$this->writeDebug($signedRequest);
+        //$this->writeDebug((string) $signedRequest->getBody());
 
         try {
             $options = $this->createHttpClientOption();
             try {
                 $response = $this->client->send($signedRequest, $options);
-                $this->writeDebug($response);
-                $this->writeDebug((string) $response->getBody());
+                //$this->writeDebug($response);
+                //$this->writeDebug((string) $response->getBody());
             } catch (RequestException $e) {
                 $hasResponse = !empty($e->hasResponse());
                 $body = (string) ($hasResponse ? $e->getResponse()->getBody() : '[NULL response]');
-                $this->writeDebug($e->getResponse());
-                $this->writeDebug($body);
+                //$this->writeDebug($e->getResponse());
+                //$this->writeDebug($body);
                 throw new ApiException(
                     "[{$e->getCode()}] {$body}",
                     $e->getCode(),

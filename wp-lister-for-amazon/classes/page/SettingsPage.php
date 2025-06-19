@@ -174,6 +174,7 @@ class WPLA_SettingsPage extends WPLA_Page {
         $default_tab = is_network_admin() ? 'license' : 'settings';
         $active_tab = isset( $_GET[ 'tab' ] ) ? sanitize_key($_GET[ 'tab' ]) : $default_tab;
         if ( 'categories' == $active_tab ) return $this->displayCategoriesPage();
+        if ( 'product_types' == $active_tab ) return $this->displayProductTypesPage();
         if ( 'developer'  == $active_tab ) return $this->displayDeveloperPage();
         if ( 'advanced'   == $active_tab ) return $this->displayAdvancedSettingsPage();
         if ( 'license'    == $active_tab ) return $this->displayLicensePage();
@@ -246,6 +247,32 @@ class WPLA_SettingsPage extends WPLA_Page {
 		$this->display( 'settings_tpl_btg', $aData );
 	}
 
+    public function displayProductTypesPage() {
+	    // create table and fetch items to show
+	    $table = new \WPLab\Amazon\Tables\ProductTypesTable();
+	    $table->prepare_items();
+
+        $mdl = new \WPLab\Amazon\Models\AmazonProductTypesModel();
+        $types = $mdl->getFiltered([
+            'per_page'  => 100
+        ]);
+
+        $installed = [];
+        foreach ( $types['items'] as $type ) {
+            $installed[ $type->getMarketplaceId() ][] = $type->getProductType();
+        }
+
+        $aData = [
+	        'plugin_url'		=> self::$PLUGIN_URL,
+	        'message'			=> $this->message,
+	        'settings_url'		=> 'admin.php?page='.self::ParentMenuId.'-settings',
+            'table'             => $table,
+            'form_action'       => 'admin.php?page='.self::ParentMenuId.'-settings'.'&tab=product_types',
+            'installed'         => $installed
+        ];
+	    $this->display( 'settings_tpl_product_types', $aData );
+    }
+
 	public function displayAdvancedSettingsPage() {
         $wp_roles = new WP_Roles();
 
@@ -291,6 +318,7 @@ class WPLA_SettingsPage extends WPLA_Page {
             'disable_sale_price'                => self::getOption( 'disable_sale_price', 0 ),
             'fallback_to_stock_status'          => self::getOption( 'fallback_to_stock_status', 0 ),
             'allow_listing_drafts'              => self::getOption( 'allow_listing_drafts', 0 ),
+            'remove_https_from_images'          => self::getOption( 'remove_https_from_images', 1 ),
 			'external_repricer_mode'  			=> self::getOption( 'external_repricer_mode', 0 ),
 			'repricing_table_show_quantity_source'  			=> self::getOption( 'repricing_table_show_quantity_source', 0 ),
 			'repricing_use_lowest_offer'  		=> self::getOption( 'repricing_use_lowest_offer', 0 ),
@@ -548,6 +576,7 @@ class WPLA_SettingsPage extends WPLA_Page {
         self::updateOption( 'disable_sale_price', 				$this->getValueFromPost( 'disable_sale_price' ) );
         self::updateOption( 'fallback_to_stock_status',			$this->getValueFromPost( 'fallback_to_stock_status' ) );
         self::updateOption( 'allow_listing_drafts', 				$this->getValueFromPost( 'allow_listing_drafts' ) );
+        self::updateOption( 'remove_https_from_images',			$this->getValueFromPost( 'remove_https_from_images' ) );
         self::updateOption( 'autofetch_listing_quality_feeds', 	$this->getValueFromPost( 'autofetch_listing_quality_feeds' ) );
         self::updateOption( 'autofetch_inventory_report', 		$this->getValueFromPost( 'autofetch_inventory_report' ) );
         self::updateOption( 'autofetch_order_report', 		    $this->getValueFromPost( 'autofetch_order_report' ) );
@@ -1010,6 +1039,7 @@ class WPLA_SettingsPage extends WPLA_Page {
 
         // jQuery UI Autocomplete
         wp_enqueue_script( 'jquery-ui-autocomplete' );
+        wp_enqueue_script( 'jquery-blockui' );
 	}
 
 	public function renderSettingsOptions() {

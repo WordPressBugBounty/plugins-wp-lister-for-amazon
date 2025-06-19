@@ -110,6 +110,10 @@ class WPLA_FeedDataBuilder {
 			if ( ! $item['sku'] ) continue;
 			WPLA()->logger->debug('processing item '.$item['sku'].' - ID '.$product_id);
 
+			if (is_string($profile_details)) {
+				$profile_details = maybe_unserialize( $profile_details );
+			}
+
 			// Skip listing parent variables if profile variations mode is FLAT #53534
 			if ( $profile_details && $profile_details['variations_mode'] == 'flat' && $product->is_type( 'variable' ) ) {
                 WPLA()->logger->debug('flat variations mode. skipping variable (parent)');
@@ -1297,19 +1301,32 @@ class WPLA_FeedDataBuilder {
 		return $value;
 	} // convertToEnglishAttributeLabel()
 
-
+	/**
+	 * @param string $original_value
+	 * @param string $placeholder
+	 * @param array $item amazon_listing array
+	 * @param WC_Product $product
+	 * @param int $post_id
+	 * @param WPLA_AmazonProfile|bool $profile
+	 *
+	 * @return array|string|string[]
+	 */
 	static public function parseProfileShortcode( $original_value, $placeholder, $item, $product, $post_id, $profile ) {
+		// make sure we have a boolen value instead of an empty profile
+		if ( $profile && !$profile->id ) {
+			$profile = false;
+		}
+
+		if ( !$product ) {
+			return str_replace( $placeholder, '', $original_value );;
+		}
+
 	    // set correct post_id for variations
         $product_id = $post_id;
-        $product_type = wpla_get_product_meta( $product, 'product_type' );
+        $product_type = $product->get_type();
         if ( $product_type == 'variation' || $product_type == 'product-part-variation' ) {
-            if ( version_compare( WC_VERSION, '3.0', '<' ) ) {
-                $post_id = $product->variation_id;
-                $product_id = $product->id;
-            } else {
-                // set the $product_id to the parent's ID
-                $product_id = WPLA_ProductWrapper::getVariationParent( $post_id );
-            }
+            // set the $product_id to the parent's ID
+            $product_id = WPLA_ProductWrapper::getVariationParent( $post_id );
         }
 
 		switch ( $placeholder ) {
@@ -1337,13 +1354,13 @@ class WPLA_FeedDataBuilder {
 					}
 				}
 
-				$value = self::doTranslate( self::htmlEntityDecode( strip_tags( $value ) ), $profile->account_id ); // fix some special characters
+				$value = self::doTranslate( self::htmlEntityDecode( strip_tags( $value ) ), $profile->account_id ?? null ); // fix some special characters
 				break;
 
 			case '[product_price]':
 				// $value = $product->get_price();			// WC2.1+
-				$value = wpla_get_product_meta( $product, 'regular_price' );			// WC2.0
-				$value = $profile ? $profile->processProfilePrice( $value ) : $value;
+				$value = $product->get_regular_price('edit');
+				$value = $profile && $profile->id ? $profile->processProfilePrice( $value ) : $value;
 				$value = apply_filters( 'wpla_filter_product_price', $value, $post_id, $product, $item, $profile );
 
                 $value  = str_replace( ',', '.', $value ); // covert to a dot decimal character - will get converted to comma later if necessary in self::convertCurrencyFormat()
@@ -1351,7 +1368,7 @@ class WPLA_FeedDataBuilder {
                 // Repricing shipping fee for _amazon_price
                 $shipping_fee = get_option( 'wpla_repricing_shipping', 0 );
 
-                if ( ( $post_id != wpla_get_product_meta( $product, 'id' ) ) && ( $product_value = get_post_meta( wpla_get_product_meta( $product, 'id' ), '_amazon_price', true ) ) ) {	// parent price
+                if ( ( $post_id != $product->get_id() ) && ( $product_value = get_post_meta( $product->get_id(), '_amazon_price', true ) ) ) {	// parent price
                     if ( !empty( $product_value ) ) {
                         $value = $product_value;
                     }
@@ -1384,13 +1401,13 @@ class WPLA_FeedDataBuilder {
 
 			case '[product_sale_price]':
 				// $value = $product->get_sale_price();		// WC2.1+
-				$value = wpla_get_product_meta( $product, 'sale_price' );				// WC2.0
+				$value = $product->get_sale_price('edit');				// WC2.0
 				$value = $profile ? $profile->processProfilePrice( $value ) : $value;
 				$value = apply_filters( 'wpla_filter_sale_price', $value, $post_id, $product, $item, $profile );
 				$value = $value ? number_format( floatval($value),2, null, '' ) : $value;
 
 				// make sure sale_price is not higher than standard_price / price - Amazon might silently ignore price updates otherwise
-				$standard_price = self::getStandardPriceForRow( wpla_get_product_meta( $product, 'sku' ) );
+				$standard_price = self::getStandardPriceForRow( $product->get_sku('edit') );
 				if ( $standard_price && ( $value > $standard_price ) ) $value = '';
 
 				// if no sale price is set, send regular price with sale end date in the past to remove previously sent sale prices
@@ -1412,7 +1429,7 @@ class WPLA_FeedDataBuilder {
 				$value = $date ? date( 'Y-m-d', $date ) : '';
 
 				// if sale price exists but no start date, fill in 2010-01-01
-				$has_sale_price = self::hasActiveSalePrice( wpla_get_product_meta( $product, 'sku' ) );
+				$has_sale_price = self::hasActiveSalePrice( $product->get_sku('edit') );
 				if ( ! $value && $has_sale_price ) $value = '2010-01-01';
 				break;
 			case '[product_sale_end]':
@@ -1420,7 +1437,7 @@ class WPLA_FeedDataBuilder {
 				$value = $date ? date( 'Y-m-d', $date ) : '';
 
 				// if sale price exists but no end date, fill in 2029-12-31
-				$has_sale_price = self::hasActiveSalePrice( wpla_get_product_meta( $product, 'sku' ) );
+				$has_sale_price = self::hasActiveSalePrice( $product->get_sku('edit') );
 				if ( ! $value && $has_sale_price ) $value = '2029-12-31';
 				break;
 
@@ -1709,7 +1726,9 @@ class WPLA_FeedDataBuilder {
 		$url_without_query = str_replace( $filename_before, $filename_after, $url_without_query );
 		$url = ( $query_string ) ? $url_without_query .'?'. $query_string : $url_without_query;
 
-		$url = self::removeHttpsFromUrl( $url );
+		if ( get_option( 'wpla_remove_https_from_images', 1 ) ) {
+			$url = self::removeHttpsFromUrl( $url );
+		}
 
 		return $url;
 	} // convertImageUrl()

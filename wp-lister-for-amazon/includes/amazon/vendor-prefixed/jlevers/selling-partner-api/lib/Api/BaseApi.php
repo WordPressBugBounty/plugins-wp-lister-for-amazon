@@ -2,7 +2,7 @@
 /**
  * @license BSD-3-Clause
  *
- * Modified by __root__ on 08-May-2024 using {@see https://github.com/BrianHenryIE/strauss}.
+ * Modified by __root__ on 07-January-2025 using {@see https://github.com/BrianHenryIE/strauss}.
  */
 
 namespace WPLab\Amazon\SellingPartnerApi\Api;
@@ -15,8 +15,6 @@ use WPLab\Amazon\SellingPartnerApi\HeaderSelector;
 
 abstract class BaseApi
 {
-	public $account_id;
-	public $market_id;
     /**
      * @var ClientInterface
      */
@@ -94,9 +92,18 @@ abstract class BaseApi
     protected function writeDebug($data)
     {
         if ($this->config->getDebug()) {
+            if ($data instanceof Throwable) {
+                $data = "$data";
+            } else if ($data instanceof WPLab\Amazon\GuzzleHttp\Psr7\Request) {
+                $data = "{$data->getMethod()} {$data->getUri()}\n" . implode("\n", $data->getHeaders());
+            } else if ($data instanceof WPLab\Amazon\GuzzleHttp\Psr7\Response) {
+                $data = "{$data->getStatusCode()} {$data->getReasonPhrase()}\n" . implode("\n", $data->getHeaders());
+            } else {
+                $data = print_r($data, true);
+            }
             file_put_contents(
                 $this->config->getDebugFile(),
-                '[' . date('Y-m-d H:i:s') . ']: ' . print_r($data, true) . "\n",
+                '[' . date('Y-m-d H:i:s') . ']: ' . $data . "\n",
                 FILE_APPEND
             );
         }

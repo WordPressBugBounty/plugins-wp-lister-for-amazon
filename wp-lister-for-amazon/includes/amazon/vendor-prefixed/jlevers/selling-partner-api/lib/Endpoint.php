@@ -2,7 +2,7 @@
 /**
  * @license BSD-3-Clause
  *
- * Modified by __root__ on 08-May-2024 using {@see https://github.com/BrianHenryIE/strauss}.
+ * Modified by __root__ on 07-January-2025 using {@see https://github.com/BrianHenryIE/strauss}.
  */
 
 namespace WPLab\Amazon\SellingPartnerApi;
@@ -96,6 +96,8 @@ class Endpoint
             'A1C3SOZRARQ6R3' => 'EU',
             // Saudi Arabia.
             'A17E79C6D8DWNP' => 'EU',
+	        // South Africa
+	        'AE08WJ6YKNBMC' => 'EU',
             // Sweden.
             'A2NODRKZP88ZB9' => 'EU',
             // Turkey.

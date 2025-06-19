@@ -76,7 +76,6 @@
         ?>
         <tr>
             <th scope="row" class="check-column"><input type="checkbox" name="row[]" value="<?php echo $row['seller-sku'] ?>"></th>
-            <!-- <td><?php echo utf8_encode( $row['item-name'] ) ?></td> -->
             <td><?php echo WPLA_ListingsModel::convertToUTF8( $row['item-name'] ) ?></td>
             <td><?php echo $product_sku ?></td>
             <td><?php echo $listing_asin ?></td>

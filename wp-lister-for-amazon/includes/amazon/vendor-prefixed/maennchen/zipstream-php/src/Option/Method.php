@@ -2,7 +2,7 @@
 /**
  * @license MIT
  *
- * Modified by __root__ on 08-May-2024 using {@see https://github.com/BrianHenryIE/strauss}.
+ * Modified by __root__ on 07-January-2025 using {@see https://github.com/BrianHenryIE/strauss}.
  */
 
 declare(strict_types=1);
@@ -17,8 +17,6 @@ use WPLab\Amazon\MyCLabs\Enum\Enum;
  * @method static STORE(): Method
  * @method static DEFLATE(): Method
  * @psalm-immutable
- * @psalm-template int
- * @extends Enum<int>
  */
 class Method extends Enum
 {

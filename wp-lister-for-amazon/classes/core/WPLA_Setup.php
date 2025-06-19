@@ -50,6 +50,12 @@ class WPLA_Setup extends WPLA_Core {
 		// db upgrade
 		WPLA_UpgradeHelper::upgradeDB();
 
+		if ( !get_option( 'wpla_product_types_installed', 0 ) && !empty( WPLA()->accounts ) ) {
+			$mdl = new \WPLab\Amazon\Models\AmazonProductTypesModel();
+			$mdl->installDefaultProductTypes();
+			update_option( 'wpla_product_types_installed', 1 );
+		}
+
 		// check if all db tables exist
 		self::checkDatabaseTables( $page );
 
@@ -351,6 +357,10 @@ class WPLA_Setup extends WPLA_Core {
     }
 
     static function displayAnnouncements() {
+		if ( wp_doing_ajax() || wp_doing_cron() ) {
+			return;
+		}
+
         $data = self::downloadAnnouncements();
 
         if ( !$data ) return;

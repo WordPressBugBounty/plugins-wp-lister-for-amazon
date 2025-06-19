@@ -3,12 +3,12 @@
 Plugin Name: WP-Lister Lite for Amazon
 Plugin URI: https://www.wplab.com/plugins/wp-lister-for-amazon/
 Description: List your products on Amazon the easy way.
-Version: 2.7.6
+Version: 2.8
 Author: WP Lab
 Author URI: https://www.wplab.com/ 
 Max WP Version: 6.7.2
 WC requires at least: 6.0.0
-WC tested up to: 9.7.1
+WC tested up to: 9.8.5
 Text Domain: wp-lister-for-amazon
 Domain Path: /languages/
 License: GPL2+
@@ -16,7 +16,7 @@ License: GPL2+
 
 if ( class_exists('WPLA_WPLister') ) die(sprintf( 'WP-Lister for Amazon %s is already installed and activated. Please deactivate any other version before you activate this one.', WPLA_VERSION ));
 
-define('WPLA_VERSION', '2.7.6' );
+define('WPLA_VERSION', '2.8' );
 define('WPLA_PATH', realpath( dirname(__FILE__) ) );
 define('WPLA_URL', plugins_url() . '/' . basename(dirname(__FILE__)) . '/' );
 
@@ -45,7 +45,10 @@ class WPLA_WPLister extends WPLA_BasePlugin {
     public $woo_backend;
     public $cron_actions;
     public $toolbar;
+
+    /* @var WPLA_MemCache */
     public $memcache;
+
     public $messages;
     public $woo_backed;
     public $woo_mb_product;
@@ -174,6 +177,7 @@ class WPLA_WPLister extends WPLA_BasePlugin {
 			$this->pages['repricing']  	 = new WPLA_RepricingPage();
 			$this->pages['stocklog']  	 = new WPLA_StockLogPage();
 			$this->pages['skugen']  	 = new WPLA_SkuGenPage();
+			$this->pages['profile_converter']  	 = new \WPLab\Amazon\Pages\ProfileConverterPage();
 			$this->pages['settings']     = new WPLA_SettingsPage();
 			$this->pages['accounts']     = new WPLA_AccountsPage();
 			$this->pages['tutorial']  	 = new WPLA_HelpPage();
@@ -186,7 +190,7 @@ class WPLA_WPLister extends WPLA_BasePlugin {
 	public function onWpInit() {
 
 		// load language
-		load_plugin_textdomain( 'wp-lister-for-amazon', false, dirname( plugin_basename( __FILE__ ) ) . '/languages/' );
+//		load_plugin_textdomain( 'wp-lister-for-amazon', false, dirname( plugin_basename( __FILE__ ) ) . '/languages/' );
 
 	}
 

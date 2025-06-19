@@ -1,4 +1,7 @@
 <?php
+
+use WPLab\Amazon\Helper\JsonFeedDataBuilder;
+
 /**
  * WPLA_AmazonFeed class
  *
@@ -24,6 +27,7 @@ class WPLA_AmazonFeed {
 
 	public $line_count;
 	public $FeedType;
+	public $product_type;
 	public $FeedProcessingStatus;
 
 
@@ -75,11 +79,13 @@ class WPLA_AmazonFeed {
 			'POST_FLAT_FILE_INVLOADER_DATA'                     => 'Inventory Loader Feed',
 			'_UPLOAD_VAT_INVOICE_'                              => 'Upload VAT Invoice',
 			'UPLOAD_VAT_INVOICE'                                => 'Upload VAT Invoice',
+			'JSON_LISTINGS_FEED'                                => 'JSON Data Feed',
 		);
 
 		$this->fieldnames = array(
 			'FeedSubmissionId',
 			'FeedType',
+			'product_type',
 			'template_name',
 			'FeedProcessingStatus',
 			'results',
@@ -262,13 +268,18 @@ class WPLA_AmazonFeed {
      * @param string $feed_type
      * @param string $template_name
      * @param int $account_id
+     * @param string $product_type
      * @return string|null
      */
-	static function getPendingFeedId( $feed_type, $template_name, $account_id ) {
+	static function getPendingFeedId( $feed_type, $template_name, $account_id, $product_type = '' ) {
 		global $wpdb;
 		$table = $wpdb->prefix . self::TABLENAME;
 		$template_name = esc_sql( $template_name );
 		$where_sql     = $template_name ? "AND template_name = '$template_name'" : '';
+
+		if ( $product_type ) {
+			$where_sql .= " AND product_type = '$product_type'";
+		}
 
 		$item = $wpdb->get_var( $wpdb->prepare("
 			SELECT id
@@ -323,9 +334,6 @@ class WPLA_AmazonFeed {
 
 		$feeds = array();
 		foreach ( $item_ids as $feed_id ) {
-			// Set status to processing to prevent getting updates causing sync issues
-			$wpdb->update( $table, ['FeedProcessingStatus' => self::STATUS_PROCESSING], ['id' => $feed_id] );
-
 			$feeds[] = new WPLA_AmazonFeed( $feed_id );
 		}
 
@@ -380,6 +388,11 @@ class WPLA_AmazonFeed {
 	function getDataArray() {
 		if ( ! $this->data || empty( $this->data ) ) return array();
 
+		if ( $this->FeedType == 'JSON_LISTINGS_FEED' ) {
+			$data = json_decode( $this->data, true );
+			return $data['messages'] ?? [];
+		}
+
 		$feed_data = $this->data;
 		if ( in_array( $this->FeedType, array('_POST_FLAT_FILE_LISTINGS_DATA_','_CHECK_FLAT_FILE_LISTINGS_DATA_', 'POST_FLAT_FILE_LISTINGS_DATA') ) ) {
 			// remove first two rows - headers are in 3rd row
@@ -398,6 +411,10 @@ class WPLA_AmazonFeed {
 
 		$rows = WPLA_ReportProcessor::csv_to_array( $feed_data );
 		return $rows;		
+	}
+
+	function getData() {
+		return $this->data;
 	}
 
     /**
@@ -468,7 +485,7 @@ class WPLA_AmazonFeed {
 		$result = $api->cancelFeed( $this->FeedSubmissionId );
 		// echo "<pre>";print_r($result);echo"</pre>";die();
 
-		if ( $result->success ) {
+		//if ( $result->success ) {
 			
 			// update feed status
 			// $this->FeedSubmissionId     = $result->FeedSubmissionId;
@@ -477,7 +494,7 @@ class WPLA_AmazonFeed {
 			// $this->status 		    	= 'cancelled';
 			// $this->update();
 
-		} // success
+		//} // success
 
 		return $result;
 	} // cancel()
@@ -601,6 +618,21 @@ class WPLA_AmazonFeed {
 
                                 break;
 
+	                        case 'JSON_LISTINGS_FEED':
+								if ( $this->template_name == 'Price & Quantity' ) {
+									$listing_data['pnq_status'] = '2'; // submitted
+								} else {
+									$listing_data['status']  = 'submitted';
+									$listing_data['history'] = '';
+									WPLA()->logger->info('changing status to submitted for SKU '.$listing_sku);
+
+									// update date_published - only if not set
+									if ( ! $listing_item->date_published )
+										$listing_data['date_published'] = gmdate('Y-m-d H:i:s');
+
+								}
+								break;
+
                             default:
                                 WPLA()->logger->warn('nothing to process for feed type '.$this->FeedType.' - SKU '.$listing_sku);
                                 break;
@@ -631,23 +663,57 @@ class WPLA_AmazonFeed {
 		$result = $api->getFeedDocument( $this->FeedDocumentId );
 
 		if ( !WPLA_Amazon_SP_API::isError( $result ) ) {
-			if ( function_exists( 'mb_convert_encoding' ) ) {
+			/*if ( function_exists( 'mb_convert_encoding' ) ) {
 				// Using mb_convert_encoding
 				$result = mb_convert_encoding( $result, 'UTF-8', 'ISO-8859-1' );
 				//$this->results = utf8_encode( $result ); // required for amazon.fr
-			}
+			}*/
 
 			$this->results = $result;
 			$this->update();
+		} else {
+			WPLA()->logger->error( 'Could not parse the feed document. '. $result->ErrorMessage );
 		}
 
 		return $result;
 	} // loadSubmissionResult()
 
+	function processJsonSubmissionResult() {
+		$results = json_decode( $this->results, true );
+
+		$this->errors   = array();
+		$this->warnings = array();
+
+		$data_array = $this->getDataArray();
+
+		if ( $this->template_name == 'Price & Quantity' ) {
+			$this->processJsonPnqResults( $data_array, $results );
+		} else {
+			$this->processJsonDataResults( $data_array, $results );
+		}
+
+		// update feed status
+		$this->success = sizeof( $this->warnings ) > 0 ? 'warning' : 'success';
+		$this->success = sizeof( $this->errors ) > 0 ? 'error' : $this->success;
+		$this->status = 'processed';
+		$this->update();
+		WPLA()->logger->info('feed has been processed');
+
+		if ( sizeof( $this->errors ) && get_option( 'wpla_feed_failure_emails', 0 ) ) {
+			$this->sendFeedFailureEmail();
+		}
+
+		return true;
+	}
+
 	function processSubmissionResult() {
 		WPLA()->logger->info('processSubmissionResult() - feed '.$this->id);
 		if ( ! $this->id ) return;
 		if ( ! $this->results ) return;
+
+		if ( $this->FeedType == 'JSON_LISTINGS_FEED' ) {
+			return $this->processJsonSubmissionResult();
+		}
 
 		$this->errors   = array();
 		$this->warnings = array();
@@ -662,7 +728,6 @@ class WPLA_AmazonFeed {
 		WPLA()->logger->info('result rows for feed '.$this->FeedSubmissionId.' ('.$this->id.'): '.sizeof($result_rows));
 		WPLA()->logger->info('result rows '.print_r($result_rows,1));
 
-		/* @todo Process UPLOAD_VAT_INVOICE results */
 		// process results
 		if ( $this->FeedType == 'POST_FLAT_FILE_FULFILLMENT_DATA' ) {
 			$this->processOrderFulfillmentResults( $feed_rows, $result_rows );
@@ -826,6 +891,198 @@ class WPLA_AmazonFeed {
 
 	} // processListingDataResults()
 
+	public function processJsonDataResults( $data_rows, $results ) {
+		WPLA()->logger->info('processing Json Data Results');
+
+		$lm = new WPLA_ListingsModel();
+		// group results by Message ID
+		$grouped_results = [];
+		foreach ( $results['issues'] as $issue ) {
+			if ( !empty( $issue['messageId'] ) ) {
+				$grouped_results[ $issue['messageId'] ][] = $issue;
+			}
+		}
+
+		// process each result row
+		foreach ($data_rows as $row) {
+			WPLA()->logger->info('processing row id: '.$row['messageId'] .'; SKU: '. $row['sku']);
+
+			$listing_data = array();
+			$row_sku      = $row['sku'];
+			$message_id   = $row['messageId'];
+
+			if ( ! $row_sku ) {
+				WPLA()->logger->warn('skipping row without SKU: '.print_r($row,1));
+				continue;
+			}
+
+			WPLA()->logger->info('processing feed sku: '.$row_sku);
+
+			// check if this is a delete feed (Inventory Loader)
+			$is_delete_feed = $row['operationType'] == 'DELETE';
+
+			// if there are no result rows for this SKU, set status to 'online'
+			if ( empty( $grouped_results[ $message_id ] ) ) {
+				$listing = $lm->getItemBySkuAndAccount( $row_sku, $this->account_id );
+
+				if ( $is_delete_feed ) {
+					if ( ! $listing ) continue;
+					if ( $listing->status == 'trashed' ) {
+						$lm->deleteItem( $listing->id );
+						WPLA()->logger->info('DELETED listing ID '.$listing->id.' SKU: '.$row_sku);
+					} else {
+						WPLA()->logger->warn('INVALID listing status for deletion - ID '.$listing->id.' / SKU: '.$row_sku.' / status: '.$listing->status);
+					}
+					continue;
+				}
+
+				$listing_data['status']  = 'online';
+				$listing_data['history'] = '';
+				$result = $lm->updateWhere( array( 'sku' => $row_sku, 'account_id' => $this->account_id ), $listing_data );
+
+				if ( $result === false ) {
+					WPLA()->logger->error( 'Error while updating listing. Retrying after 1s.');
+					//WPLA()->logger->error( $wpdb->last_error );
+					sleep(1);
+					$lm->updateWhere( array( 'sku' => $row_sku, 'account_id' => $this->account_id ), $listing_data );
+				}
+				WPLA()->logger->info('changed status to online: '.$row_sku);
+
+				continue;
+
+			}
+
+			$processing_result = $this->processJsonRowErrors( $row, $grouped_results );
+
+			// update listing
+			if ( ! empty( $processing_result['errors'] ) ) {
+
+				$listing_data['status']  = 'failed';
+				$listing_data['history'] = serialize( array( 'errors' => $processing_result['errors'], 'warnings' => $processing_result['warnings'] ) );
+				$lm->updateWhere( array( 'sku' => $row_sku, 'account_id' => $this->account_id ), $listing_data );
+				WPLA()->logger->info('changed status to FAILED: '.$row_sku);
+
+				$this->errors   = array_merge( $this->errors, $processing_result['errors']);
+				$this->warnings = array_merge( $this->warnings, $processing_result['warnings']);
+
+			} elseif ( ! empty( $processing_result['warnings'] ) ) {
+
+				$listing_data['status']  = $is_delete_feed ? 'trashed' : 'online';
+				$listing_data['history'] = serialize( array( 'errors' => $processing_result['errors'], 'warnings' => $processing_result['warnings'] ) );
+				$lm->updateWhere( array( 'sku' => $row_sku, 'account_id' => $this->account_id ), $listing_data );
+
+				WPLA()->logger->info('changed status to online: '.$row_sku);
+				$this->warnings = array_merge( $this->warnings, $processing_result['warnings']);
+
+			}
+
+		} // foreach row
+
+	} // processListingDataResults()
+
+	public function processJsonPnqResults( $data_rows, $results ) {
+		WPLA()->logger->info('processing Json PNQ Results');
+
+		$lm = new WPLA_ListingsModel();
+		// group results by Message ID
+		$grouped_results = [];
+		foreach ( $results['issues'] as $issue ) {
+			if ( !empty( $issue['messageId'] ) ) {
+				$grouped_results[ $issue['messageId'] ][] = $issue;
+			}
+		}
+
+		foreach ( $data_rows as $row ) {
+			WPLA()->logger->info('processing row id: '.$row['messageId'] .'; SKU: '. $row['sku']);
+
+			$message_id = $row['messageId'];
+			$listing_data = array();
+
+			// if there are no issues for this messageId, set the listing to online
+			if ( empty( $grouped_results[ $message_id ] ) ) {
+				$listing_data['pnq_status']  = '0';
+				$lm->updateWhere( array( 'sku' => $row['sku'], 'pnq_status' => '2', 'account_id' => $this->account_id ), $listing_data );
+				WPLA()->logger->info('changed status to online: '.$row['sku']);
+				continue;
+			}
+
+			$processing_result = $this->processJsonRowErrors( $row, $grouped_results );
+
+			// update listing
+			if ( ! empty( $processing_result['errors'] ) ) {
+				$listing_data['pnq_status']  = '-1';
+				$lm->updateWhere( array( 'sku' => $row['sku'], 'pnq_status' => '2', 'account_id' => $this->account_id ), $listing_data );
+				WPLA()->logger->info('changed PNQ status to FAILED (-1): '.$row['sku']);
+
+				$this->errors   = array_merge( $this->errors, $processing_result['errors']);
+				$this->warnings = array_merge( $this->warnings, $processing_result['warnings']);
+			} elseif ( ! empty( $processing_result['warnings'] ) ) {
+				$listing_data['pnq_status']  = '0';
+				$lm->updateWhere( array( 'sku' => $row['sku'], 'pnq_status' => '2', 'account_id' => $this->account_id ), $listing_data );
+
+				WPLA()->logger->info('changed PNQ status to 0: '.$row['sku']);
+				$this->warnings = array_merge( $this->warnings, $processing_result['warnings']);
+			}
+		}
+	}
+
+	private function processJsonRowErrors( $json_row, $grouped_results ) {
+		$message_id = $json_row['messageId'];
+
+		// handle errors and warnings
+		$errors         = array();
+		$warnings       = array();
+		$processed_keys = array();
+
+		foreach ($grouped_results[ $message_id ] as $result) {
+			$severity       = $result['severity'];
+			$lc_severity    = strtolower( $severity );
+
+			// translate error-type
+			if ( $lc_severity == 'fehler' ) 		$severity = 'ERROR';	// amazon.de
+			if ( $lc_severity == 'warnung' ) 		$severity = 'WARNING';
+			if ( $lc_severity == 'erreur' ) 		$severity = 'ERROR';	// amazon.fr
+			if ( $lc_severity == 'avertissement' )  $severity = 'WARNING';
+
+			// backwards-compatible error array
+			$error_array = [
+				'error-code'    => $result['code'],
+				'error-message' => $result['message'],
+				'error-type'    => $result['severity'],
+				'original-record-number' => $result['messageId']
+			];
+
+			// compute hash to identify duplicate errors
+			$row_key = md5( $json_row['sku'] . $result['code'] . $severity . $message_id );
+
+			if ( 'ERROR' == $severity ) {
+				WPLA()->logger->info('error: '.$json_row['sku'] .' - '.$row_key.' - '.$result['message']);
+				if ( ! in_array($row_key, $processed_keys) ) {
+					$errors[]         = $error_array;
+					$processed_keys[] = $row_key;
+				}
+			} elseif ( 'WARNING' == $severity ) {
+				WPLA()->logger->info('warning: '.$json_row['sku'] .' - '.$row_key.' - '.$result['message']);
+				if ( ! in_array($row_key, $processed_keys) ) {
+					$warnings[]       = $error_array;
+					$processed_keys[] = $row_key;
+				}
+			} else {
+				// unknown severity value
+				WPLA()->logger->info('UNKNOWN SEVERITY: '. $severity .' - '.$json_row['sku'] .' - '.$row_key.' - '.$result['message']);
+				if ( ! in_array($row_key, $processed_keys) ) {
+					$warnings[]       = $error_array;
+					$processed_keys[] = $row_key;
+				}
+			}
+		}
+
+		return [
+			'errors'    => $errors,
+			'warnings'  => $warnings
+		];
+	}
+
 	public function processListingPnqResults( $feed_rows, $result_rows ) {
 
 		$lm = new WPLA_ListingsModel();
@@ -833,7 +1090,7 @@ class WPLA_AmazonFeed {
 		// index results by SKU
 		$results = array();
 		foreach ( $result_rows as $r ) {
-			if ( ! isset( $r['sku'] ) || empty( $r['sku'] ) ) continue;
+			if ( empty( $r['sku'] ) ) continue;
 			$results[ $r['sku'] ][] = $r;
 			WPLA()->logger->info('result sku: '.$r['sku']);
 		}
@@ -1257,6 +1514,7 @@ class WPLA_AmazonFeed {
 		WPLA()->logger->info('updatePendingFeedForAccount('.$account->id.') - '.$account->title);
 		WPLA()->logger->info('------------------------------');
 		$lm = new WPLA_ListingsModel();
+		$builder = new JsonFeedDataBuilder();
 
 		// build feed(s) for updated (changed,prepared,matched) products
 		WPLA()->logger->start('getGroupedPendingProductsForAccount');
@@ -1282,26 +1540,38 @@ class WPLA_AmazonFeed {
 				WPLA()->logger->info('number of items: '.sizeof($items));
 
 				// get profile
-				$profile  = new WPLA_AmazonProfile( $profile_id );
+				$profile  = new WPLA_AmazonProfile();
+				if ( $profile_id ) {
+					// get profile
+					$profile  = new WPLA_AmazonProfile( $profile_id );
+
+					if ( $profile->product_type ) {
+						// Use JSON feeds now for listing loader feeds
+						self::buildJsonFeed( $items, $account, JsonFeedDataBuilder::OPERATION_PARTIAL_UPDATE, $profile->product_type, null, $profile->product_type );
+						continue;
+					}
+				}
+
+				if ( $profile_id == 0 || $template_type == 'LiLo' ) {
+					// Use JSON feeds now for listing loader feeds
+					self::buildJsonFeed( $items, $account, JsonFeedDataBuilder::OPERATION_PARTIAL_UPDATE, 'PRODUCT', null, 'Listing Loader' );
+					continue;
+				}
+
+
 
 				// Since most of the templates will now have the fptcustom template type, compare using
                 // the template's name AND title instead to see if we should append to an existing feed #30382 #30551
                 if ( $template ) {
                     $tpl_title   = $template->name . '-'. $template->title;
-                    $append_feed = in_array( $tpl_title, $processed_tpl_types );
                 } else {
                     // append if a feed with the same template type has been generated just now
                     $tpl_title   = $template_type;
-                    $append_feed = in_array( $tpl_title, $processed_tpl_types );
                 }
-
-
+				$append_feed = in_array( $tpl_title, $processed_tpl_types );
 
 				// adjust feed type for Inventory Loader
 				$feed_type = 'POST_FLAT_FILE_LISTINGS_DATA';
-				// if ( $template_type == 'InventoryLoader' ) {
-				// 	$feed_type = '_POST_FLAT_FILE_INVLOADER_DATA_';
-				// }
 
 				// build Listing Data or ListingLoader feed
 				WPLA()->logger->start('buildFeed');
@@ -1314,19 +1584,53 @@ class WPLA_AmazonFeed {
 
 			}
 
-			// WPLA()->logger->logSpentTime('parseProductColumn');
-			// WPLA()->logger->logSpentTime('parseProfileShortcode');
-			// WPLA()->logger->logSpentTime('parseVariationAttributeColumn');
-			// WPLA()->logger->logSpentTime('processAttributeShortcodes');
-			// WPLA()->logger->logSpentTime('processCustomMetaShortcodes');
-
 		} // foreach $grouped_items
 
 
 		// build Price and Quantity feed for this account
 		$items = $lm->getAllProductsForAccountByPnqStatus( $account->id, 1 );
 		WPLA()->logger->info('number of PNQ items: '.sizeof($items));
-		WPLA_AmazonFeed::buildFeed( 'POST_FLAT_FILE_PRICEANDQUANTITYONLY_UPDATE_DATA', $items, $account );
+		//WPLA_AmazonFeed::buildJson( 'POST_FLAT_FILE_PRICEANDQUANTITYONLY_UPDATE_DATA', $items, $account );
+		self::buildJsonFeed( $items, $account, JsonFeedDataBuilder::OPERATION_PARTIAL_UPDATE, 'PRODUCT', $builder->getPriceAndQuantityFields(), 'Price & Quantity' );
+		/*$json = $builder->buildPriceAndQuantityJson( $items, $account );
+
+		if ( $json ) {
+			// set feed properties (required since $this is recycled here...)
+			$new_feed = new WPLA_AmazonFeed();
+			$new_feed->data                 = $json;
+			$new_feed->line_count           = sizeof($items);
+			$new_feed->FeedType             = 'JSON_LISTINGS_FEED';
+			$new_feed->template_name        = 'Price and Quantity';
+			$new_feed->FeedProcessingStatus = 'pending';
+			$new_feed->status               = self::STATUS_PENDING;
+			$new_feed->account_id           = $account->id;
+			$new_feed->date_created         = gmdate('Y-m-d H:i:s');
+
+			// check if a pending feed of this type already exists
+			$existing_feed_id = self::getPendingFeedId( 'JSON_LISTINGS_FEED', 'Price and Quantity', $account->id );
+
+			if ( $existing_feed_id ) {
+
+				// update existing feed (replace)
+				$new_feed->id = $existing_feed_id;
+				$new_feed->update();
+				WPLA()->logger->info('updated existing feed '.$new_feed->id);
+
+			} else {
+
+				// add new feed
+				$new_feed->id = null;
+				$new_feed->add();
+				WPLA()->logger->info('added NEW feed - id '.$new_feed->id);
+
+			}
+
+			WPLA()->logger->info('------');
+		}*/
+
+		// Build JSON feeds for all listings using the Product Type API
+		$items = $lm->getPendingProductsForAccountByProductType( $account->id );
+		WPLA_AmazonFeed::buildJsonFeed( $items, $account );
 
 
 		// build delete products feed for this account
@@ -1352,6 +1656,44 @@ class WPLA_AmazonFeed {
         }
     }
 
+	/**
+	 * @todo see if this needs to support the appending of feeds
+	 * @param array $items
+	 * @param WPLA_AmazonAccount $account
+	 * @param string $operation
+	 * @param string $product_type
+	 * @param array $feed_attributes
+	 * @param string $feed_name
+	 *
+	 * @return bool
+	 */
+	public static function buildJsonFeed( $items, $account, $operation = JsonFeedDataBuilder::OPERATION_UPDATE, $product_type = null, $feed_attributes = [], $feed_name = '' ) {
+		WPLA()->logger->info('buildJsonFeed() - account id: '.$account->id);
+		WPLA()->logger->info('items count: '.sizeof($items));
+
+		if ( \WPLA_AmazonFeed::getPendingFeedId( 'JSON_LISTINGS_FEED', $feed_name, $account->id, $product_type ) ) {
+			WPLA()->logger->info('skipped - feed already exists');
+			return false;
+		}
+
+		// run 3rd-party code prior to building feeds (added for #17160)
+		do_action( 'wpla_build_json', $items, $account );
+
+		if ( empty( $items ) ) {
+			return false;
+		}
+
+		$builder = new JsonFeedDataBuilder();
+
+		// build feeds here. Add to existing pending feeds with the same account ID until the feed reaches the max number
+		// of messages/items allowed by Amazon.
+		$builder->addItemsToFeed( $items, $account, $operation, $product_type, $feed_attributes, $feed_name );
+		//self::buildJsonFeedsForAccount( $json, $account );
+
+		WPLA()->logger->info('------');
+
+		return true;
+	}
 
 	// build feed for updated products
 	static function buildFeed( $feed_type, $items, $account, $profile = false, $append_feed = false, $template_type = false ) {
@@ -1361,16 +1703,6 @@ class WPLA_AmazonFeed {
 
         // run 3rd-party code prior to building feeds (added for #17160)
         do_action( 'wpla_build_feed', $feed_type, $items, $account );
-
-        /**
-         * Defer this check and filtering to make sure all invalid listings (e.g. No SKUs) get removed first before limiting the row count
-         * @since 2.5.1
-         */
-		// limit feed size to prevent timeout
-//		$max_feed_size = get_option( 'wpla_max_feed_size', 1000 );
-//		if ( sizeof($items) > $max_feed_size ) {
-//			$items = array_slice( $items, 0, $max_feed_size );
-//		}
 
 		// adjust feed type for Inventory Loader
 		if ( $template_type == 'InventoryLoader' ) {
@@ -1417,6 +1749,7 @@ class WPLA_AmazonFeed {
 			   	WPLA()->logger->logTime('buildProductRemovalFeedData');
    				$feed_type = 'POST_FLAT_FILE_INVLOADER_DATA';
 				break;
+
 
 			default:
 				# default

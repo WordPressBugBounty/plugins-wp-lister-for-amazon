@@ -115,7 +115,7 @@ unset( $wpl_feed->types );
     <!-- <pre><?php #print_r( $wpl_feed ) ?></pre> -->
 
     <p>
-        <a href="admin.php?page=wpla-feeds&amp;action=wpla_download_feed_results&amp;amazon_feed=<?php echo $wpl_feed->id ?>&amp;_wpnonce=<?php echo wp_create_nonce( 'wpla_download_feed_results' ); ?>" class="button">Download CSV</a>
+        <a href="admin.php?page=wpla-feeds&amp;action=wpla_download_feed_results&amp;amazon_feed=<?php echo $wpl_feed->id ?>&amp;_wpnonce=<?php echo wp_create_nonce( 'wpla_download_feed_results' ); ?>" class="button">Download</a>
     </p>
 
 

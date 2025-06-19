@@ -174,8 +174,8 @@ $is_expert_mode      = $profile_editor_mode == 'expert' ? true : false;
 		<tr id="wpla_tpl_row_<?php echo $field['field'] ?>" class="wpla_tpl_row <?php echo $row_class1 .' '. $row_class2 ?>">
 			<td width="40%">
 				<span class="wpla_field_label"><?php echo $field['label'] ?></span>
-				<?php $field_definition = str_replace( "<br />\n<br />\n", '<br />', nl2br($field['definition']) ) ?>
-                <?php wpla_tooltip( '<b>Accepted Values</b><br>' . nl2br($field['accepted']) ) ?>
+				<?php $field_definition = str_replace( "<br />\n<br />\n", '<br />', nl2br($field['definition'] ?? '') ) ?>
+                <?php wpla_tooltip( '<b>Accepted Values</b><br>' . nl2br($field['accepted'] ?? '') ) ?>
                 <?php wpla_tooltip( '<b>Definition</b><br><i>' . $field['field'] . '</i><br>' . $field_definition ) ?>
 			</td>
 			<td width="50%">
@@ -297,32 +297,6 @@ $is_expert_mode      = $profile_editor_mode == 'expert' ? true : false;
 	<?php endforeach; ?>
 
 </table>
-
-<style>
-	#feed-template-data {
-		width: 100%;
-		margin-top: 1em;
-	}
-	#feed-template-data th {
-		text-align: left;
-	}
-	#feed-template-data th h4 {
-		margin-bottom: 0;
-	}
-	#feed-template-data input,
-	#feed-template-data select {
-		width:90%;
-	}
-	#feed-template-searchbar {
-		padding-bottom: 0.5em;
-		border-bottom: 1px solid #eee;
-	}
-    .select2-container {
-        box-sizing: border-box;
-        display: inline-block;
-        margin-bottom: 5px !important;
-    }
-</style>
 
 <!-- hidden ajax categories tree -->
 <div id="wpla_shortcode_selection_wrapper" style="display:none">

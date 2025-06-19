@@ -242,6 +242,55 @@ class WPLA_ListingsPage extends WPLA_Page {
 			$this->showMessage( sprintf( __( '%s failed items were prepared for resubmission.', 'wp-lister-for-amazon' ), count($items) ) );
 		}
 
+        if ( $this->requestAction() == 'wpla_listing_check' ) {
+            check_admin_referer( 'bulk-listings' );
+
+	        $lm    = new WPLA_ListingsModel();
+            $items =  is_array( $_REQUEST['listing'] ) ? wpla_clean($_REQUEST['listing']) : array( wpla_clean($_REQUEST['listing']) );
+
+            foreach ( $items as $id ) {
+	            $listing = $lm->getItem( $id );
+	            $account = WPLA()->accounts[ $listing['account_id'] ];
+
+	            $api    = new WPLA_Amazon_SP_API( $account->id );
+	            $result = $api->getListingsItem( $listing['sku'] );
+
+	            if ( !WPLA_Amazon_SP_API::isError( $result ) ) {
+		            $success = true;
+		            $history = [
+			            'errors' => [],
+			            'warnings' => []
+		            ];
+
+		            if ( $result->getIssues() ) {
+			            foreach ( $result->getIssues() as $issue ) {
+				            $error = [
+					            'error-code'    => $issue->getCode(),
+					            'error-message' => $issue->getMessage(),
+					            'error-type'    => $issue->getSeverity()
+				            ];
+
+				            if ( $issue->getSeverity() == 'ERROR' ) {
+					            $success = false;
+					            $history['errors'][] = $error;
+				            } elseif ( $issue->getSeverity() == 'WARNING' ) {
+					            $history['warnings'][] = $error;
+				            }
+			            }
+		            }
+
+		            $data = [
+			            //'status' => WPLA_ListingsModel::STATUS_FAILED,
+			            'history' => serialize( $history )
+		            ];
+		            $lm->updateListing( $listing['id'], $data );
+	            }
+            }
+
+	        $this->showMessage( __( 'Completed the fetching of issues for the selected listings', 'wp-lister-for-amazon' ) );
+
+        }
+
 		if ( $this->requestAction() == 'wpla_clear_import_queue' ) {
 		    check_admin_referer( 'wpla_listings_tools' );
 
@@ -468,13 +517,13 @@ class WPLA_ListingsPage extends WPLA_Page {
 
         // check for changed, matched and prepared items - and show message
         $is_feed_page = isset($_GET['page']) && ($_GET['page'] == 'wpla-feeds');
-        if ( isset($summary->changed) ||  isset($summary->prepared) ||  isset($summary->matched) ) {
+        if ( isset($summary->changed) || isset($summary->matched) ) {
         	$next_schedule = $this->print_schedule_info( 'wpla_update_schedule' );
 
         	// build nice combined message
         	$summary_msg = '';
         	$summary_array = array();
-        	foreach ( array('changed','prepared','matched') as $status) {
+        	foreach ( array(WPLA_ListingsModel::STATUS_CHANGED, WPLA_ListingsModel::STATUS_MATCHED) as $status) {
         		if ( ! isset($summary->$status) ) continue;
         		$link_url   = 'admin.php?page=wpla&listing_status='.$status;
         		$link_title = $summary->$status . ' ' . $status;
@@ -507,6 +556,29 @@ class WPLA_ListingsPage extends WPLA_Page {
         if ( isset($summary->changed) ) {
 			$problems = WPLA_FeedValidator::checkChangedProducts();
 			if ( $problems ) $this->showMessage( $problems, 1 );		
+        }
+
+        // Add prepared listings to the queue, if they aren't in the queue yet
+        $listingsModel->enqueuePreparedListings();
+
+        $queued = get_option( WPLA_ListingsModel::PUBLISH_QUEUE_KEY, [] );
+        if ( !empty( $queued ) ) {
+            $num_queued = count( $queued );
+	        $msg  = '<p>';
+
+            if ( WPLA_Setup::isStagingSite() ) {
+                $schedule_text = 'manually';
+            } else {
+                $schedule_text = 'in the background';
+            }
+
+	        $msg .= sprintf( __( '%d new product(s) will be submitted to Amazon %s.', 'wp-lister-for-amazon' ), $num_queued, $schedule_text );
+	        $msg .= '&nbsp;&nbsp;';
+
+	        $msg .= '<a href="admin.php?page=wpla&listing_status=prepared" id="" class="button button-small wpl_job_button">' . __( 'View Prepared Listings', 'wp-lister-for-amazon' ) . '</a>';
+
+	        $msg .= '</p>';
+	        $this->showMessage( $msg );
         }
 
         // check for new online items without ASIN

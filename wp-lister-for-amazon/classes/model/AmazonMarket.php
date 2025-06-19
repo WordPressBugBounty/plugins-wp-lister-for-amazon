@@ -56,6 +56,12 @@ class WPLA_AmazonMarket {
 		return $item;
 	}
 
+	static function getNamebyMarketplaceId( $marketplace_id ) {
+		global $wpdb;
+
+		return $wpdb->get_var( $wpdb->prepare( "SELECT title FROM {$wpdb->prefix}amazon_markets WHERE marketplace_id = %s", $marketplace_id ) );
+	}
+
 	// get single market by country code (US)
 	static function getMarketByCountyCode( $code )	{
 		global $wpdb;
@@ -83,6 +89,37 @@ class WPLA_AmazonMarket {
 		", OBJECT_K);
 
 		return $items;
+	}
+
+	/**
+	 * Get all supported marketplaces that all accounts have access to
+	 *
+	 * This method removes all unsupported marketplaces like the Amazon Pay marketplace
+	 *
+	 * @return array
+	 */
+	static function getAllFromAccounts() {
+		global $wpdb;
+
+		$marketplaces = [];
+
+		$all_markets = WPLA_AmazonMarket::getAll();
+		$supported_markets = wp_list_pluck($all_markets, 'marketplace_id' );
+
+		foreach ( WPLA()->accounts as $account ) {
+			$markets = maybe_unserialize( $account->allowed_markets );
+
+			if ( is_array($markets) ) {
+				foreach ( $markets as $market ) {
+					if ( !array_key_exists( $market->MarketplaceId, $marketplaces ) && in_array( $market->MarketplaceId, $supported_markets ) ) {
+						$marketplaces[ $market->MarketplaceId ] = $market->Name;
+					}
+				}
+			}
+		}
+
+		asort($marketplaces);
+		return $marketplaces;
 	}
 
 	// get market code

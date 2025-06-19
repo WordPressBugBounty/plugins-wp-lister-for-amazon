@@ -7,7 +7,7 @@
  * primary concern and you are using an opcode cache. PLEASE DO NOT EDIT THIS
  * FILE, changes will be overwritten the next time the script is run.
  *
- * @version 4.17.0
+ * @version 4.18.0
  *
  * @warning
  *      You must *not* include any other HTML Purifier files before this file,
@@ -18,7 +18,7 @@
  *      library directory; this is not auto-set.
  *
  * @license LGPL-2.1-or-later
- * Modified by __root__ on 08-May-2024 using {@see https://github.com/BrianHenryIE/strauss}.
+ * Modified by __root__ on 07-January-2025 using {@see https://github.com/BrianHenryIE/strauss}.
  */
 
 require 'WPLab_Amazon_HTMLPurifier.php';
@@ -104,6 +104,7 @@ require 'WPLab_Amazon_HTMLPurifier/AttrDef/CSS/Length.php';
 require 'WPLab_Amazon_HTMLPurifier/AttrDef/CSS/ListStyle.php';
 require 'WPLab_Amazon_HTMLPurifier/AttrDef/CSS/Multiple.php';
 require 'WPLab_Amazon_HTMLPurifier/AttrDef/CSS/Percentage.php';
+require 'WPLab_Amazon_HTMLPurifier/AttrDef/CSS/Ratio.php';
 require 'WPLab_Amazon_HTMLPurifier/AttrDef/CSS/TextDecoration.php';
 require 'WPLab_Amazon_HTMLPurifier/AttrDef/CSS/URI.php';
 require 'WPLab_Amazon_HTMLPurifier/AttrDef/HTML/Bool.php';

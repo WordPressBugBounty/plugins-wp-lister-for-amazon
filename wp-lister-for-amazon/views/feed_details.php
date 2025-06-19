@@ -215,7 +215,7 @@
         <a href="#" onclick="jQuery('#wpla_feed_details_debug').slideToggle();return false;" class="button">Debug Data</a> &nbsp;
         <a href="<?php echo $feed_permalink ?>" class="button">Permalink</a> &nbsp;
         <a href="admin.php?page=wpla-feeds&amp;action=view_amazon_feed_details_raw&amp;amazon_feed=<?php echo $wpl_feed->id ?>&amp;_wpnonce=<?php echo wp_create_nonce( 'wpla_view_feed_details_raw' ); ?>" class="button" target="_blank">View raw feed</a> &nbsp;
-        <a href="admin.php?page=wpla-feeds&amp;action=wpla_download_feed_content&amp;amazon_feed=<?php echo $wpl_feed->id ?>&amp;_wpnonce=<?php echo wp_create_nonce( 'wpla_download_feed_content' ); ?>" class="button">Download CSV</a>
+        <a href="admin.php?page=wpla-feeds&amp;action=wpla_download_feed_content&amp;amazon_feed=<?php echo $wpl_feed->id ?>&amp;_wpnonce=<?php echo wp_create_nonce( 'wpla_download_feed_content' ); ?>" class="button">Download</a>
 
     </div>
 
@@ -278,7 +278,7 @@
         <?php endif; ?>
 
         <p>
-            <a href="admin.php?page=wpla-feeds&amp;action=wpla_download_feed_results&amp;amazon_feed=<?php echo $wpl_feed->id ?>&amp;_wpnonce=<?php echo wp_create_nonce( 'wpla_download_feed_results' ); ?>" class="button">Download CSV</a>
+            <a href="admin.php?page=wpla-feeds&amp;action=wpla_download_feed_results&amp;amazon_feed=<?php echo $wpl_feed->id ?>&amp;_wpnonce=<?php echo wp_create_nonce( 'wpla_download_feed_results' ); ?>" class="button">Download</a>
         </p>
 
     </div>

@@ -2,7 +2,7 @@
 /**
  * @license BSD-3-Clause
  *
- * Modified by __root__ on 08-May-2024 using {@see https://github.com/BrianHenryIE/strauss}.
+ * Modified by __root__ on 07-January-2025 using {@see https://github.com/BrianHenryIE/strauss}.
  */
 
 namespace WPLab\Amazon\SellingPartnerApi;
@@ -182,6 +182,7 @@ class Authentication implements RequestSignerContract
                 // generating an RDT as long as no dataElements are passed.
                 $restrictedPath === null || ($dataElements === [] && in_array($operation, $hasDataElements, true))
             )
+            || Endpoint::isSandbox("{$request->getUri()->getScheme()}://{$request->getUri()->getHost()}")
         ) {
             $relevantCreds = $this->getAwsCredentials();
         } else if ($this->signingScope) {  // There is no overlap between grantless and restricted operations
@@ -210,7 +211,7 @@ class Authentication implements RequestSignerContract
             }
 
             // Sandbox requests don't require RDTs
-            if ($needRdt && !Endpoint::isSandbox($request->getUri()->getHost())) {
+            if ($needRdt) {
                 $relevantCreds = $this->getRestrictedDataToken($restrictedPath, $request->getMethod(), $dataElements);
             }
         }

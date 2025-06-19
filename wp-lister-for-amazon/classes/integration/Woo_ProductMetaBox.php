@@ -238,17 +238,20 @@ class WPLA_Product_MetaBox {
 				'id' 			=> 'wpl_amazon_condition_type',
 				'label' 		=> __( 'Item Condition', 'wp-lister-for-amazon' ),
 				'options' 		=> array(
-						''                      => __( '-- use profile setting --', 'wp-lister-for-amazon' ),
-						'New'                   => __( 'New', 'wp-lister-for-amazon' ),
-						'UsedLikeNew'           => __( 'Used - Like New', 'wp-lister-for-amazon' ),
-						'UsedVeryGood'          => __( 'Used - Very Good', 'wp-lister-for-amazon' ),
-						'UsedGood'              => __( 'Used - Good', 'wp-lister-for-amazon' ),
-						'UsedAcceptable'        => __( 'Used - Acceptable', 'wp-lister-for-amazon' ),
-						'Refurbished'           => __( 'Refurbished', 'wp-lister-for-amazon' ),
-						'CollectibleLikeNew'    => __( 'Collectible - Like New', 'wp-lister-for-amazon' ),
-						'CollectibleVeryGood'   => __( 'Collectible - Very Good', 'wp-lister-for-amazon' ),
-						'CollectibleGood'       => __( 'Collectible - Good', 'wp-lister-for-amazon' ),
-						'CollectibleAcceptable' => __( 'Collectible - Acceptable', 'wp-lister-for-amazon' ),
+						''                          => __( '-- use profile setting --', 'wp-lister-for-amazon' ),
+						'club_club'                 => __( 'Club', 'wp-lister-for-amazon' ),
+						'collectible_acceptable'    => __( 'Collectible - Acceptable', 'wp-lister-for-amazon' ),
+						'collectible_good'          => __( 'Collectible - Good', 'wp-lister-for-amazon' ),
+						'collectible_like_new'      => __( 'Collectible - Like New', 'wp-lister-for-amazon' ),
+						'collectible_very_good'     => __( 'Collectible - Very Good', 'wp-lister-for-amazon' ),
+						'new_new'                   => __( 'New', 'wp-lister-for-amazon' ),
+						'new_oem'                   => __( 'New - OEM', 'wp-lister-for-amazon' ),
+						'new_open_box'              => __( 'New - Open Box', 'wp-lister-for-amazon' ),
+						'refurbished_refurbished'   => __( 'Refurbished', 'wp-lister-for-amazon' ),
+						'used_acceptable'           => __( 'Used - Acceptable', 'wp-lister-for-amazon' ),
+						'used_good'                 => __( 'Used - Good', 'wp-lister-for-amazon' ),
+						'used_like_new'             => __( 'Used - Like New', 'wp-lister-for-amazon' ),
+						'used_very_good'            => __( 'Used - Very Good', 'wp-lister-for-amazon' ),
 					),
 				'description' 	=> 'Indicates the condition of the item. Review the condition guidelines definitions.',
 				'desc_tip'		=>  true,
@@ -458,43 +461,43 @@ class WPLA_Product_MetaBox {
 		if ( ! isset( $_POST['wpla_save_product_nonce'] ) || ! wp_verify_nonce( $_POST['wpla_save_product_nonce'], 'wpla_save_product' ) ) return;
 
 		// convert decimal comma for all price fields
-		$_amazon_price         = wc_format_decimal(	wpla_clean(@$_POST['wpl_amazon_price']) );
-		$_amazon_b2b_price     = wc_format_decimal( wpla_clean(@$_POST['wpl_amazon_b2b_price']) );
-		$_amazon_minimum_price = wc_format_decimal( wpla_clean(@$_POST['wpl_amazon_minimum_price']) );
-		$_amazon_maximum_price = wc_format_decimal( wpla_clean(@$_POST['wpl_amazon_maximum_price']) );
+		$_amazon_price         = wc_format_decimal(	wpla_clean( $_POST['wpl_amazon_price'] ?? '' ) );
+		$_amazon_b2b_price     = wc_format_decimal( wpla_clean( $_POST['wpl_amazon_b2b_price'] ?? '' ) );
+		$_amazon_minimum_price = wc_format_decimal( wpla_clean( $_POST['wpl_amazon_minimum_price'] ?? '' ) );
+		$_amazon_maximum_price = wc_format_decimal( wpla_clean( $_POST['wpl_amazon_maximum_price'] ?? '' ) );
 
 		// Update post meta
-		update_post_meta( $post_id, '_amazon_title', 					wpla_clean(@$_POST['wpl_amazon_title']) );
+		update_post_meta( $post_id, '_amazon_title', 					wpla_clean( $_POST['wpl_amazon_title'] ?? '' ) );
 		update_post_meta( $post_id, '_amazon_price', 					$_amazon_price );
 		update_post_meta( $post_id, '_amazon_b2b_price',    			$_amazon_b2b_price );
 		update_post_meta( $post_id, '_amazon_minimum_price', 			$_amazon_minimum_price );
 		update_post_meta( $post_id, '_amazon_maximum_price', 			$_amazon_maximum_price );
-		update_post_meta( $post_id, '_amazon_product_id', 				wpla_clean(@$_POST['wpl_amazon_product_id'] ) );
-		update_post_meta( $post_id, '_amazon_id_type', 					wpla_clean(@$_POST['wpl_amazon_id_type']) );
-		update_post_meta( $post_id, '_amazon_condition_type', 			wpla_clean(@$_POST['wpl_amazon_condition_type']) );
-		update_post_meta( $post_id, '_amazon_condition_note', 			wpla_clean(@$_POST['wpl_amazon_condition_note']) );
-		update_post_meta( $post_id, '_amazon_external_repricer', 		wpla_clean(@$_POST['wpl_amazon_external_repricer']) );
-		update_post_meta( $post_id, '_amazon_fba_overwrite', 			wpla_clean(@$_POST['wpl_amazon_fba_overwrite']) );
-		update_post_meta( $post_id, '_amazon_restock_date', 			wpla_clean(@$_POST['wpl_amazon_restock_date']) );
-		update_post_meta( $post_id, '_amazon_bullet_point1',			wpla_clean(@$_POST['wpl_amazon_bullet_point1']) );
-		update_post_meta( $post_id, '_amazon_bullet_point2',			wpla_clean(@$_POST['wpl_amazon_bullet_point2']) );
-		update_post_meta( $post_id, '_amazon_bullet_point3',			wpla_clean(@$_POST['wpl_amazon_bullet_point3']) );
-		update_post_meta( $post_id, '_amazon_bullet_point4',			wpla_clean(@$_POST['wpl_amazon_bullet_point4']) );
-		update_post_meta( $post_id, '_amazon_bullet_point5',			wpla_clean(@$_POST['wpl_amazon_bullet_point5']) );
+		update_post_meta( $post_id, '_amazon_product_id', 				wpla_clean( $_POST['wpl_amazon_product_id'] ?? '' ) );
+		update_post_meta( $post_id, '_amazon_id_type', 				wpla_clean($_POST['wpl_amazon_id_type']  ?? '') );
+		update_post_meta( $post_id, '_amazon_condition_type', 			wpla_clean( $_POST['wpl_amazon_condition_type'] ?? '') );
+		update_post_meta( $post_id, '_amazon_condition_note', 			wpla_clean($_POST['wpl_amazon_condition_note'] ?? '') );
+		update_post_meta( $post_id, '_amazon_external_repricer', 		wpla_clean( $_POST['wpl_amazon_external_repricer'] ?? '' ) );
+		update_post_meta( $post_id, '_amazon_fba_overwrite', 			wpla_clean( $_POST['wpl_amazon_fba_overwrite'] ?? '' ) );
+		update_post_meta( $post_id, '_amazon_restock_date', 			wpla_clean( $_POST['wpl_amazon_restock_date'] ?? '' ) );
+		update_post_meta( $post_id, '_amazon_bullet_point1',			wpla_clean( $_POST['wpl_amazon_bullet_point1'] ?? '' ) );
+		update_post_meta( $post_id, '_amazon_bullet_point2',			wpla_clean( $_POST['wpl_amazon_bullet_point2'] ?? '' ) );
+		update_post_meta( $post_id, '_amazon_bullet_point3',			wpla_clean( $_POST['wpl_amazon_bullet_point3'] ?? '' ) );
+		update_post_meta( $post_id, '_amazon_bullet_point4',			wpla_clean( $_POST['wpl_amazon_bullet_point4'] ?? '' ) );
+		update_post_meta( $post_id, '_amazon_bullet_point5',			wpla_clean( $_POST['wpl_amazon_bullet_point5'] ?? '' ) );
 
         if ( 'single' == get_option( 'wpla_keyword_fields_type', 'separate' ) ) {
-            update_post_meta( $post_id, '_amazon_search_term', 			wpla_clean(@$_POST['wpl_amazon_search_term']) );
+            update_post_meta( $post_id, '_amazon_search_term', 			wpla_clean( $_POST['wpl_amazon_search_term'] ?? '' ) );
         } else {
-            update_post_meta( $post_id, '_amazon_generic_keywords1',	wpla_clean(@$_POST['wpl_amazon_generic_keywords1']) );
-            update_post_meta( $post_id, '_amazon_generic_keywords2',	wpla_clean(@$_POST['wpl_amazon_generic_keywords2']) );
-            update_post_meta( $post_id, '_amazon_generic_keywords3',	wpla_clean(@$_POST['wpl_amazon_generic_keywords3']) );
-            update_post_meta( $post_id, '_amazon_generic_keywords4',	wpla_clean(@$_POST['wpl_amazon_generic_keywords4']) );
-            update_post_meta( $post_id, '_amazon_generic_keywords5',	wpla_clean(@$_POST['wpl_amazon_generic_keywords5']) );
+            update_post_meta( $post_id, '_amazon_generic_keywords1',	wpla_clean( $_POST['wpl_amazon_generic_keywords1'] ?? '' ) );
+            update_post_meta( $post_id, '_amazon_generic_keywords2',	wpla_clean( $_POST['wpl_amazon_generic_keywords2'] ?? '' ) );
+            update_post_meta( $post_id, '_amazon_generic_keywords3',	wpla_clean( $_POST['wpl_amazon_generic_keywords3'] ?? '' ) );
+            update_post_meta( $post_id, '_amazon_generic_keywords4',	wpla_clean( $_POST['wpl_amazon_generic_keywords4'] ?? '' ) );
+            update_post_meta( $post_id, '_amazon_generic_keywords5',	wpla_clean( $_POST['wpl_amazon_generic_keywords5'] ?? '' ) );
         }
 
-		update_post_meta( $post_id, '_amazon_product_description',		wp_kses_post(@$_POST['wpl_amazon_product_description']) );
+		update_post_meta( $post_id, '_amazon_product_description',		wp_kses_post( $_POST['wpl_amazon_product_description'] ?? '' ) );
 
-		update_post_meta( $post_id, '_wpla_asin',						wpla_clean(@$_POST['wpl_amazon_asin']) );
+		update_post_meta( $post_id, '_wpla_asin',						wpla_clean( $_POST['wpl_amazon_asin'] ?? '' ) );
 
 
         // create matched listing when ASIN is entered manually
@@ -693,18 +696,33 @@ class WPLA_Product_MetaBox {
 
         // available item conditions
 		$available_item_conditions = array(
-			''                      => __( '-- use profile setting --', 'wp-lister-for-amazon' ),
-			'New'                   => __( 'New', 'wp-lister-for-amazon' ),
-			'UsedLikeNew'           => __( 'Used - Like New', 'wp-lister-for-amazon' ),
-			'UsedVeryGood'          => __( 'Used - Very Good', 'wp-lister-for-amazon' ),
-			'UsedGood'              => __( 'Used - Good', 'wp-lister-for-amazon' ),
-			'UsedAcceptable'        => __( 'Used - Acceptable', 'wp-lister-for-amazon' ),
-			'Refurbished'           => __( 'Refurbished', 'wp-lister-for-amazon' ),
-			'CollectibleLikeNew'    => __( 'Collectible - Like New', 'wp-lister-for-amazon' ),
-			'CollectibleVeryGood'   => __( 'Collectible - Very Good', 'wp-lister-for-amazon' ),
-			'CollectibleGood'       => __( 'Collectible - Good', 'wp-lister-for-amazon' ),
-			'CollectibleAcceptable' => __( 'Collectible - Acceptable', 'wp-lister-for-amazon' ),
+			''                          => __( '-- use profile setting --', 'wp-lister-for-amazon' ),
+			'club_club'                 => __( 'Club', 'wp-lister-for-amazon' ),
+			'collectible_acceptable'    => __( 'Collectible - Acceptable', 'wp-lister-for-amazon' ),
+			'collectible_good'          => __( 'Collectible - Good', 'wp-lister-for-amazon' ),
+			'collectible_like_new'      => __( 'Collectible - Like New', 'wp-lister-for-amazon' ),
+			'collectible_very_good'     => __( 'Collectible - Very Good', 'wp-lister-for-amazon' ),
+			'new_new'                   => __( 'New', 'wp-lister-for-amazon' ),
+			'new_oem'                   => __( 'New - OEM', 'wp-lister-for-amazon' ),
+			'new_open_box'              => __( 'New - Open Box', 'wp-lister-for-amazon' ),
+			'refurbished_refurbished'   => __( 'Refurbished', 'wp-lister-for-amazon' ),
+			'used_acceptable'           => __( 'Used - Acceptable', 'wp-lister-for-amazon' ),
+			'used_good'                 => __( 'Used - Good', 'wp-lister-for-amazon' ),
+			'used_like_new'             => __( 'Used - Like New', 'wp-lister-for-amazon' ),
+			'used_very_good'            => __( 'Used - Very Good', 'wp-lister-for-amazon' ),
 		);
+        $item_conditions_map = [
+            'New'                       => 'new_new',
+            'UsedLikeNew'               => 'used_like_new',
+            'UsedVeryGood'              => 'used_very_good',
+            'UsedGood'                  => 'used_good',
+            'UsedAcceptable'            => 'used_acceptable',
+            'Refurbished'               => 'refurbished_refurbished',
+            'CollectibleLikeNew'        => 'collectible_like_new',
+            'CollectibleVeryGood'       => 'collectible_very_good',
+            'CollectibleGood'           => 'collectible_good',
+            'CollectibleAcceptable'     => 'collectible_acceptable',
+        ];
 
         // available FBA overwrite modes
 		$available_fba_overwrite_modes = array(
@@ -837,9 +855,10 @@ class WPLA_Product_MetaBox {
                     </label>
 					<select name="variable_amazon_condition_type[<?php echo $loop; ?>]" class="select" style="">
                     <?php
+                        $new_amazon_condition_type = isset( $item_conditions_map[ $_amazon_condition_type ] ) ?? '';
                         foreach ( $available_item_conditions as $key => $option_name ) {
                             echo '<option value="' . $key . '" ';
-                            selected($key, $_amazon_condition_type);
+                            selected($key, $new_amazon_condition_type);
                             echo '>' . $option_name . '</option>';
                         }
                     ?>

@@ -31,7 +31,7 @@ class WPLA_ProductsImporter {
         $this->request_count++;
 
         if ( WPLA_Amazon_SP_API::isError( $result ) ) {
-            $this->lastError = sprintf( __( 'There was a problem fetching product details for %s: %s', 'wp-lister-for-amazon' ), $listing['asin'], $result->ErrorMessage );
+            $this->lastError = sprintf( __( 'There was a problem fetching product details for %s: %s', 'wp-lister-for-amazon' ), $asin, $result->ErrorMessage );
             return false;
         }
 
@@ -102,7 +102,7 @@ class WPLA_ProductsImporter {
             return false;
         }
 
-        $product_type = self::getProductTypeFromCatalogItem( $result );
+        $product_type = self::getWooCommerceProductTypeFromCatalogItem( $result );
         $this->request_count++;
         // echo "<pre>getMatchingProductForId() returned: ";print_r($result);echo"</pre>";#die();
 
@@ -250,10 +250,10 @@ class WPLA_ProductsImporter {
 
     /**
      * Analyze the Catalog Item to determine its product type
-     * @paramWPLab\Amazon\SellingPartnerApi\Model\CatalogItemsV20220401\Item $item
+     * @param WPLab\Amazon\SellingPartnerApi\Model\CatalogItemsV20220401\Item $item
      * @return string One of simple,parent or variation
      */
-    private function getProductTypeFromCatalogItem( $item ) {
+    private function getWooCommerceProductTypeFromCatalogItem( $item ) {
 	    $type = 'simple'; // default type
 
         if ( $item && $item->getRelationships() ) {

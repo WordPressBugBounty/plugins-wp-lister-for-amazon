@@ -24,7 +24,7 @@
  *          HTMLPurifier_DirectLex
  *
  * @license LGPL-2.1-or-later
- * Modified by __root__ on 08-May-2024 using {@see https://github.com/BrianHenryIE/strauss}.
+ * Modified by __root__ on 07-January-2025 using {@see https://github.com/BrianHenryIE/strauss}.
  */
 
 class WPLab_Amazon_HTMLPurifier_Lexer_DOMLex extends WPLab_Amazon_HTMLPurifier_Lexer
@@ -74,6 +74,9 @@ class WPLab_Amazon_HTMLPurifier_Lexer_DOMLex extends WPLab_Amazon_HTMLPurifier_L
         $options = 0;
         if ($config->get('Core.AllowParseManyTags') && defined('LIBXML_PARSEHUGE')) {
             $options |= LIBXML_PARSEHUGE;
+        }
+        if ($config->get('Core.RemoveBlanks') && defined('LIBXML_NOBLANKS')) {
+            $options |= LIBXML_NOBLANKS;
         }
 
         set_error_handler(array($this, 'muteErrorHandler'));

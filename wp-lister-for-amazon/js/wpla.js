@@ -15,5 +15,20 @@
             }
 
         });
+
     } );
 })( jQuery );
+
+function wpla_block(el) {
+    jQuery(el).block({
+        message: null,
+        overlayCSS: {
+            background: '#fff',
+            opacity: 0.6
+        }
+    });
+}
+
+function wpla_unblock(el) {
+    jQuery(el).unblock();
+}

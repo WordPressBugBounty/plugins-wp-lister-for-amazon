@@ -2,7 +2,7 @@
 /**
  * @license MIT
  *
- * Modified by __root__ on 08-May-2024 using {@see https://github.com/BrianHenryIE/strauss}.
+ * Modified by __root__ on 07-January-2025 using {@see https://github.com/BrianHenryIE/strauss}.
  */
 
 namespace WPLab\Amazon\GuzzleHttp;
@@ -81,8 +81,8 @@ class PrepareBodyMiddleware
 
         $expect = $options['expect'] ?? null;
 
-        // Return if disabled or if you're not using HTTP/1.1 or HTTP/2.0
-        if ($expect === false || $request->getProtocolVersion() < 1.1) {
+        // Return if disabled or using HTTP/1.0
+        if ($expect === false || $request->getProtocolVersion() === '1.0') {
             return;
         }
 

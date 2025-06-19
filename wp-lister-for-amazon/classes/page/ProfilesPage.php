@@ -52,6 +52,9 @@ class WPLA_ProfilesPage extends WPLA_Page {
 		wp_enqueue_script( 'thickbox' );
 		wp_enqueue_style( 'thickbox' );
 
+		wp_enqueue_script( 'wpla' );
+		wp_enqueue_script( 'jquery-blockui' );
+
 	}
 	
 	public function handleSubmitOnInit() {
@@ -114,6 +117,7 @@ class WPLA_ProfilesPage extends WPLA_Page {
 
 	    // create table and fetch items to show
 	    $this->profilesTable->prepare_items();
+		$needs_conversion = WPLA_AmazonProfile::getProfilesThatNeedConversion();
 
 		// process errors 		
 		// if ($this->IC->message) $this->showMessage( $this->IC->message,1 );
@@ -123,7 +127,7 @@ class WPLA_ProfilesPage extends WPLA_Page {
 			'message'					=> $this->message,
 
 			'profilesTable'				=> $this->profilesTable,
-		
+			'needs_conversion'          => count($needs_conversion),
 			'form_action'				=> 'admin.php?page='.self::ParentMenuId.'-profiles'
 		);
 		$this->display( 'profiles_page', $aData );
@@ -141,6 +145,8 @@ class WPLA_ProfilesPage extends WPLA_Page {
 		} else {
 			$profile = new WPLA_AmazonProfile( wpla_clean($_REQUEST['profile']) );
 		}
+
+		$account_id = $profile->account_id ?: 0;
 		
 		// $listingsModel = new ListingsModel();
 		// $prepared_listings  = $listingsModel->getAllPreparedWithProfile( $item['profile_id'] );
@@ -177,6 +183,8 @@ class WPLA_ProfilesPage extends WPLA_Page {
 			// 'templates'                 => $templates,
 			'category_templates'        => $category_templates,
 			'liloader_templates'        => $liloader_templates,
+			'account_id'                => $account_id ?? 0,
+			'product_types'             => \WPLab\Amazon\Models\AmazonProductTypesModel::getTypesAsDropdownOptions( $account_id ),
 			'profile_listings'          => $listings,
 			'profile_details'           => maybe_unserialize( $profile->details ),
 
@@ -204,7 +212,7 @@ class WPLA_ProfilesPage extends WPLA_Page {
 		$profile->fillFromArray( $post_data );
 
 		// add field data
-		$profile->fields = maybe_serialize( $this->getPreprocessedPostData( 'tpl_col_', true ) );
+		$profile->fields = maybe_serialize( $this->getPreprocessedPostData( 'tpl_col_', false ) );
 
 		// insert or update
 		if ( $profile_id ) {
@@ -245,10 +253,17 @@ class WPLA_ProfilesPage extends WPLA_Page {
 		$details = array();
 		// echo "<pre>";print_r($_POST);echo"</pre>";die();
 
-        $postdata = WPLA_FeedTemplateHelper::get_real_input('post');
+        //$postdata = WPLA_FeedTemplateHelper::get_real_input('post');
+		$postdata = WPLA_AmazonWebHelper::getFlatInput('POST');
 		foreach ( $postdata as $key => $val ) {
-		    $key = WPLA_FeedTemplateHelper::restore_field_name( $key );
-			if ( empty($val) && !is_numeric($val) && $skip_empty ) continue;
+//		    $key = WPLA_FeedTemplateHelper::restore_field_name( $key );
+			$key = WPLA_AmazonWebHelper::restoreFieldName( $key );
+
+			// Skip empty fields if $skip_empty is TRUE AND the field is not a marketplace_id/language_tag field
+			if ( strpos( $key, 'marketplace_id') === false && strpos( $key, 'language_tag') === false && empty($val) && !is_numeric($val) && $skip_empty ) {
+				continue;
+			}
+
 			if ( substr( $key, 0, strlen($prefix) ) == $prefix ) {
 				$field = substr( $key, strlen($prefix) );
 

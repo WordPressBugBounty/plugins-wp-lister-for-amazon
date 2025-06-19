@@ -23,7 +23,7 @@ function htmlpurifier_filter_extractstyleblocks_muteerrorhandler()
  *      call WPLab_Amazon_HTMLPurifier_Filter_ExtractStyleBlocks->cleanCSS()
  *
  * @license LGPL-2.1-or-later
- * Modified by __root__ on 08-May-2024 using {@see https://github.com/BrianHenryIE/strauss}.
+ * Modified by __root__ on 07-January-2025 using {@see https://github.com/BrianHenryIE/strauss}.
  */
 class WPLab_Amazon_HTMLPurifier_Filter_ExtractStyleBlocks extends WPLab_Amazon_HTMLPurifier_Filter
 {
@@ -57,6 +57,11 @@ class WPLab_Amazon_HTMLPurifier_Filter_ExtractStyleBlocks extends WPLab_Amazon_H
      */
     private $_enum_attrdef;
 
+    /**
+     * @type WPLab_Amazon_HTMLPurifier_AttrDef_Enum
+     */
+    private $_universal_attrdef;
+
     public function __construct()
     {
         $this->_tidy = new csstidy();
@@ -71,6 +76,13 @@ class WPLab_Amazon_HTMLPurifier_Filter_ExtractStyleBlocks extends WPLab_Amazon_H
                 'active',
                 'hover',
                 'focus'
+            )
+        );
+        $this->_universal_attrdef = new WPLab_Amazon_HTMLPurifier_AttrDef_Enum(
+            array(
+                'initial',
+                'inherit',
+                'unset',
             )
         );
     }
@@ -308,6 +320,11 @@ class WPLab_Amazon_HTMLPurifier_Filter_ExtractStyleBlocks extends WPLab_Amazon_H
                     foreach ($style as $name => $value) {
                         if (!isset($css_definition->info[$name])) {
                             unset($style[$name]);
+                            continue;
+                        }
+                        $uni_ret = $this->_universal_attrdef->validate($value, $config, $context);
+                        if ($uni_ret !== false) {
+                            $style[$name] = $uni_ret;
                             continue;
                         }
                         $def = $css_definition->info[$name];

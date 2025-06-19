@@ -701,6 +701,34 @@ class WPLA_ImportHelper {
         return $response;
     }
 
+	public static function processVatInvoiceDataReport( $report, $rows, $job, $task ) {
+		// process rows
+		foreach ($rows as $row) {
+			$vat_number = $row['buyer-vat-number'];
+
+			$order = WPLA_OrdersModel::getWhere( 'order_id', $row['order-id'] );
+
+			if ( $vat_number && $order ) {
+				if ( $order->post_id ) {
+					$wc_order = wc_get_order( $order->post_id );
+					$wc_order->update_meta_data( '_billing_vat_number', $vat_number );
+					$wc_order->update_meta_data( '_billing_vat_country', $row['bill-country'] );
+					$wc_order->save();
+				}
+			}
+
+		}
+
+		// build response
+		$response = new stdClass();
+		$response->job  	= $job;
+		$response->task 	= $task;
+		$response->errors   = '';
+		$response->success  = true;
+
+		return $response;
+	}
+
 	// process single Quality report page
 	public static function processQualityReportPage( $report, $rows, $job, $task ) {
 		$listingsModel = new WPLA_ListingsModel();

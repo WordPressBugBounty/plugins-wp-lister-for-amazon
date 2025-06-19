@@ -1,5 +1,8 @@
 <?php
 
+/**
+ * @deprecated
+ */
 class WPLA_FeedTemplateIndex {
 	
 	static public function get_file_index() {

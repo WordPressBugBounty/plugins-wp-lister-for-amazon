@@ -18,11 +18,11 @@
  * and WPLab_Amazon_HTMLPurifier_Config.
  *
  *@license LGPL-2.1-or-later
- *Modified by __root__ on 08-May-2024 using {@see https://github.com/BrianHenryIE/strauss}.
+ *Modified by __root__ on 07-January-2025 using {@see https://github.com/BrianHenryIE/strauss}.
  */
 
 /*
-    HTML Purifier 4.17.0 - Standards Compliant HTML Filtering
+    HTML Purifier 4.18.0 - Standards Compliant HTML Filtering
     Copyright (C) 2006-2008 Edward Z. Yang
 
     This library is free software; you can redistribute it and/or
@@ -61,12 +61,12 @@ class WPLab_Amazon_HTMLPurifier
      * Version of HTML Purifier.
      * @type string
      */
-    public $version = '4.17.0';
+    public $version = '4.18.0';
 
     /**
      * Constant with version of HTML Purifier.
      */
-    const VERSION = '4.17.0';
+    const VERSION = '4.18.0';
 
     /**
      * Global configuration object.

@@ -40,7 +40,7 @@
  * limitation of the token system and some workarounds would be nice.
  *
  * @license LGPL-2.1-or-later
- * Modified by __root__ on 08-May-2024 using {@see https://github.com/BrianHenryIE/strauss}.
+ * Modified by __root__ on 07-January-2025 using {@see https://github.com/BrianHenryIE/strauss}.
  */
 class WPLab_Amazon_HTMLPurifier_Lexer
 {
@@ -273,20 +273,6 @@ class WPLab_Amazon_HTMLPurifier_Lexer
     }
 
     /**
-     * Special Internet Explorer conditional comments should be removed.
-     * @param string $string HTML string to process.
-     * @return string HTML with conditional comments removed.
-     */
-    protected static function removeIEConditional($string)
-    {
-        return preg_replace(
-            '#<!--\[if [^>]+\]>.*?<!\[endif\]-->#si', // probably should generalize for all strings
-            '',
-            $string
-        );
-    }
-
-    /**
      * Callback function for escapeCDATA() that does the work.
      *
      * @warning Though this is public in order to let the callback happen,
@@ -325,8 +311,6 @@ class WPLab_Amazon_HTMLPurifier_Lexer
 
         // escape CDATA
         $html = $this->escapeCDATA($html);
-
-        $html = $this->removeIEConditional($html);
 
         // extract body from document if applicable
         if ($config->get('Core.ConvertDocumentToFragment')) {

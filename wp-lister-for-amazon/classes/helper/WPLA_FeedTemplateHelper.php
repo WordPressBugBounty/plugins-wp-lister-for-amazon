@@ -1,5 +1,8 @@
 <?php
 
+/**
+ * @deprecated
+ */
 class WPLA_FeedTemplateHelper extends WPLA_Core {
 	
 	var $logger;

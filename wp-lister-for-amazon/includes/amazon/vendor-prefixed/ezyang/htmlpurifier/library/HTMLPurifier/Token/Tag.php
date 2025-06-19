@@ -4,7 +4,7 @@
  * Abstract class of a tag token (start, end or empty), and its behavior.
  *
  * @license LGPL-2.1-or-later
- * Modified by __root__ on 08-May-2024 using {@see https://github.com/BrianHenryIE/strauss}.
+ * Modified by __root__ on 07-January-2025 using {@see https://github.com/BrianHenryIE/strauss}.
  */
 abstract class WPLab_Amazon_HTMLPurifier_Token_Tag extends WPLab_Amazon_HTMLPurifier_Token
 {
@@ -47,7 +47,7 @@ abstract class WPLab_Amazon_HTMLPurifier_Token_Tag extends WPLab_Amazon_HTMLPuri
         $this->name = ctype_lower($name) ? $name : strtolower($name);
         foreach ($attr as $key => $value) {
             // normalization only necessary when key is not lowercase
-            if (!ctype_lower($key)) {
+            if (!ctype_lower((string)$key)) {
                 $new_key = strtolower($key);
                 if (!isset($attr[$new_key])) {
                     $attr[$new_key] = $attr[$key];

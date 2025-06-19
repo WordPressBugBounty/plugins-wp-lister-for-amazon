@@ -2,7 +2,7 @@
 /**
  * @license MIT
  *
- * Modified by __root__ on 08-May-2024 using {@see https://github.com/BrianHenryIE/strauss}.
+ * Modified by __root__ on 07-January-2025 using {@see https://github.com/BrianHenryIE/strauss}.
  */
 
 namespace WPLab\Amazon\Psr\Http\Message;
@@ -20,10 +20,10 @@ interface UploadedFileFactoryInterface
      *
      * @param StreamInterface $stream Underlying stream representing the
      *     uploaded file content.
-     * @param int $size in bytes
+     * @param int|null $size in bytes
      * @param int $error PHP file upload error
-     * @param string $clientFilename Filename as provided by the client, if any.
-     * @param string $clientMediaType Media type as provided by the client, if any.
+     * @param string|null $clientFilename Filename as provided by the client, if any.
+     * @param string|null $clientMediaType Media type as provided by the client, if any.
      *
      * @return UploadedFileInterface
      *
@@ -31,9 +31,9 @@ interface UploadedFileFactoryInterface
      */
     public function createUploadedFile(
         StreamInterface $stream,
-        int $size = null,
+        ?int $size = null,
         int $error = \UPLOAD_ERR_OK,
-        string $clientFilename = null,
-        string $clientMediaType = null
+        ?string $clientFilename = null,
+        ?string $clientMediaType = null
     ): UploadedFileInterface;
 }

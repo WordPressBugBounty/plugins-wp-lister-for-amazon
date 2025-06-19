@@ -7,6 +7,7 @@ require_once WPLA_PATH .'/classes/core/WPLA_Amazon_SP_API_Authentication.php';
 
 use WPLab\Amazon\SellingPartnerApi\Api\FbaOutboundV20200701Api as FbaOutboundApi;
 use WPLab\Amazon\SellingPartnerApi\Api\FeedsV20210630Api as FeedsApi;
+use WPLab\Amazon\SellingPartnerApi\Api\ProductTypeDefinitionsV20200901Api as ProductTypeDefinitionsApi;
 use WPLab\Amazon\SellingPartnerApi\FeedType;
 use WPLab\Amazon\SellingPartnerApi\Api\SellersV1Api as SellersApi;
 use WPLab\Amazon\SellingPartnerApi\Api\CatalogItemsV20220401Api as CatalogApi;
@@ -109,6 +110,7 @@ class WPLA_Amazon_SP_API {
         // use autoloader to load AmazonAPI classes
         //spl_autoload_register('WPLA_AmazonAPI::autoloadAmazonClasses');
         $account_id = $this->account_id;
+		$this->setAccountId( $account_id ); #fixes the error `($marketplace_id) must be of type string, null given`
 
         $account = new WPLA_AmazonAccount( $account_id );
 
@@ -153,10 +155,14 @@ class WPLA_Amazon_SP_API {
             $service = new FbaOutboundApi( $config, $this->client );
         } elseif ( 'Sellers' == $section ) {
 
-            $api_section     = 'Sellers';
-            $this->AccessKey = $this->buildSpecialAccessKey( $api_section );
+	        $api_section     = 'Sellers';
+	        $this->AccessKey = $this->buildSpecialAccessKey( $api_section );
 
-            $service = new SellersApi( $config );
+	        $service = new SellersApi( $config );
+        } elseif ( $section == 'Listings' ) {
+			$api_section = 'Listings';
+			$this->AccessKey = $this->buildSpecialAccessKey( $api_section);
+			$service = new ListingsApi( $config );
         } else {
             /* @todo Figure out the default API to load */
             $this->AccessKey = $this->buildSpecialAccessKey('');
@@ -165,8 +171,8 @@ class WPLA_Amazon_SP_API {
 
         // make dblogger available in API client
         //$service->dblogger   = $this->dblogger;
-        $service->account_id = $this->account_id;
-        $service->market_id  = $this->market_id;
+        //$service->account_id = $this->account_id;
+        //$service->market_id  = $this->market_id;
 
         // Uncomment to try out Mock Service that simulates MarketplaceWebService
         // responses without calling MarketplaceWebService service.
@@ -662,14 +668,29 @@ class WPLA_Amazon_SP_API {
 
         try {
             $doc     = $api->getFeedDocument( $feed_document_id );
-            $request = wp_remote_get( $doc->getUrl(), ['timeout' => 30] );
+
+			$client = new WPLab\Amazon\GuzzleHttp\Client();
+			$res = $client->request( 'GET', $doc->getUrl() );
+	        $response = $res->getBody()->getContents();
+
+			/*$request = wp_remote_get( $doc->getUrl(), ['timeout' => 30] );
 
             if ( is_wp_error( $request ) ) {
                 WPLA()->logger->error( 'Error downloading Feed Document: '. $request->get_error_message() );
                 throw new Exception( $request->get_error_message() );
             }
 
-            return wp_remote_retrieve_body( $request );
+			$response = wp_remote_retrieve_body(  $request );*/
+
+			if ( $doc->getCompressionAlgorithm() == 'GZIP' ) {
+				$response = gzdecode($response);
+
+				if ($response === false) {
+					throw new Exception( 'Unable to decompress the response' );
+				}
+			}
+
+            return $response;
         }  catch ( \WPLab\Amazon\SellingPartnerApi\ApiException $ex ) {
             $error = new stdClass();
             $error->ErrorMessage = $ex->getMessage();
@@ -748,28 +769,58 @@ class WPLA_Amazon_SP_API {
      * Listings API
      */
 
+	/**
+	 * @param array $listing
+	 * @param WPLA_AmazonProfile $profile
+	 *
+	 * @return stdClass|\WPLab\Amazon\SellingPartnerApi\Model\ListingsV20210801\ListingsItemSubmissionResponse
+	 */
+	public function putListingsItem( $listing, $profile ) {
+		$this->initAPI( 'Listings' );
+
+		$api = new ListingsApi( $this->config, $this->client );
+		$builder = new \WPLab\Amazon\Helper\JsonFeedDataBuilder();
+
+		try {
+			if ( $profile->product_type ) {
+				$product_type = $profile->product_type;
+			} else {
+				$product_type = get_post_meta( $listing['post_id'], '_wpla_custom_product_type', true );
+			}
+
+			$body_data = [
+				'productType'  => $product_type,
+				'requirements' => 'LISTING',
+				'attributes'   => $builder->getAttributes( $listing, $profile )
+			];
+
+			$body = new \WPLab\Amazon\SellingPartnerApi\Model\ListingsV20200901\ListingsItemPutRequest( $body_data );
+			return $api->putListingsItem( $this->account->merchant_id, $listing['sku'], $this->account->marketplace_id, $body_data );
+		} catch (\WPLab\Amazon\SellingPartnerApi\ApiException | Exception $ex ) {
+			// Also catch Exceptions because toXML and fromXML methods throw Exceptions on invalid XML strings
+			$error = new stdClass();
+			$error->ErrorMessage = $ex->getMessage();
+			$error->ErrorCode = $ex->getCode();
+			$error->StatusCode = $ex->getCode();
+			return $error;
+		}
+	}
+
     /**
      * getListingsItem call
      * @param string $sku
-     * @return array|\SellingPartnerApi\Model\ListingsV20210801\Item|stdClass
+     * @return \WPLab\Amazon\SellingPartnerApi\Model\ListingsV20210801\Item|stdClass
      */
     public function getListingsItem( $sku ) {
         $this->initAPI( 'Listings' );
         $api = new ListingsApi( $this->config, $this->client );
 
         try {
-            return $api->getListingsItem( $this->account->merchant_id, $sku, [$this->account->marketplace_id], null, 'summaries,attributes,issues,offers,fulfillmentAvailability,procurement' );
-        } catch (\WPLab\Amazon\SellingPartnerApi\ApiException $ex) {
+            return $api->getListingsItem( $this->account->merchant_id, $sku, $this->account->marketplace_id, null, 'summaries,attributes,issues,offers,fulfillmentAvailability,procurement' );
+        } catch (\WPLab\Amazon\SellingPartnerApi\ApiException | Exception $ex) {
             $error = new stdClass();
             $error->ErrorMessage = $ex->getMessage();
             $error->ErrorCode = $ex->getCode();
-            return $error;
-        } catch (Exception $ex) {
-            // Also catch Exceptions because toXML and fromXML methods throw Exceptions on invalid XML strings
-            $error = new stdClass();
-            $error->ErrorMessage = $ex->getMessage();
-            $error->ErrorCode = $ex->getCode();
-            $error->StatusCode = $ex->getCode();
             return $error;
         }
     }
@@ -787,13 +838,13 @@ class WPLA_Amazon_SP_API {
         $api = new CatalogApi( $this->config, $this->client );
 
         if ( empty( $included_data ) ) {
-            $included_data = ['summaries','attributes','identifiers','images','productTypes','relationships'];
+            $included_data = 'summaries,attributes,identifiers,images,productTypes,relationships';
         }
 
         try {
             return $api->getCatalogItem(
                 $asin,
-                [$this->account->marketplace_id],
+                $this->account->marketplace_id,
                 $included_data,
                 null
             );
@@ -822,13 +873,12 @@ class WPLA_Amazon_SP_API {
 
         try {
             $results = $api->searchCatalogItems(
-                [$this->account->marketplace_id],
-                [$sku],
-                ['SKU'],
+                $this->account->marketplace_id,
+                $sku,
+                'SKU',
                 'summaries,attributes,identifiers,images,productTypes',
                 null,
-                $this->account->merchant_id,
-                null
+                $this->account->merchant_id
             );
 
             return $results->getItems();
@@ -847,7 +897,7 @@ class WPLA_Amazon_SP_API {
     /**
      * SearchCatalogItems call
      *
-     * @param array $keywords
+     * @param string $keywords CSV of keywords
      * @return Catalog\ItemSearchResults|stdClass
      */
     public function searchCatalogItems( $keywords = [], $identifiers = null, $identifiers_type = null, $seller_id = null ) {
@@ -858,13 +908,13 @@ class WPLA_Amazon_SP_API {
 
         try {
             $results = $api->searchCatalogItems(
-                [$this->account->marketplace_id],
+                $this->account->marketplace_id,
                 $identifiers,
                 $identifiers_type,
-                ['summaries','attributes','identifiers','images','productTypes','relationships'],
+                'summaries,attributes,identifiers,images,productTypes,relationships',
                 null,
                 $seller_id,
-                (array)$keywords
+                $keywords
             );
 
             return $results;
@@ -895,10 +945,10 @@ class WPLA_Amazon_SP_API {
 
         try {
             $results = $api->searchCatalogItems(
-                [$this->account->marketplace_id],
+                $this->account->marketplace_id,
                 $identifiers,
                 $identifier_type,
-                ['summaries','attributes','identifiers','images','productTypes','relationships'],
+                'summaries,attributes,identifiers,images,productTypes,relationships',
                 null,
                 $this->account->merchant_id
             );
@@ -1235,8 +1285,8 @@ class WPLA_Amazon_SP_API {
             $marketplace_ids[] = $this->MarketplaceId; // fall back
         }
 
-		$next_token = get_transient( 'wpla_get_orders_next_token' );
-		WPLA()->logger->debug( 'next_token from Transient: '. $next_token );
+		$next_token = get_transient( 'wpla_get_orders_next_token_' . $this->account_id );
+		WPLA()->logger->debug( '['. $this->account_id.'] next_token from Transient: '. $next_token );
 
 	    // handle custom number of days
 	    if ( $days ) {
@@ -1266,7 +1316,8 @@ class WPLA_Amazon_SP_API {
                 $next_token = $order_list->getNextToken();
 
                 while ( $next_token ) {
-	                set_transient( 'wpla_get_orders_next_token', $next_token, 600 );
+	                // Store the raw NextToken in the transient
+	                set_transient( 'wpla_get_orders_next_token_' . $this->account_id, $next_token, 600 );
 
 					if ( count( $orders ) > 100 ) {
 						break;
@@ -1290,6 +1341,10 @@ class WPLA_Amazon_SP_API {
 					} else {
 						$next_token = false;
 					}
+
+	                if ( !$next_token ) {
+		                delete_transient( 'wpla_get_orders_next_token_' . $this->account_id );
+	                }
                 }
             }
 
@@ -1305,6 +1360,12 @@ class WPLA_Amazon_SP_API {
 		if ($ex->getCode() == 429) {
 			return $orders;
 		} else {
+			// Delete the next token transient if we get a 400 error (bad request)
+			// This usually indicates the next token is invalid or expired
+			if ($ex->getCode() == 400) {
+				delete_transient( 'wpla_get_orders_next_token_' . $this->account_id );
+			}
+			
 			$error = new stdClass();
 			$error->ErrorMessage = $ex->getMessage();
 			$error->ErrorCode = $ex->getCode();
@@ -1619,31 +1680,22 @@ class WPLA_Amazon_SP_API {
         try {
             $doc = $api->getReportDocument( $document_id );
 
-            $response = wp_remote_get( $doc->getUrl(), ['timeout' => 30] );
-
-            if ( is_wp_error( $response ) ) {
-                throw new Exception( $response->get_error_message(), $response->get_error_code() );
-            }
-
-            $body    = wp_remote_retrieve_body( $response );
-            $decoded = $body;
+	        $client = new WPLab\Amazon\GuzzleHttp\Client();
+	        $res = $client->request( 'GET', $doc->getUrl() );
+	        $response = $res->getBody()->getContents();
 
             /**
              * Use ReportDocument::getCompressionAlgorithm from the API to determine if we need to decode the data
              */
-            if ( $doc->getCompressionAlgorithm() == 'GZIP' ) {
-                $decoded = gzdecode( $body );
-            }
-            /*$content_type = wp_remote_retrieve_header( $response, 'content-type' );
-            if ( strpos( $content_type, 'text/plain' ) === false ) {
-                $decoded = gzdecode( $body );
+	        if ( $doc->getCompressionAlgorithm() == 'GZIP' ) {
+		        $response = gzdecode($response);
 
-                if ( false === $decoded ) {
-                    $decoded = $body;
-                }
-            }*/
+		        if ($response === false) {
+			        throw new Exception( 'Unable to decompress the response' );
+		        }
+	        }
 
-            return $decoded;
+            return $response;
             //return gzdecode( wp_remote_retrieve_body( $response ) );
         } catch ( \WPLab\Amazon\SellingPartnerApi\ApiException $ex ) {
             $error = new stdClass();
@@ -1752,6 +1804,55 @@ class WPLA_Amazon_SP_API {
 
         return $api->getEligibleShipmentServices( $body );
     }
+
+	/**
+	 * Product Type Definitions and Schema
+	 */
+
+	/**
+	 * @return WPLab\Amazon\SellingPartnerApi\Model\ProductTypeDefinitionsV20200901\ProductTypeList
+	 */
+	public function searchDefinitionsProductTypes( $marketplace_ids = [], $keywords = null ) {
+		$this->initAPI();
+		$api = new ProductTypeDefinitionsApi( $this->config, $this->client );
+
+		$marketplace_str = implode('/', $marketplace_ids);
+		$keywords_str = $keywords ?? '';
+		$cache = get_transient( 'wpla_searchDefinitionsProductTypes_'. $marketplace_str .'_'. $keywords_str );
+
+		if ( $cache ) {
+			return maybe_unserialize( $cache );
+		}
+
+		try {
+			$resp = $api->searchDefinitionsProductTypes($marketplace_ids, $keywords);
+
+			// store in cache
+			set_transient( 'wpla_searchDefinitionsProductTypes_'. $marketplace_str .'_'. $keywords_str, maybe_serialize( $resp ), 3600 );
+
+			return $resp;
+		} catch ( \WPLab\Amazon\SellingPartnerApi\ApiException $e ) {
+			WPLA()->logger->error( 'SP-API Exception: '. $e->getMessage() );
+
+			$error = new stdClass();
+			$error->ErrorMessage = $e->getMessage();
+			$error->ErrorCode    = $e->getCode();
+			return $error;
+		}
+
+	}
+
+	public function getDefinitionsProductType( $product_type, $marketplace = null ) {
+		$this->initAPI();
+		$api = new ProductTypeDefinitionsApi( $this->config, $this->client );
+
+		if ( is_null($marketplace) ) {
+			$marketplace = $this->MarketplaceId;
+		}
+
+		return $api->getDefinitionsProductType( $product_type, [$marketplace], $this->account->merchant_id );
+	}
+
 
     public static function isError( $response ) {
         if ( is_object( $response ) && isset( $response->ErrorMessage ) ) {

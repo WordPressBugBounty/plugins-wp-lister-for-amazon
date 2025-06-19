@@ -20,6 +20,7 @@
 
         <a href="<?php echo $wpl_settings_url; ?>&tab=settings"   class="nav-tab <?php echo $active_tab == 'settings' ? 'nav-tab-active' : ''; ?>"><?php echo __( 'General Settings', 'wp-lister-for-amazon' ) ?></a>
         <a href="<?php echo $wpl_settings_url; ?>&tab=accounts"   class="nav-tab <?php echo $active_tab == 'accounts' ? 'nav-tab-active' : ''; ?>"><?php echo __( 'Accounts', 'wp-lister-for-amazon' ) ?></a>
+        <a href="<?php echo $wpl_settings_url; ?>&tab=product_types" class="nav-tab <?php echo $active_tab == 'product_types' ? 'nav-tab-active' : ''; ?>"><?php echo __( 'Product Types', 'wp-lister-for-amazon' ) ?></a>
         <a href="<?php echo $wpl_settings_url; ?>&tab=categories" class="nav-tab <?php echo $active_tab == 'categories' ? 'nav-tab-active' : ''; ?>"><?php echo __( 'Categories', 'wp-lister-for-amazon' ) ?></a>
         <a href="<?php echo $wpl_settings_url; ?>&tab=advanced"   class="nav-tab <?php echo $active_tab == 'advanced' ? 'nav-tab-active' : ''; ?>"><?php echo __( 'Advanced', 'wp-lister-for-amazon' ) ?></a>
 

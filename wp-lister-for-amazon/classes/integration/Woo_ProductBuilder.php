@@ -5,6 +5,7 @@ class WPLA_ProductBuilder {
 	var $images_url;
 	var $updated_count;
 	var $images_hashmap = array();
+	var $last_insert_id;
 
     /**
      * @paramWPLab\Amazon\SellingPartnerApi\Model\CatalogItemsV20220401\Item $result
@@ -160,7 +161,7 @@ class WPLA_ProductBuilder {
 
     /**
      * @param array $item
-     * @paramWPLab\Amazon\SellingPartnerApi\Model\CatalogItemsV20220401\Item $product_node
+     * @param WPLab\Amazon\SellingPartnerApi\Model\CatalogItemsV20220401\Item $product_node
      * @param string $product_type
      * @param array $variations
      */
@@ -780,7 +781,11 @@ class WPLA_ProductBuilder {
         foreach ( $product_node->getProductTypes() as $type_node ) {
             //$data['attributes'] = $this->mapAttributesForProductType( $listing['attributes'], $type_node->getProductType() );
             $product_types[] = $type_node->getProductType();
+
+			$data['_meta_fields']['_wpla_custom_product_type']   = $type_node->getProductType();
+			$data['_meta_fields']['_wpla_custom_marketplace_id'] = $type_node->getMarketplaceId();
         }
+
         if ( in_array( 'ABIS_BOOK',  $product_types ) ) {
 
 			if ( isset( $listing['attributes']['manufacturer'] ) ) {
@@ -1097,6 +1102,12 @@ class WPLA_ProductBuilder {
 			foreach ( $data['_meta_fields'] as $meta_key => $meta_value ) {
 				update_post_meta( $post_id, $meta_key, $meta_value );
 			}
+		}
+
+		// make sure the product type is installed
+		if ( !empty( $data['_meta_fields']['_wpla_custom_product_type'] ) && !empty( $data['_meta_fields']['_wpla_custom_marketplace_id'] ) ) {
+			$product_types_mdl = new \WPLab\Amazon\Models\AmazonProductTypesModel();
+			$product_types_mdl->getDefinitionsProductType( $data['_meta_fields']['_wpla_custom_product_type'], $data['_meta_fields']['_wpla_custom_marketplace_id'], true );
 		}
 
 		// set amazon item condition

@@ -8,7 +8,7 @@
  * Handles referencing and derefencing character entities
  *
  * @license LGPL-2.1-or-later
- * Modified by __root__ on 08-May-2024 using {@see https://github.com/BrianHenryIE/strauss}.
+ * Modified by __root__ on 07-January-2025 using {@see https://github.com/BrianHenryIE/strauss}.
  */
 class WPLab_Amazon_HTMLPurifier_EntityParser
 {
@@ -119,8 +119,8 @@ class WPLab_Amazon_HTMLPurifier_EntityParser
     protected function entityCallback($matches)
     {
         $entity = $matches[0];
-        $hex_part = @$matches[1];
-        $dec_part = @$matches[2];
+        $hex_part = isset($matches[1]) ? $matches[1] : null;
+        $dec_part = isset($matches[2]) ? $matches[2] : null;
         $named_part = empty($matches[3]) ? (empty($matches[4]) ? "" : $matches[4]) : $matches[3];
         if ($hex_part !== NULL && $hex_part !== "") {
             return WPLab_Amazon_HTMLPurifier_Encoder::unichr(hexdec($hex_part));

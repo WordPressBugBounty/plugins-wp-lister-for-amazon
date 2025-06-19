@@ -30,7 +30,7 @@
  * we don't run into any of them, just have tr tags is OK.
  *
  * @license LGPL-2.1-or-later
- * Modified by __root__ on 08-May-2024 using {@see https://github.com/BrianHenryIE/strauss}.
+ * Modified by __root__ on 07-January-2025 using {@see https://github.com/BrianHenryIE/strauss}.
  */
 class WPLab_Amazon_HTMLPurifier_ChildDef_Table extends WPLab_Amazon_HTMLPurifier_ChildDef
 {
@@ -193,6 +193,9 @@ class WPLab_Amazon_HTMLPurifier_ChildDef_Table extends WPLab_Amazon_HTMLPurifier
             $current_tr_tbody = null;
 
             foreach($content as $node) {
+                if (!isset($node->name)) {
+                    continue;
+                }
                 switch ($node->name) {
                 case 'tbody':
                     $current_tr_tbody = null;

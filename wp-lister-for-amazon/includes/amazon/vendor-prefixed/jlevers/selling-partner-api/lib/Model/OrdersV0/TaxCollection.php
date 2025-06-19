@@ -8,7 +8,7 @@
  * @package  SellingPartnerApi
  *
  * @license BSD-3-Clause
- * Modified by __root__ on 08-May-2024 using {@see https://github.com/BrianHenryIE/strauss}.
+ * Modified by __root__ on 07-January-2025 using {@see https://github.com/BrianHenryIE/strauss}.
  */
 
 /**
@@ -263,8 +263,11 @@ class TaxCollection extends BaseModel implements ModelInterface, ArrayAccess, \J
      */
     public function setResponsibleParty($responsible_party)
     {
+        if (empty($responsible_party)) {
+            $responsible_party = null;
+        }
         $allowedValues = $this->getResponsiblePartyAllowableValues();
-        if (false&&!is_null($responsible_party) &&!in_array(strtoupper($responsible_party), $allowedValues, true)) {
+        if (!is_null($responsible_party) &&!in_array(strtoupper($responsible_party), $allowedValues, true)) {
             throw new \InvalidArgumentException(
                 sprintf(
                     "Invalid value '%s' for 'responsible_party', must be one of '%s'",

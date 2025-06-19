@@ -331,17 +331,17 @@
 								<option value="2" <?php if ( $wpl_enable_item_condition_fields == '2' ): ?>selected="selected"<?php endif; ?>><?php echo __( 'Hide for variations', 'wp-lister-for-amazon' ); ?> (<?php _e('default', 'wp-lister-for-amazon' ); ?>)</option>
 							</select>
 
-							<label for="wpl-enable_categories_page" class="text_label">
-								<?php echo __( 'Categories in main menu', 'wp-lister-for-amazon' ) ?>
-                                <?php wpla_tooltip('This will add a <em>Categories</em> submenu entry visible to users who can manage listings.') ?>
+							<!--<label for="wpl-enable_categories_page" class="text_label">
+								<?php /*echo __( 'Categories in main menu', 'wp-lister-for-amazon' ) */?>
+                                <?php /*wpla_tooltip('This will add a <em>Categories</em> submenu entry visible to users who can manage listings.') */?>
 							</label>
 							<select id="wpl-enable_categories_page" name="wpla_enable_categories_page" class="required-entry select">
-								<option value="0" <?php if ( $wpl_enable_categories_page != '1' ): ?>selected="selected"<?php endif; ?>><?php echo __( 'No', 'wp-lister-for-amazon' ); ?> (<?php _e('default', 'wp-lister-for-amazon' ); ?>)</option>
-								<option value="1" <?php if ( $wpl_enable_categories_page == '1' ): ?>selected="selected"<?php endif; ?>><?php echo __( 'Yes', 'wp-lister-for-amazon' ); ?></option>
+								<option value="0" <?php /*if ( $wpl_enable_categories_page != '1' ): */?>selected="selected"<?php /*endif; */?>><?php /*echo __( 'No', 'wp-lister-for-amazon' ); */?> (<?php /*_e('default', 'wp-lister-for-amazon' ); */?>)</option>
+								<option value="1" <?php /*if ( $wpl_enable_categories_page == '1' ): */?>selected="selected"<?php /*endif; */?>><?php /*echo __( 'Yes', 'wp-lister-for-amazon' ); */?></option>
 							</select>
 							<p class="desc" style="display: block;">
-								<?php echo __( 'Enable this to make category settings available to users without access to other Amazon settings.', 'wp-lister-for-amazon' ); ?><br>
-							</p>
+								<?php /*echo __( 'Enable this to make category settings available to users without access to other Amazon settings.', 'wp-lister-for-amazon' ); */?><br>
+							</p>-->
 
 							<label for="wpl-enable_accounts_page" class="text_label">
 								<?php echo __( 'Accounts in main menu', 'wp-lister-for-amazon' ) ?>
@@ -682,6 +682,18 @@
                             </select>
                             <p class="desc" style="display: block;">
                                 <?php echo __( 'Enable to push product drafts to Amazon', 'wp-lister-for-amazon' ); ?><br>
+                            </p>
+
+                            <label for="wpl-remove_https_from_images" class="text_label">
+								<?php echo __( 'Force HTTP for Image URLs', 'wp-lister-for-amazon' ); ?>
+								<?php wpla_tooltip('Amazon used to block images submitted from HTTPS URLs. If your images are being rejected and your site uses HTTPS, disable this setting and try again.') ?>
+                            </label>
+                            <select id="wpl-remove_https_from_images" name="wpla_remove_https_from_images" class="required-entry select">
+                                <option value="1"  <?php selected( $wpl_remove_https_from_images, 1 ); ?>><?php echo __( 'Yes', 'wp-lister-for-amazon' ); ?> (<?php _e('default', 'wp-lister-for-amazon' ); ?>)</option>
+                                <option value="0"  <?php selected( $wpl_remove_https_from_images, 0 ); ?>><?php echo __( 'No', 'wp-lister-for-amazon' ); ?></option>
+                            </select>
+                            <p class="desc" style="display: block;">
+								<?php echo __( 'Set whether to allow images using HTTPS to be submitted to Amazon.', 'wp-lister-for-amazon' ); ?><br>
                             </p>
 
 							<label for="wpl-product_gallery_fallback" class="text_label">

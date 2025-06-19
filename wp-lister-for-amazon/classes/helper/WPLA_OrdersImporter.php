@@ -71,7 +71,7 @@ class WPLA_OrdersImporter {
             if ( WPLA_Amazon_SP_API::isError( $order_address ) ) {
                 WPLA()->logger->error( 'GetOrderAddress #'. $order->getAmazonOrderId() .' Error: '. print_r( $order_address, 1 ) );
 
-                if ( $order_address->ErrorCode == 429 ) {
+                if ( $order_address->ErrorCode == 429 || $order_address->ErrorCode == 500 ) {
                     $this->throttling_is_active = true;
                     wpla_show_message('GetOrderAddress requests are throttled. Skipping further order processing until next run.','warn');
                     return false;
@@ -81,7 +81,7 @@ class WPLA_OrdersImporter {
             if ( WPLA_Amazon_SP_API::isError( $buyer_info ) ) {
                 WPLA()->logger->error( 'GetOrderBuyerInfo #'. $order->getAmazonOrderId() .' Error: '. print_r( $buyer_info, 1 ) );
 
-                if ( $buyer_info->ErrorCode == 429 ) {
+                if ( $buyer_info->ErrorCode == 429 || $buyer_info->ErrorCode == 500 ) {
                     $this->throttling_is_active = true;
                     wpla_show_message('GetBuyerInfo requests are throttled. Skipping further order processing until next run.','warn');
                     return false;
@@ -90,7 +90,8 @@ class WPLA_OrdersImporter {
 
             // with the isError checks above, we shouldn't reach this point with an stdClass $order_address
             if ( !is_callable( array( $order_address, 'getShippingAddress' ) ) ) {
-                WPLA()->logger->error( 'Invalid data type for $order_address. '.  print_r( $order_address, 1) );
+	            $this->throttling_is_active = true;
+                WPLA()->logger->error( 'Invalid data type for $order_address. Possibly throttled '.  print_r( $order_address, 1) );
                 return false;
             }
 
@@ -99,14 +100,24 @@ class WPLA_OrdersImporter {
 
         }
 
+		$buyer_name = '';
+		if ( $order->getShippingAddress() && method_exists( $order->getShippingAddress(), 'getName' ) ) {
+			$buyer_name = $order->getShippingAddress()->getName();
+		}
+
+		$buyer_email = '';
+		if ( $order->getBuyerInfo() && method_exists($order->getBuyerInfo(), 'getBuyerEmail' ) ) {
+			$buyer_email = $order->getBuyerInfo()->getBuyerEmail();
+		}
+
 		$data = array(
 			'order_id'             => $order->getAmazonOrderId(),
 			'status'               => $order->getOrderStatus(),
 			// pending orders are missing some details
 			'total'                => $order->getOrderTotal() ? $order->getOrderTotal()->getAmount() : '',
 			'currency'             => $order->getOrderTotal() ? $order->getOrderTotal()->getCurrencyCode() : '',
-			'buyer_name'           => $order->getShippingAddress() ? $order->getShippingAddress()->getName() : '',
-			'buyer_email'          => $order->getBuyerInfo() ? $order->getBuyerInfo()->getBuyerEmail() : '',
+			'buyer_name'           => $buyer_name,
+			'buyer_email'          => $buyer_email,
 			'PaymentMethod'        => $order->getPaymentMethod()? $order->getPaymentMethod() : '',
 			'ShippingAddress_City' => $order->getShippingAddress() ? $order->getShippingAddress()->getCity() : '',
 			'date_created'         => $this->convertIsoDateToSql( $order->getPurchaseDate() ),
@@ -503,6 +514,7 @@ class WPLA_OrdersImporter {
             $orders_before_ts = strtotime( $ts );
         }
 
+		$number_of_orders = 0;
 		foreach ( $orders as $order ) {
 		    // Check ignore_orders_before against PurchaseDate instead of LastUpdateDate #54103
             //if ( $orders_before_ts && strtotime($order->LastUpdateDate) < $orders_before_ts ) {
@@ -510,8 +522,21 @@ class WPLA_OrdersImporter {
                 WPLA()->logger->info( 'Skipping old order #'. $order->getAmazonOrderId() .' because of ignore_orders_before_ts' );
                 continue;
             }
-			$this->importOrder( $order, $account );
+
+			if ( $this->importOrder( $order, $account ) ) {
+				$number_of_orders++;
+			}
+
+			if ( $this->throttling_is_active ) {
+				// throttling detected, stop all further processing
+				break;
+			}
 		}
+
+		// Disabled for now as it is generating a large number of reports that gets throttled
+		//if ( $number_of_orders ) {
+		//	WPLA_AmazonReport::createVatInvoiceDataReport();
+		//}
 
 	}
 

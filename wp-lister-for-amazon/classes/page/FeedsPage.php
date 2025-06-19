@@ -62,24 +62,12 @@ class WPLA_FeedsPage extends WPLA_Page {
 	    // $this->feedsTable = new WPLA_FeedsTable();
 	    $this->feedsTable->prepare_items();
 
-	    $feeds_in_progress = self::getOption( 'feeds_in_progress', 0 );
-	    if ( $feeds_in_progress > 0 ) {
-        	$next_schedule = $this->print_schedule_info( 'wpla_update_schedule' );
-	    	$msg = '<p>';
-	    	$msg .= sprintf( __( '%s feed submission(s) are currently in progress.', 'wp-lister-for-amazon' ), $feeds_in_progress );
-	    	// $msg .= ' Please click Update Feeds until all feeds have been processed.';
-	    	$msg .= ' ';
-	    	$msg .= sprintf( __( 'Next check for updated feeds will be executed %s', 'wp-lister-for-amazon' ), $next_schedule );
-	    	$msg .= '&nbsp;&nbsp;&nbsp;<a href="admin.php?page=wpla-feeds&action=wpla_update_feeds&_wpnonce='. wp_create_nonce( 'wpla_update_feeds' ) .'" class="button button-small">'.__( 'Check now', 'wp-lister-for-amazon' ).'</a></p>';
-			$this->showMessage( $msg );
-	    }
-
 		$aData = array(
 			'plugin_url'				=> self::$PLUGIN_URL,
 			'message'					=> $this->message,
 
 			'feedsTable'				=> $this->feedsTable,
-			'feeds_in_progress'			=> $feeds_in_progress,
+			'feeds_in_progress'			=> self::getOption( 'feeds_in_progress', 0 ),
 		
 			'form_action'				=> 'admin.php?page='.self::ParentMenuId.'-feeds'
 		);
@@ -254,6 +242,18 @@ class WPLA_FeedsPage extends WPLA_Page {
 			$this->showMessage( $msg );		
         }
 
+		$feeds_in_progress = self::getOption( 'feeds_in_progress', 0 );
+		if ( $feeds_in_progress > 0 ) {
+			$next_schedule = $this->print_schedule_info( 'wpla_update_schedule' );
+			$msg = '<p>';
+			$msg .= sprintf( __( '%s feed submission(s) are currently in progress.', 'wp-lister-for-amazon' ), $feeds_in_progress );
+			// $msg .= ' Please click Update Feeds until all feeds have been processed.';
+			$msg .= ' ';
+			$msg .= sprintf( __( 'Next check for updated feeds will be executed %s', 'wp-lister-for-amazon' ), $next_schedule );
+			$msg .= '&nbsp;&nbsp;&nbsp;<a href="admin.php?page=wpla-feeds&action=wpla_update_feeds&_wpnonce='. wp_create_nonce( 'wpla_update_feeds' ) .'" class="button button-small">'.__( 'Check now', 'wp-lister-for-amazon' ).'</a></p>';
+			$this->showMessage( $msg );
+		}
+
 	} // showNotifications()
 
 
@@ -263,8 +263,6 @@ class WPLA_FeedsPage extends WPLA_Page {
         // echo "<pre>";print_r($feed_ids);echo"</pre>";die();
 
         if ( empty($feed_ids) ) return;
-
-		$accounts = WPLA_AmazonAccount::getAll();
 
 		foreach ($feed_ids as $feed_id ) {
 
@@ -279,24 +277,31 @@ class WPLA_FeedsPage extends WPLA_Page {
             $feed = $api->getFeed($feed->FeedSubmissionId);
 
             if (WPLA_Amazon_SP_API::isError($feed)) {
-                $msg = sprintf(__('Unable to retrieve feed from Amazon: %s. Reason: %s', 'wp-lister-for-amazon'), $feed_row->FeedSubmissionId, $feed->ErrorMessage);
+                $msg = sprintf(__('Unable to retrieve feed from Amazon: %s. Reason: %s', 'wp-lister-for-amazon'), $feed->FeedSubmissionId, $feed->ErrorMessage);
                 WPLA()->logger->error($msg);
                 $this->showMessage($msg, true, true);
                 continue;
             }
 
-            $feeds[] = $feed;
+			// run the import
+			WPLA_AmazonFeed::processFeedsSubmissionList( $feed, $account );
+
+			$msg  = sprintf( __( '%s feed submission(s) were found for account %s.', 'wp-lister-for-amazon' ), sizeof($feed), $account->title );
+			WPLA()->logger->info( $msg );
+			$this->showMessage( nl2br($msg),0,1 );
         }
 
-        if ( is_array( $feeds ) )  {
+        /*if ( is_array( $feeds ) )  {
+	        foreach ( $feeds as $account_id => $feed ) {
+		        $account = new WPLA_AmazonAccount($account_id);
 
-            // run the import
-            WPLA_AmazonFeed::processFeedsSubmissionList( $feeds, $account );
+		        // run the import
+		        WPLA_AmazonFeed::processFeedsSubmissionList( $feed, $account );
 
-            $msg  = sprintf( __( '%s feed submission(s) were found for account %s.', 'wp-lister-for-amazon' ), sizeof($feeds), $account->title );
-            WPLA()->logger->info( $msg );
-            $this->showMessage( nl2br($msg),0,1 );
-
+		        $msg  = sprintf( __( '%s feed submission(s) were found for account %s.', 'wp-lister-for-amazon' ), sizeof($feed), $account->title );
+		        WPLA()->logger->info( $msg );
+		        $this->showMessage( nl2br($msg),0,1 );
+	        }
         } elseif ( $feeds->Error->Message ) {
             $msg = sprintf( __( 'There was a problem fetching feed submissions for account %s.', 'wp-lister-for-amazon' ), $account->title ) .' - Error: '. $feeds->Error->Message;
             WPLA()->logger->error( $msg );
@@ -305,7 +310,7 @@ class WPLA_FeedsPage extends WPLA_Page {
             $msg = sprintf( __( 'There was a problem fetching feed submissions for account %s.', 'wp-lister-for-amazon' ), $account->title );
             WPLA()->logger->error( $msg );
             $this->showMessage( nl2br($msg),1,1 );
-        }
+        }*/
 
 	} // action_update_feeds()
 	
@@ -360,6 +365,10 @@ class WPLA_FeedsPage extends WPLA_Page {
 	
 		// get amazon_feed record
 		$feed = new WPLA_AmazonFeed( $id );
+
+		if ( $feed->FeedType == 'JSON_LISTINGS_FEED' ) {
+			return $this->showJsonFeedDetails( $feed );
+		}
 		
 		// prepare feed content
 		// $rows = WPLA_ReportProcessor::csv_to_array( $feed_data );
@@ -409,11 +418,48 @@ class WPLA_FeedsPage extends WPLA_Page {
 		
 	}
 
+	/**
+	 * @param WPLA_AmazonFeed $feed
+	 *
+	 * @return void
+	 */
+	public function showJsonFeedDetails( $feed ) {
+		$lite_or_pro = WPLA_LIGHT ? 'Lite' : 'Pro';
+		$wpl_version = 'WP-Lister for Amazon '.  $lite_or_pro . ' v' . WPLA_VERSION;
+		$result = $feed->results ? json_decode( $feed->results, true ) : [];
+		$aData = array(
+			'feed'				=> $feed,
+			'wplister_version'  => $wpl_version,
+			'license_email'     => get_option('wpla_activation_email'),
+			'result_rows'		=> $result,
+			'result_header'		=> '',
+		);
+		$this->display( 'json_feed_details', $aData );
+	}
+
+	public function showJsonFeedResults( $feed ) {
+		$result = $feed->results ? json_decode( $feed->results, true ) : [];
+		$aData = array(
+			'feed'				=> $feed,
+			'result_rows'		=> $result,
+			'result_header'		=> '',
+		);
+
+		$this->display( 'json_feed_results', $aData );
+	}
+
 	public function showRawFeedData( $id ) {
 	
 		$feed = new WPLA_AmazonFeed( $id );
-		header("Content-Type:text/plain");
-		echo $feed->data;
+
+		if ( $feed->FeedType == 'JSON_LISTINGS_FEED' ) {
+			header("Content-Type:application/json");
+			echo json_encode( json_decode($feed->data), JSON_PRETTY_PRINT );
+		} else {
+			header("Content-Type:text/plain");
+			echo $feed->data;
+		}
+
 		exit();
 		
 	}
@@ -423,7 +469,12 @@ class WPLA_FeedsPage extends WPLA_Page {
 		$feed = new WPLA_AmazonFeed( $id );
 		if ( ! $feed ) die('Invalid feed');
 		$feed_id  = $feed->FeedSubmissionId ? $feed->FeedSubmissionId : $id;
-		$filename = $use_results ? 'amazon-feed-'.$feed_id.'-results.csv' : 'amazon-feed-'.$feed_id.'.csv';
+
+		if ( $feed->FeedType == 'JSON_LISTINGS_FEED' ) {
+			$filename = $use_results ? 'amazon-feed-'.$feed_id.'-results.json' : 'amazon-feed-'.$feed_id.'.json';
+		} else {
+			$filename = $use_results ? 'amazon-feed-'.$feed_id.'-results.csv' : 'amazon-feed-'.$feed_id.'.csv';
+		}
 
 		// send as csv
 		header("Content-Type: text/csv");
@@ -436,7 +487,7 @@ class WPLA_FeedsPage extends WPLA_Page {
 		header("Expires: 0"); // Proxies
 
 		// send content
-		echo $use_results ? $feed->results : $feed->data;
+		echo $use_results ? $feed->results : json_encode( json_decode($feed->data), JSON_PRETTY_PRINT );
 		exit();	
 	}
 
@@ -444,6 +495,10 @@ class WPLA_FeedsPage extends WPLA_Page {
 	
 		// get amazon_feed record
 		$feed = new WPLA_AmazonFeed( $id );
+
+		if ( $feed->FeedType == 'JSON_LISTINGS_FEED' ) {
+			return $this->showJsonFeedResults( $feed );
+		}
 
 		$result_header  = implode("\n", array_slice(explode("\n", $feed->results), 0, 4));
 		$result_content = implode("\n", array_slice(explode("\n", $feed->results), 4));

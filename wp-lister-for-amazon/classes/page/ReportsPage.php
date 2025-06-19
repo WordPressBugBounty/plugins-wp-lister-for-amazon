@@ -132,33 +132,38 @@ class WPLA_ReportsPage extends WPLA_Page {
 		if ( $this->requestAction() == 'wpla_request_report' ) {
 		    check_admin_referer( 'wpla_request_report' );
 
-			$accounts = WPLA_AmazonAccount::getAll();
+			if ( $_REQUEST['wpla_report_type'] == 'GET_FLAT_FILE_VAT_INVOICE_DATA_REPORT' ) {
+				WPLA_AmazonReport::createVatInvoiceDataReport();
+				$this->showMessage( __( 'Invoice Report requested.', 'wp-lister-for-amazon' ) );
+			} else {
+				$accounts = WPLA_AmazonAccount::getAll();
 
-			foreach ($accounts as $account ) {
+				foreach ($accounts as $account ) {
 
-				$api = new WPLA_Amazon_SP_API( $account->id );
+					$api = new WPLA_Amazon_SP_API( $account->id );
 
-				// request report - returns request list as array on success
-                $report_type    = WPLA_AmazonReport::getReportType( wpla_clean( $_REQUEST['wpla_report_type'] ) );
+					// request report - returns request list as array on success
+					$report_type    = WPLA_AmazonReport::getReportType( wpla_clean( $_REQUEST['wpla_report_type'] ) );
 
-                $report_id = $api->createReport( $report_type['name'] );
+					$report_id = $api->createReport( $report_type['name'] );
 
-                if ( is_object($report_id) && isset( $report_id->ErrorMessage ) ) {
-                    $this->showMessage( sprintf( __( 'There was a problem requesting the report for account %s.', 'wp-lister-for-amazon' ), $account->title ) .'<br>Error: '. $report_id->ErrorMessage, 1 );
-                } else {
-                    $report = $api->getReport( $report_id );
+					if ( is_object($report_id) && isset( $report_id->ErrorMessage ) ) {
+						$this->showMessage( sprintf( __( 'There was a problem requesting the report for account %s.', 'wp-lister-for-amazon' ), $account->title ) .'<br>Error: '. $report_id->ErrorMessage, 1 );
+					} else {
+						$report = $api->getReport( $report_id );
 
-	                if ( !empty( $report->errors ) && isset( $report->errors[0]->message ) ) {
-		                $this->showMessage( sprintf( __( 'There was a problem requesting the report for account %s.', 'wp-lister-for-amazon' ), $account->title ) .'<br>Error: '. $report->errors[0]->message, 1 );
-	                } elseif ( isset( $report->ErrorMessage ) ) {
-		                $this->showMessage( sprintf( __( 'There was a problem requesting the report for account %s.', 'wp-lister-for-amazon' ), $account->title ) .'<br>Error: '. $report->ErrorMessage, 1 );
-	                } else {
-		                WPLA_AmazonReport::processReport( $report, $account, true );
+						if ( !empty( $report->errors ) && isset( $report->errors[0]->message ) ) {
+							$this->showMessage( sprintf( __( 'There was a problem requesting the report for account %s.', 'wp-lister-for-amazon' ), $account->title ) .'<br>Error: '. $report->errors[0]->message, 1 );
+						} elseif ( isset( $report->ErrorMessage ) ) {
+							$this->showMessage( sprintf( __( 'There was a problem requesting the report for account %s.', 'wp-lister-for-amazon' ), $account->title ) .'<br>Error: '. $report->ErrorMessage, 1 );
+						} else {
+							WPLA_AmazonReport::processReport( $report, $account, true );
 
-		                $this->showMessage( sprintf( __( 'Report requested for account %s.', 'wp-lister-for-amazon' ), $account->title ) );
-	                }
-                }
+							$this->showMessage( sprintf( __( 'Report requested for account %s.', 'wp-lister-for-amazon' ), $account->title ) );
+						}
+					}
 
+				}
 			}
 
 		}

@@ -260,7 +260,7 @@ class WPLA_InventoryCheck extends WPLA_Model  {
         if ( $page < $total_pages ) {
             $page++;
             update_option( 'wpla_bg_inventory_check_step', $page );
-            as_schedule_single_action( time() + 1, 'wpla_bg_inventory_check_run', array( 'report' => $report->id ) );
+            as_schedule_single_action( time() + 1, 'wpla_bg_inventory_check_run', array( 'report' => $report->id ), 'WPLA' );
         } else {
 	        WPLA()->logger->info( 'Done processing report. Out of sync products found: '. count($this->oos_products) );
             // Done processing. Reset the data then send the notification email
@@ -268,6 +268,7 @@ class WPLA_InventoryCheck extends WPLA_Model  {
 
             if ( count( $this->oos_products ) ) {
                 // out-of-sync products found!
+
 	            WPLA()->logger->info( 'Out of sync products found: '. count($this->oos_products) );
 	            do_action( 'wpla_out_of_sync_products_found', $this->oos_products );
                 $this->sendSyncNotificationEmail();

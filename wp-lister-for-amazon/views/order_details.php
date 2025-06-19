@@ -90,7 +90,7 @@ $buyer_email = isset( $d->BuyerEmail ) ? $d->BuyerEmail : $wpl_amazon_order['buy
 
             <b>Payment address:</b><br>
             <?php //todo ?>
-            <?php if ( @$d->Buyer->RegistrationAddress ) : ?>
+            <?php if ( isset($d->Buyer->RegistrationAddress) ) : ?>
                 <?php echo $d->Buyer->RegistrationAddress->Name ?> <br>
                 <?php if (isset($d->Buyer->RegistrationAddress->AddressLine1)): ?>
                 <?php echo $d->Buyer->RegistrationAddress->AddressLine1 ?> <br>

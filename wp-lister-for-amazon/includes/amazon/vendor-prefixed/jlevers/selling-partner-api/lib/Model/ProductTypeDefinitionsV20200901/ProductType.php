@@ -8,7 +8,7 @@
  * @package  SellingPartnerApi
  *
  * @license BSD-3-Clause
- * Modified by __root__ on 08-May-2024 using {@see https://github.com/BrianHenryIE/strauss}.
+ * Modified by __root__ on 07-January-2025 using {@see https://github.com/BrianHenryIE/strauss}.
  */
 
 /**
@@ -62,6 +62,7 @@ class ProductType extends BaseModel implements ModelInterface, ArrayAccess, \Jso
       */
     protected static $openAPITypes = [
         'name' => 'string',
+        'display_name' => 'string',
         'marketplace_ids' => 'string[]'
     ];
 
@@ -74,6 +75,7 @@ class ProductType extends BaseModel implements ModelInterface, ArrayAccess, \Jso
       */
     protected static $openAPIFormats = [
         'name' => null,
+        'display_name' => null,
         'marketplace_ids' => null
     ];
 
@@ -87,6 +89,7 @@ class ProductType extends BaseModel implements ModelInterface, ArrayAccess, \Jso
      */
     protected static $attributeMap = [
         'name' => 'name',
+        'display_name' => 'displayName',
         'marketplace_ids' => 'marketplaceIds'
     ];
 
@@ -97,6 +100,7 @@ class ProductType extends BaseModel implements ModelInterface, ArrayAccess, \Jso
      */
     protected static $setters = [
         'name' => 'setName',
+        'display_name' => 'setDisplayName',
         'marketplace_ids' => 'setMarketplaceIds'
     ];
 
@@ -107,6 +111,7 @@ class ProductType extends BaseModel implements ModelInterface, ArrayAccess, \Jso
      */
     protected static $getters = [
         'name' => 'getName',
+        'display_name' => 'getDisplayName',
         'marketplace_ids' => 'getMarketplaceIds'
     ];
 
@@ -128,6 +133,7 @@ class ProductType extends BaseModel implements ModelInterface, ArrayAccess, \Jso
     public function __construct(array $data = null)
     {
         $this->container['name'] = $data['name'] ?? null;
+        $this->container['display_name'] = $data['display_name'] ?? null;
         $this->container['marketplace_ids'] = $data['marketplace_ids'] ?? null;
     }
 
@@ -142,6 +148,9 @@ class ProductType extends BaseModel implements ModelInterface, ArrayAccess, \Jso
         if ($this->container['name'] === null) {
             $invalidProperties[] = "'name' can't be null";
         }
+	    if ($this->container['display_name'] === null) {
+		    $invalidProperties[] = "'display_name' can't be null";
+	    }
         if ($this->container['marketplace_ids'] === null) {
             $invalidProperties[] = "'marketplace_ids' can't be null";
         }
@@ -160,7 +169,7 @@ class ProductType extends BaseModel implements ModelInterface, ArrayAccess, \Jso
     }
 
     /**
-     * Sets name
+     * Sets display_name
      *
      * @param string $name The name of the Amazon product type.
      *
@@ -172,6 +181,29 @@ class ProductType extends BaseModel implements ModelInterface, ArrayAccess, \Jso
 
         return $this;
     }
+	/**
+	 * Gets name
+	 *
+	 * @return string
+	 */
+	public function getDisplayName()
+	{
+		return $this->container['display_name'];
+	}
+
+	/**
+	 * Sets name
+	 *
+	 * @param string $name The name of the Amazon product type.
+	 *
+	 * @return self
+	 */
+	public function setDisplayName($name)
+	{
+		$this->container['display_name'] = $name;
+
+		return $this;
+	}
     /**
      * Gets marketplace_ids
      *

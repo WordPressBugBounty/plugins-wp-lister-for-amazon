@@ -4,26 +4,29 @@
  *
  */
 
-// class WPLA_AmazonProfile extends WPLA_NewModel {
 class WPLA_AmazonProfile {
 
 	const TABLENAME = 'amazon_profiles';
 
-	var $id;
-	var $data;
-	var $fieldnames;
+	public $id;
+	public $data;
+	public $fieldnames;
+	public $old_fields;
+	public $unmapped_fields;
 
-	var $profile_id;
-	var $profile_name;
-	var $profile_description;
-	var $feed_type;
-	var $details;
-	var $fields;
-	var $tpl_id;
-	var $account_id;
-	var $total_items;
+	public $profile_id;
+	public $profile_name;
+	public $profile_description;
+	public $marketplace_id;
+	public $product_type;
+	public $feed_type;
+	public $details;
+	public $fields;
+	public $tpl_id;
+	public $account_id;
+	public $total_items;
 
-	function __construct( $id = null ) {
+	public function __construct( $id = null ) {
 		
 		$this->init();
 
@@ -64,6 +67,8 @@ class WPLA_AmazonProfile {
 			'details',
 			'fields',
 			'tpl_id',
+			'product_type',
+			'marketplace_id',
 			'account_id'
 		);
 
@@ -94,12 +99,39 @@ class WPLA_AmazonProfile {
 			'sale-price'          => '[product_sale_price]',
 			'sale-start-date'     => '[product_sale_start]',
 			'sale-end-date'       => '[product_sale_end]',
+
+			// category feeds
+			'externally_assigned_product_identifier[0][value]'                  => '[amazon_product_id]',
+			'item_name[0][value]'                                               => '[product_title]',
+			'product_description[0][value]'                                     => '[product_content]',
+			'purchasable_offer[0][our_price][schedule][0][value_with_tax]'         => '[product_price]',
+			'purchasable_offer[0][discounted_price][schedule][0][value_with_tax]'  => '[product_sale_price]',
+			'purchasable_offer[0][discounted_price][schedule][0][start_at]'        => '[product_sale_start]',
+			'purchasable_offer[0][discounted_price][schedule][0][end_at]'          => '[product_sale_end]',
 		);
 
 	}
 
+	/**
+	 * Returns TRUE if this profile uses the outdated Listings Feed Templates.
+	 *
+	 * A profile is considered a legacy profile if all the following conditions are true
+	 * 1) it has a profile ID
+	 * 2) it has a tpl_id
+	 * 3) it doesn't have a product_type value
+	 *
+	 * @return bool
+	 */
+	public function isLegacyProfile() {
+		if ( $this->id && $this->tpl_id && empty( $this->product_type ) ) {
+			return true;
+		}
+
+		return false;
+	}
+
 	// get single profile
-	static function getProfile( $id )	{
+	public static function getProfile( $id )	{
 		global $wpdb;
 		$table = $wpdb->prefix . self::TABLENAME;
 		
@@ -114,7 +146,7 @@ class WPLA_AmazonProfile {
 	}
 
 	// get all profiles
-	static function getAll() {
+	public static function getAll() {
 		global $wpdb;
 		$table = $wpdb->prefix . self::TABLENAME;
 
@@ -127,7 +159,19 @@ class WPLA_AmazonProfile {
 		return $items;
 	}
 
-	static function getAllNames() {
+	public static function getAllUsingTemplate( $tpl_id ) {
+		global $wpdb;
+		$table = $wpdb->prefix . self::TABLENAME;
+
+		return $wpdb->get_results($wpdb->prepare( "
+			SELECT *
+			FROM $table
+			WHERE tpl_id = %d
+			ORDER BY profile_name ASC
+		", $tpl_id ), OBJECT_K);
+	}
+
+	public static function getAllNames() {
 		global $wpdb;	
 		$table = $wpdb->prefix . self::TABLENAME;
 
@@ -145,7 +189,7 @@ class WPLA_AmazonProfile {
 		return $profiles;		
 	}
 
-	static function getAllTemplateNames() {
+	public static function getAllTemplateNames() {
 		global $wpdb;	
 		$table = $wpdb->prefix . self::TABLENAME;
 
@@ -164,7 +208,7 @@ class WPLA_AmazonProfile {
 	}
 
 	// Get the first profile ID found for listings linked to $post_id
-	static function getProfileForProduct( $post_id ) {
+	public static function getProfileForProduct( $post_id ) {
 	    $lm = new WPLA_ListingsModel();
 	    $listings = $lm->getAllItemsByPostOrParentID( $post_id );
 	    $profile_id = 0;
@@ -180,7 +224,7 @@ class WPLA_AmazonProfile {
     }
 
 	// count items using profile and status (optimized version of the above methods)
-	static function countProfilesUsingTemplate( $tpl_id ) {
+	public static function countProfilesUsingTemplate( $tpl_id ) {
 		global $wpdb;	
 		$table = $wpdb->prefix . self::TABLENAME;
 
@@ -193,29 +237,33 @@ class WPLA_AmazonProfile {
 		return $item_count;
 	}
 
-	static function duplicateProfile($id) {
-		global $wpdb;	
-		$table = $wpdb->prefix . self::TABLENAME;
+	public static function getProfilesThatNeedConversion() {
+		$profiles_mdl   = new \WPLA_AmazonProfile();
+		$all_profiles   = $profiles_mdl->getAll();
 
-		// get raw db content
-		$data = $wpdb->get_row( $wpdb->prepare("
-			SELECT * 
-			FROM $table
-			WHERE profile_id = %d
-		", $id ), ARRAY_A);
-				
-		// adjust duplicate
-		$data['profile_name'] = $data['profile_name'] .' ('. __( 'duplicated', 'wp-lister-for-amazon' ).')';
-		unset( $data['profile_id'] );				
+		$converted_profiles = get_option( 'wpla_json_converted_profiles', [] );
 
-		// insert record				
-		$wpdb->insert( $table, $data );
+		foreach ( $all_profiles as $idx => $profile ) {
+			if ( $profile->product_type ) {
+				unset( $all_profiles[ $idx ] );
+			} elseif ( in_array( $profile->profile_id, array_keys($converted_profiles)) ) {
+				unset( $all_profiles[ $idx ] );
+			}
+		}
 
-		return $wpdb->insert_id;		
+		return $all_profiles;
+	}
+
+	public static function duplicateProfile($id) {
+		$base = new WPLA_AmazonProfile( $id );
+		$dupe = clone $base;
+		$dupe->profile_id = null;
+		$dupe->profile_name = $dupe->profile_name . ' (duplicated)';
+		return $dupe->add();
 	}
 
 	// add profile
-	function add() {
+	public function add() {
 		global $wpdb;
 		$table = $wpdb->prefix . self::TABLENAME;
 		// echo "<pre>";print_r($this);echo"</pre>";die();
@@ -223,6 +271,7 @@ class WPLA_AmazonProfile {
 		$data = array();
 		foreach ( $this->fieldnames as $key ) {
 			if ( isset( $this->$key ) && ! is_null( $this->$key ) ) {
+				$this->$key = maybe_serialize( $this->$key );
 				$data[ $key ] = $this->$key;
 			} 
 		}
@@ -237,14 +286,18 @@ class WPLA_AmazonProfile {
 	} // add()
 
 	// update profile
-	function update() {
+	public function update() {
 		global $wpdb;
 		$table = $wpdb->prefix . self::TABLENAME;
 
 		$data = array();
 		foreach ( $this->fieldnames as $key ) {
 			if ( isset( $this->$key ) && ! is_null( $this->$key ) ) {
-				$data[ $key ] = $this->$key;
+				if ( in_array( $key, ['details', 'fields'] ) && !is_string( $this->$key ) ) {
+					$data[ $key ] = maybe_serialize( $this->$key );
+				} else {
+					$data[ $key ] = $this->$key;
+				}
 			} 
 		}
 
@@ -262,7 +315,7 @@ class WPLA_AmazonProfile {
 
 
 	// populate profile fields from data array
-	function fillFromArray( $data ) {
+	public function fillFromArray( $data ) {
 
 		foreach ( $this->fieldnames as $key ) {
 			if ( isset( $data[$key] ) ) {
@@ -273,7 +326,7 @@ class WPLA_AmazonProfile {
 	} // fillFromArray()
 
 
-	function delete() {
+	public function delete() {
 		global $wpdb;
 		$table = $wpdb->prefix . self::TABLENAME;
 
@@ -286,7 +339,7 @@ class WPLA_AmazonProfile {
 
 
 
-	function processProfilePrice( $price ) {
+	public function processProfilePrice( $price ) {
 		if ( ! $this->id ) return $price;
 		if ( ! $price ) return false;
 
@@ -306,7 +359,7 @@ class WPLA_AmazonProfile {
 		return $price;
 	} // processProfilePrice()
 
-	function reverseProfilePrice( $price ) {
+	public function reverseProfilePrice( $price ) {
 		if ( ! $this->id ) return $price;
 		if ( ! $price ) return false;
 
@@ -330,7 +383,7 @@ class WPLA_AmazonProfile {
 
 
 
-	function getPageItems( $current_page, $per_page ) {
+	public function getPageItems( $current_page, $per_page ) {
 		global $wpdb;
 		$table = $wpdb->prefix . self::TABLENAME;
 
@@ -377,6 +430,26 @@ class WPLA_AmazonProfile {
 		return $items;
 	} // getPageItems()
 
+	public function getAttributeNamesMap() {
+		return [
+			'feed_product_type' => 'product_type',
+			'standard_price'    => 'purchasable_offer[0][our_price][schedule][0][value_with_tax]',
+			'quantity'          => 'fulfillment_availability[0][quantity]',
+			'main_image_url'    => 'main_product_image_locator[0][media_location]',
+			'other_image_url1'    => 'other_product_image_locator1[0][media_location]',
+			'other_image_url2'    => 'other_product_image_locator2[0][media_location]',
+			'other_image_url3'    => 'other_product_image_locator3[0][media_location]',
+			'other_image_url4'    => 'other_product_image_locator4[0][media_location]',
+			'other_image_url5'    => 'other_product_image_locator5[0][media_location]',
+			'other_image_url6'    => 'other_product_image_locator6[0][media_location]',
+			'other_image_url7'    => 'other_product_image_locator7[0][media_location]',
+			'other_image_url8'    => 'other_product_image_locator8[0][media_location]',
+
+			// unknowns
+			'shaft_style_type' => 'shaft_style_type',
+			'fulfillment_center_id' => 'fulfillment_center_id',
+		];
+	}
 
 } // WPLA_AmazonProfile()
 

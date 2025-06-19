@@ -156,6 +156,7 @@ class WPLA_ReportsTable extends WP_List_Table {
             'GET_AMAZON_FULFILLED_SHIPMENTS_DATA_GENERAL',
             'GET_FBA_FULFILLMENT_INVENTORY_HEALTH_DATA',
             'GET_FLAT_FILE_ORDER_REPORT_DATA_INVOICING',
+            'GET_FLAT_FILE_VAT_INVOICE_DATA_REPORT',
         );
 
         $report_is_enabled = in_array( $item['ReportType'], $enabled_report_types );

@@ -73,7 +73,7 @@ class WPLA_ProfilesTable extends WP_List_Table {
     function column_default($item, $column_name){
         switch($column_name){
             case 'status':
-            case 'template':
+            case 'type':
             case 'account_id':
                 return $item[$column_name];
             default:
@@ -107,6 +107,7 @@ class WPLA_ProfilesTable extends WP_List_Table {
 
         //Build row actions
         $actions = array(
+			'id'        => 'ID: '. $item['profile_id'],
             'edit'      => sprintf('<a href="?page=%s&action=%s&profile=%s">%s</a>',$page,'edit',$item['profile_id'],__( 'Edit', 'wp-lister-for-amazon' )),
             'duplicate' => sprintf('<a href="?page=%s&action=%s&profile=%s&_wpnonce=%s">%s</a>',$page,'wpla_duplicate_profile',$item['profile_id'], wp_create_nonce( 'wpla_duplicate_profile' ), __( 'Duplicate', 'wp-lister-for-amazon' )),
             'download'  => sprintf('<a href="?page=%s&action=%s&profile=%s&_wpnonce=%s">%s</a>',$page,'wpla_download_listing_profile',$item['profile_id'], wp_create_nonce( 'wpla_download_listing_profile' ), __( 'Download', 'wp-lister-for-amazon' )),
@@ -115,14 +116,39 @@ class WPLA_ProfilesTable extends WP_List_Table {
 
         // make title link to edit page
         $title = sprintf('<a href="?page=%s&action=%s&profile=%s" class="title_link">%s</a>', $page, 'edit', $item['profile_id'], $item['profile_name'] );
+
+	    // see if this is a converted template, and if there are listings that can be transferred over
+	    $lm = new WPLA_ListingsModel();
+
+	    $profile_transfer_string = '';
+	    $converted_profiles = get_option( 'wpla_json_converted_profiles', [] );
+	    $source_id = array_search( $item['profile_id'], $converted_profiles );
+	    $profile_listings  = $lm->findAllListingsByColumn( $source_id, 'profile_id' );
+
+		if ( $source_id && count( $profile_listings) > 0 ) {
+			$profile_listings  = $lm->findAllListingsByColumn( $source_id, 'profile_id' );
+			$source_profile = new WPLA_AmazonProfile( $source_id );
+			$profile_transfer_string = sprintf('<br><small>Converted from %s (#%d) - <a href="#" class="migrate-listings" data-src="%d" data-id="%d">move %d listings now</a>.</small>', $source_profile->profile_name, $source_profile->profile_id, $source_profile->profile_id, $item['profile_id'], count( $profile_listings ) );
+		}
         
         //Return the title contents
-        return sprintf('%1$s <br><span style="color:silver">%2$s</span>%3$s',
+        return sprintf('%1$s <br><span style="color:silver">%2$s</span>%3$s%4$s',
             /*$1%s*/ $title,
             /*$2%s*/ $item['profile_description'],
-            /*$3%s*/ $this->row_actions($actions)
+            /*$3%s*/ $this->row_actions($actions),
+            /*$4%s*/ $profile_transfer_string,
         );
     }
+
+	function column_type( $item ) {
+		if ( $item['tpl_id'] ) {
+			return $this->column_template( $item );
+		}
+
+		$type = $item['product_type'];
+
+		return $type;
+	}
 
     function column_template($item){
 
@@ -136,7 +162,7 @@ class WPLA_ProfilesTable extends WP_List_Table {
 
         // show warning if template is meant for a different marketplace than this profile's account is linked to #20604
         $account = WPLA()->memcache->getAccount( $item['account_id'] );
-        if ( $account && $account->market_id != $template->site_id ) {
+        if ( $account && $template && $account->market_id != $template->site_id ) {
             $message = '<small style="color:darkred">'.__( 'Warning: This listing template can not be used on Amazon', 'wp-lister-for-amazon' ).' '.$account->market_code.'</small><br>';
         }
 
@@ -195,7 +221,7 @@ class WPLA_ProfilesTable extends WP_List_Table {
         $columns = array(
             'cb'        		=> '<input type="checkbox" />', //Render a checkbox instead of text
             'profile_name'      => __( 'Profile', 'wp-lister-for-amazon' ),
-            'template'          => __( 'Template', 'wp-lister-for-amazon' ),
+            'type'              => __( 'Product Type', 'wp-lister-for-amazon' ),
             'account'           => __( 'Account', 'wp-lister-for-amazon' )
         );
         return $columns;

@@ -28,7 +28,7 @@ class WPLA_Page extends WPLA_Core {
         add_action( 'admin_enqueue_scripts', array( &$this, 'enqueueAdminScripts' ) );
 
 		if ( is_admin() ) {
-			add_action( 'plugins_loaded', 	array( &$this, 'handleSubmit' ) );
+			add_action( 'init', 	array( &$this, 'handleSubmit' ) );
 		}
 
 	}

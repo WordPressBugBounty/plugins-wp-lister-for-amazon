@@ -84,8 +84,7 @@
 					<div class="postbox" id="DbLoggingBox">
 						<h3 class="hndle"><span><?php echo __( 'Logging and Maintenance', 'wp-lister-for-amazon' ) ?></span></h3>
 						<div class="inside">
-
-							<label for="wpl-option-log_to_db" class="text_label"><?php echo __( 'Log to database', 'wp-lister-for-amazon' ); ?></label>
+                            <label for="wpl-option-log_to_db" class="text_label"><?php echo __( 'Log to database', 'wp-lister-for-amazon' ); ?></label>
 							<select id="wpl-option-log_to_db" name="wpla_option_log_to_db" title="Logging" class=" required-entry select">
 								<option value="1" <?php if ( $wpl_option_log_to_db == '1' ): ?>selected="selected"<?php endif; ?>><?php echo __( 'Yes', 'wp-lister-for-amazon' ); ?></option>
 								<option value="0" <?php if ( $wpl_option_log_to_db != '1' ): ?>selected="selected"<?php endif; ?>><?php echo __( 'No', 'wp-lister-for-amazon' ); ?></option>

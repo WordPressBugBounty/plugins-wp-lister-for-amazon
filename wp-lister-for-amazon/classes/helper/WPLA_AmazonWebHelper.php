@@ -306,4 +306,51 @@ class WPLA_AmazonWebHelper {
     } // fetchPageContent()
 
 
+	/**
+	 * @param string $field_name
+	 * @return string
+	 */
+	public static function flattenFieldName( $field_name ) {
+		return str_replace( ['[',']'], ['%5B', '%5D'], $field_name );
+	}
+
+	/**
+	 * @param string $field_name
+	 * @return string
+	 */
+	public static function restoreFieldName( $field_name ) {
+		return str_replace( ['%5B', '%5D'], ['[', ']'], $field_name );
+	}
+
+	/**
+	 * Returns a flat/single dimension array of fields instead of the usual array in $_POST and $_GET when fields have [] in the name
+	 *
+	 * @param $source GET or POST
+	 * @return array
+	 */
+	public static function getFlatInput($source) {
+		$pairs = explode("&", strtolower($source) == 'post' ? file_get_contents("php://input") : $_SERVER['QUERY_STRING']);
+		$vars = array();
+
+		if ( empty( array_filter( $pairs ) ) ) {
+			// fallback to accessing the superglobal array if PHP cannot read from php://input #55236
+			$vars = $_REQUEST;
+		} else {
+			foreach ($pairs as $pair) {
+				$nv             = explode("=", $pair);
+				$name           = urldecode($nv[0]);
+				$value          = urldecode($nv[1]);
+
+				if ( substr( $name, -2, 2 ) === '[]' ) {
+					$array_name            = str_replace( '[]', '', $name );
+					$vars[ $array_name ][] = $value;
+				} else {
+					$vars[$name]    = $value;
+				}
+			}
+		}
+
+		return $vars;
+	}
+
 } // class WPLA_AmazonWebHelper

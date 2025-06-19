@@ -38,8 +38,8 @@ class WPLA_AmazonReport {
         // remove the underscore from the prefix and suffix
         $report_type = trim( $report_type, '_' );
 
-        if ( defined( '\SellingPartnerApi\ReportType::' . $report_type ) ) {
-            return constant( '\SellingPartnerApi\ReportType::'. $report_type );
+        if ( defined( '\WPLab\Amazon\SellingPartnerApi\ReportType::' . $report_type ) ) {
+            return constant( '\WPLab\Amazon\SellingPartnerApi\ReportType::'. $report_type );
         }
 
         // feed_type not found.
@@ -49,6 +49,22 @@ class WPLA_AmazonReport {
             'restricted'    => false
         ];
     }
+
+	public static function createVatInvoiceDataReport() {
+		$report_type = self::getReportType( 'GET_FLAT_FILE_VAT_INVOICE_DATA_REPORT' );
+		$supported_accounts = ['ES', 'UK', 'FR', 'NL', 'DE', 'IT', 'SE', 'PL'];
+		$accounts = WPLA_AmazonAccount::getAll();
+
+		foreach ($accounts as $account ) {
+			if ( !in_array( $account->market_code, $supported_accounts ) ) {
+				continue;
+			}
+
+			$api = new WPLA_Amazon_SP_API( $account->id );
+			//$api->createReport( $report_type['name'] );
+		}
+
+	}
 
 	function __construct( $id = null ) {
 
@@ -115,6 +131,7 @@ class WPLA_AmazonReport {
             'GET_FLAT_FILE_PAYMENT_SETTLEMENT_DATA'      => 'Flat File Settlement Report',
             'GET_ORDERS_DATA'                            => 'XML Order Report',
             'GET_FLAT_FILE_ORDER_REPORT_DATA_INVOICING'  => 'Flat File Order Report (Invoicing)',
+            'GET_FLAT_FILE_VAT_INVOICE_DATA_REPORT'      => 'Flat File VAT Invoice Data Report (VIDR)',
             'GET_FLAT_FILE_ORDERS_DATA'                  => 'Flat File Order Report',
             'GET_FLAT_FILE_PENDING_ORDERS_DATA'          => 'Flat File Pending Order Report',
             'GET_XML_BROWSE_TREE_DATA'                   => 'Browse Tree Report',
@@ -589,6 +606,13 @@ class WPLA_AmazonReport {
 			return;
        	}
 
+		if ( in_array( $this->ReportType, [ 'GET_FLAT_FILE_VAT_INVOICE_DATA_REPORT' ] ) ) {
+			$rows = $this->get_data_rows();
+			WPLA_ImportHelper::processVatInvoiceDataReport( $this, $rows, null, null );
+			$wpdb->update( $table, array('success' => 'yes'), array('id' => $this->id ) );
+			return;
+		}
+
 	} // autoProcessNewReport()
 
     function processOrdersDataReport() {
@@ -610,6 +634,8 @@ class WPLA_AmazonReport {
             $wpdb->update( $table, array('success' => 'yes'), array('id' => $this->id ) );
             return;
         }
+
+
     }
 
 

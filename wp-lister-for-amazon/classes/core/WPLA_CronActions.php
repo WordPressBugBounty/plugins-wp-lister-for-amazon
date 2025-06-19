@@ -44,6 +44,8 @@ class WPLA_CronActions {
 		add_action('wpla_request_daily_order_report', 		    array( &$this, 'request_daily_order_report' ) );
 		add_action('wpla_request_daily_fba_shipments_report', 	array( &$this, 'request_daily_fba_shipments_report' ) );
 
+		add_action( WPLA_ListingsModel::PUBLISH_QUEUE_CRON,        array( $this, 'process_publish_queue_runner' ) );
+
 
 		// add custom cron schedules
 		add_filter( 'cron_schedules', array( &$this, 'cron_add_custom_schedules' ) );
@@ -100,7 +102,7 @@ class WPLA_CronActions {
 		// If Dedicated Orders Cron is enabled, wpla_update_orders will be called as an async task using ActionScheduler.
 		if ( get_option( 'wpla_dedicated_orders_cron', 0 ) ) {
             // Create an async background task that checks for new orders
-            wpla_enqueue_async_action( 'wpla_update_orders' );
+            wpla_enqueue_async_action( 'wpla_update_orders', [], 'WPLA' );
         } else {
             // update orders
             do_action('wpla_update_orders');
@@ -148,6 +150,8 @@ class WPLA_CronActions {
 			do_action( 'wpla_fba_report_schedule' ); // if the daily schedule didn't run, we can assume the FBA schedule didn't run either
         }
 
+		// Check for listings left in the queue and try to publish them again
+		WPLA_ListingsModel::maybeSchedulePublishingCron();
 
 		// clean up
 		$this->removeLock();
@@ -243,7 +247,7 @@ class WPLA_CronActions {
 				WPLA()->logger->info('fetching ASIN for SKU '.$listing->sku.' ('.$listing->id.') - type: '.$listing->product_type );
 
 				$api        = new WPLA_Amazon_SP_API( $account->id );
-				$result     = $api->searchCatalogItemsByIdentifier( [$listing->sku ], 'SKU' );
+				$result     = $api->searchCatalogItemsByIdentifier( $listing->sku , 'SKU' );
 
 				if ( ! WPLA_Amazon_SP_API::isError( $result ) )  {
                     foreach( $result->getItems() as $product ) {
@@ -569,6 +573,9 @@ class WPLA_CronActions {
 					'POST_FLAT_FILE_FULFILLMENT_ORDER_REQUEST_DATA',		// Flat File FBA Shipment Injection Fulfillment Feed
 					'POST_FLAT_FILE_INVLOADER_DATA',						// Inventory Loader Feed (Product Removal)
                     'UPLOAD_VAT_INVOICE',                                  // VAT Invoice uploading
+
+					// JSON
+					'JSON_LISTINGS_FEED',
 				);
 
 				if ( ! in_array( $feed->FeedType, $autosubmit_feeds ) ) {
@@ -648,6 +655,209 @@ class WPLA_CronActions {
 
 	} // request_daily_fba_report()
 
+	/**
+	 * Loop handler: processes the queue in batches and reschedules itself if needed.
+	 */
+	public function process_publish_queue_runner() {
+		if ( WPLA_Setup::isStagingSite() ) {
+			return;
+		}
+		WPLA()->logger->debug( 'Running process_publish_queue_runner' );
+
+		// Lock settings
+		$lock_key       = 'wpla_amazon_publish_queue_lock';
+		$lock_ttl       = 5 * 60; // 5 minutes in seconds
+
+		$lock = get_option( $lock_key );
+		if ( $lock ) {
+			$locked_at = intval( $lock );
+			if ( time() - $locked_at < $lock_ttl ) {
+				WPLA()->logger->debug( 'Another process_publish_queue_runner is active; exiting.' );
+				return;
+			}
+			// Lock expired — clear it
+			delete_option( $lock_key );
+		}
+		// Acquire fresh lock (store current timestamp)
+		add_option( $lock_key, time(), '', 'no' );
+
+		try {
+			// Rate limit settings
+			$batch_size     = 5;    // max items per batch
+			$batch_interval = 1;    // seconds between batches
+			// Maximum execution time to avoid host-enforced timeouts (seconds)
+			$max_runtime    = 30;
+
+			$mdl            = new WPLA_ListingsModel();
+			$json_builder   = new \WPLab\Amazon\Helper\JsonFeedDataBuilder();
+
+			$profiles_cache = [];
+
+			$queue      = get_option( 'wpla_amazon_publish_queue', array() );
+			$start_time = time();
+
+			WPLA()->logger->debug( 'Current queue size: '. count( $queue ) );
+
+			// Prepare a buffer for items that need retrying due to throttling
+			$retry_queue = [];
+
+			while ( ! empty( $queue ) ) {
+				// Prevent running past safe runtime
+				if ( time() - $start_time >= $max_runtime ) {
+					// Persist remaining *plus* any throttled items, and reschedule
+					$new_queue = array_merge( $retry_queue, $queue );
+					update_option( 'wpla_amazon_publish_queue', $new_queue, false );
+					wp_schedule_single_event( time() + $batch_interval, 'wpla_process_publish_queue_runner' );
+					$elapsed = time() - $start_time;
+					WPLA()->logger->debug( 'Terminating early to prevent timeout. Elapsed: ' . $elapsed .'s' );
+					return;
+				}
+
+				$chunk = array_splice( $queue, 0, $batch_size );
+				foreach ( $chunk as $listing_id ) {
+					WPLA()->logger->debug( 'Submitting '. $listing_id );
+					try {
+						$listing    = $mdl->getItem( $listing_id );
+						$profile_id = $listing['profile_id'];
+
+						if ( isset( $profiles_cache[ $profile_id ] ) ) {
+							$profile = $profiles_cache[ $profile_id ];
+						} else {
+							$profile = new WPLA_AmazonProfile( $profile_id );
+							$profiles_cache[ $profile_id ] = $profile;
+						}
+
+						if ( !$json_builder->canSubmitListing( $listing, $profile ) ) {
+							throw new Exception( 'Failed canSubmitListing() check!', 401 );
+						}
+
+						//$api->setAccountId( $profile->account_id );
+						$api = new WPLA_Amazon_SP_API( $profile->account_id );
+						$result = $api->putListingsItem( $listing, $profile );
+
+						if ( !WPLA_Amazon_SP_API::isError( $result ) ) {
+							if ( $result->getStatus() == 'ACCEPTED' ) {
+								// SUCCESS: update listing status to online so it gets marked as "needs update" to fetch the ASIN
+								$update_data = [
+									'status' => WPLA_ListingsModel::STATUS_SUBMITTED
+								];
+
+								/*if ( isset( $result['Identifiers']['MarketplaceASIN']['ASIN'] ) ) {
+									$asin = sanitize_text_field( $result['Identifiers']['MarketplaceASIN']['ASIN'] );
+									$update_data['asin'] = $asin;
+									update_post_meta( $listing['post_id'], '_wpla_asin', $asin );
+								}*/
+								$mdl->updateListing( $listing_id, $update_data );
+							} else {
+								$history = [
+									'errors' => [],
+									'warnings' => []
+								];
+								foreach ( $result->getIssues() as $issue ) {
+									$error = [
+										'error-code'    => $issue->getCode(),
+										'error-message' => $issue->getMessage(),
+										'error-type'    => $issue->getSeverity()
+									];
+
+									if ( $issue->getSeverity() == 'ERROR' ) {
+										$history['errors'][] = $error;
+									} elseif ( $issue->getSeverity() == 'WARNING' ) {
+										$history['warnings'][] = $error;
+									}
+								}
+
+								$data = [
+									'status' => WPLA_ListingsModel::STATUS_FAILED,
+									'history' => serialize( $history )
+								];
+								$mdl->updateListing( $listing_id, $data );
+							}
+						} else {
+							// API returned an error payload
+							// Check for Amazon throttling
+							if ( in_array( $result->StatusCode, [429, 503], true ) ) {
+								WPLA()->logger->info( "Throttled on {$listing_id}, will retry next run (code: {$result->StatusCode})" );
+								$retry_queue[] = $listing_id;
+							} else {
+								// Non-retryable error: mark failed
+								WPLA()->logger->info( "Publish failed for {$listing_id} ({$result->StatusCode} - {$result->ErrorMessage} )" );
+								$history = [
+									'errors' => [],
+									'warnings' => []
+								];
+
+								$error = [
+									'error-code'    => $result->StatusCode,
+									'error-message' => $result->ErrorMessage,
+									'error-type'    => 'ERROR'
+								];
+								$history['errors'][] = $error;
+
+								$mdl->updateListing( $listing_id, ['status' => WPLA_ListingsModel::STATUS_FAILED, 'history' => serialize($history)] );
+
+								WPLA_ListingsModel::removeListingFromPublishingQueue( $listing_id );
+							}
+						}
+
+					} catch ( Exception $e ) {
+						// Exception during HTTP call / parsing
+						$code = $e->getCode();
+						if ( intval($code) === 429 ) {
+							WPLA()->logger->warn( "Caught HTTP 429 for {$listing_id}, re-queuing" );
+							$retry_queue[] = $listing_id;
+						} else {
+							WPLA()->logger->error( sprintf(
+								'Amazon Queue Exception for %d: %s',
+								$listing_id,
+								$e->getMessage()
+							) );
+
+							$history = [
+								'errors' => [],
+								'warnings' => []
+							];
+
+							$error = [
+								'error-code'    => $e->getCode(),
+								'error-message' => $e->getMessage(),
+								'error-type'    => 'ERROR'
+							];
+
+							$history['errors'][] = $error;
+
+							if ( isset( $listing_id ) ) {
+								$data = [
+									'status' => WPLA_ListingsModel::STATUS_FAILED,
+									'history' => serialize( $history )
+								];
+
+								$mdl->updateListing( $listing_id, $data );
+								WPLA_ListingsModel::removeListingFromPublishingQueue( $listing_id );
+							}
+						}
+					}
+				}
+
+				// Merge throttled items back to front of queue and clear buffer
+				if ( ! empty( $retry_queue ) ) {
+					$queue = array_merge( $retry_queue, $queue );
+					$retry_queue = [];
+				}
+
+				// Small pause to respect rate limit
+				WPLA()->logger->debug( 'Sleeping for '. $batch_interval .'s' );
+				sleep( $batch_interval );
+			}
+
+			// Queue fully processed
+			WPLA()->logger->debug( 'Finished the queue!' );
+			delete_option( WPLA_ListingsModel::PUBLISH_QUEUE_KEY );
+		} finally {
+			// Release the lock
+			delete_option( $lock_key );
+		}
+	}
 
 	// request FBA fulfilled shipment reports for all active accounts
 	public function request_daily_fba_shipments_report() {

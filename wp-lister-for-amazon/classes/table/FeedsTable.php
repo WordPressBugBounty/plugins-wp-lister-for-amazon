@@ -127,15 +127,19 @@ class WPLA_FeedsTable extends WP_List_Table {
         );
 
         // item title
-        $title = $item['FeedTypeName'];
-        if ( ! $item['line_count'] && ! $item['data'] ) {
-            $title = ' <i style="color:silver">'.$title.'</i>';
-            unset( $actions['view_amazon_feed_details'] );
-            unset( $actions['process_amazon_feed_again'] );
-        }
-        if ( $item['template_name'] ) {
-            $template_name = $item['template_name'] == 'Offer' ? 'ListingLoader' : $item['template_name'];
-            $title .= ' <i style="color:silver">'.$template_name.'</i>';
+        if ( $item['FeedType'] == 'JSON_LISTINGS_FEED' ) {
+	        $title = $item['template_name'].' <i style="color:silver">JSON Feed</i>';
+        } else {
+	        $title = $item['FeedTypeName'];
+	        if ( ! $item['line_count'] && ! $item['data'] ) {
+		        $title = ' <i style="color:silver">'.$title.'</i>';
+		        unset( $actions['view_amazon_feed_details'] );
+		        unset( $actions['process_amazon_feed_again'] );
+	        }
+	        if ( $item['template_name'] ) {
+		        $template_name = $item['template_name'] == 'Offer' ? 'ListingLoader' : $item['template_name'];
+		        $title .= ' <i style="color:silver">'.$template_name.'</i>';
+	        }
         }
 
         // if ( ! $item['GeneratedFeedId'] ) unset( $actions['submit_feed_to_amazon'] );

@@ -7,6 +7,8 @@ class WPLA_ProductWrapper {
 	const taxonomy  = 'product_cat';
 	const menu_page_position = '57.26';
 
+	static $attributes_cache = null;
+
 	// get custom post type
 	static function getPostType() {
 		return self::post_type;
@@ -77,7 +79,7 @@ class WPLA_ProductWrapper {
 	static function getStock( $post_id ) {
         WPLA()->logger->info( 'WPLA getStock');
 
-	    if ( wpla_is_json( $post_id ) ) {
+	    if ( $post_id && wpla_is_json( $post_id ) ) {
             WPLA()->logger->info( 'Found JSON string for $post_id');
 	        $data = json_decode( $post_id, true );
 	        $post_id = $data['id'];
@@ -91,7 +93,7 @@ class WPLA_ProductWrapper {
         }
 
 
-        if ( !$product || !$product->exists() ) {
+        if ( is_null( $post_id ) || !$product || !$product->exists() ) {
             WPLA()->logger->debug( 'getStock: Product not found from #'. print_r( $post_id, true ) );
             return 0;
         }
@@ -727,6 +729,11 @@ class WPLA_ProductWrapper {
 	static function getAttributeTaxonomies() {
 		global $woocommerce;
 
+		// get from the cache
+		if ( !is_null( self::$attributes_cache ) ) {
+			return self::$attributes_cache;
+		}
+
 		if ( function_exists('wc_get_attribute_taxonomy_names') ) {
 			$attribute_taxonomies = wc_get_attribute_taxonomy_names();	// WC2.2+
 		} else {
@@ -749,6 +756,7 @@ class WPLA_ProductWrapper {
 
         // WPLA()->logger->info( 'getAttributeTaxonomies() result: '.print_r($attributes,1));
 
+		self::$attributes_cache = $attributes;
 		return $attributes;
 	}
 
@@ -786,11 +794,7 @@ class WPLA_ProductWrapper {
 
         $product_type = wpla_get_product_meta( $post_id, 'product_type' );
         if ( $product && ( $product_type == 'variation' || $product_type == 'product-part-variation' ) ) {
-            if ( version_compare( WC_VERSION, '3.0', '>=' ) ) {
-                return $product->get_parent_id();
-            } else {
-                return $product->parent->id;
-            }
+            return $product->get_parent_id();
         }
 
         return false;

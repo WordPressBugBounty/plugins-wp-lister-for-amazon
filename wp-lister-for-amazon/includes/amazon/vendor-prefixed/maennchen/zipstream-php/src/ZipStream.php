@@ -2,7 +2,7 @@
 /**
  * @license MIT
  *
- * Modified by __root__ on 08-May-2024 using {@see https://github.com/BrianHenryIE/strauss}.
+ * Modified by __root__ on 07-January-2025 using {@see https://github.com/BrianHenryIE/strauss}.
  */
 
 declare(strict_types=1);
@@ -304,7 +304,7 @@ class ZipStream
         $options->defaultTo($this->opt);
 
         $file = new File($this, $name, $options);
-        $file->processStream(new Stream($stream));
+        $file->processStream(new DeflateStream($stream));
     }
 
     /**

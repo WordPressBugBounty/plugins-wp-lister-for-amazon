@@ -13,6 +13,21 @@
 	<h2><?php echo __( 'Profiles', 'wp-lister-for-amazon' ) ?></h2>
 	<?php echo $wpl_message ?>
 
+    <?php
+    if ( $wpl_needs_conversion ):
+    ?>
+    <div class="message error">
+        <p>
+            <b><?php _e('Warning', 'wp-lister-for-amazon'); ?>:</b> <?php printf( _n('You have %d profile that still use Feed Templates.', 'You have %d profiles that still use Feed Templates.', $wpl_needs_conversion, 'wp-lister-for-amazon' ), $wpl_needs_conversion ); ?>
+        </p>
+        <p>
+            <?php _e('Amazon is phasing out Feed Templates (Flat File Feeds) and moving to Product Types API to manage product attributes. This change impacts how WP-Lister structures and submits your product data—support for Flat File Feeds ends on June 30, 2025.', 'wp-lister-for-amazon'); ?>
+            <br/><br/>
+            <?php _e('Click the button below to open the Profile Conversion tool.', 'wp-lister-for-amazon'); ?>
+        </p>
+        <p><a class="button" href="<?php echo admin_url('admin.php?page=wpla-tools&tab=profile-converter'); ?>"><?php _e('Convert Profiles', 'wp-lister-for-amazon'); ?></a></p>
+    </div>
+    <?php endif; ?>
 
 	<!-- show profiles table -->
     <!-- Forms are NOT created automatically, so you need to wrap the table in one to use features like bulk actions -->
@@ -53,6 +68,22 @@
 				jQuery('.row-actions .delete a').on('click', function() {
 					return confirm("<?php echo __( 'Are you sure you want to delete this item?.', 'wp-lister-for-amazon' ) ?>");
 				})
+
+                jQuery('.migrate-listings').on( 'click', function(e) {
+                    e.preventDefault();
+
+                    if ( !confirm('Do you want to migrate the listings over to this new profile?') ) {
+                        return false;
+                    }
+
+                    var params = {
+                        'from': jQuery(this).data('src'),
+                        'to': jQuery(this).data('id')
+                    }
+
+                    WPLA.JobRunner.runJob( 'moveListingsToProfile', 'Moving listings to a new profile...', params );
+                    return false;
+                });
 	
 			}
 		);

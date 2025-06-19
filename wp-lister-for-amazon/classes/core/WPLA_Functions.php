@@ -59,10 +59,35 @@ function wpla_logger_end_timer($key) {
 	WPLA()->logger->endTimer($key);
 }
 
-// show admin message (since 0.9.4.2)
+/**
+ * Show admin message
+ * @param $message
+ * @param string $type info, warn or error
+ * @param array $params accepts persistent and dismissible keys
+ *
+ * $params keys:
+ * bool params[persistent]  Set to TRUE to store message as a transient to be shown on the next page load
+ * bool params[dismissible] Set to TRUE to make the notification dismissible
+ */
 function wpla_show_message( $message, $type = 'info', $params = [] ) {
+	$params = wp_parse_args( $params, array(
+		'persistent'    => false,
+		'dismissible'   => false,
+	));
+
 	WPLA()->messages->add_message( $message, $type, $params );
 }
+
+// Return TRUE if the current request is done via AJAX
+function wpla_request_is_ajax() {
+	return ( defined( 'DOING_AJAX' ) && DOING_AJAX ) || ( defined( 'WOOCOMMERCE_CHECKOUT' ) && WOOCOMMERCE_CHECKOUT ) || ( isset($_POST['action']) && ( $_POST['action'] == 'editpost' ) ) ;
+}
+
+// Return TRUE if the current request is done via the REST API
+function wpla_request_is_rest() {
+	return ( (defined( 'WC_API_REQUEST' ) && WC_API_REQUEST) || (defined( 'REST_REQUEST' ) && REST_REQUEST) );
+}
+
 
 // register custom shortcode to be used in listing profiles
 function wpla_register_profile_shortcode( $shortcode, $title, $callback ) {
@@ -228,4 +253,39 @@ function wpla_is_valid_date($date, $format = 'Y-m-d')
     $d = DateTime::createFromFormat($format, $date);
     // The Y ( 4 digits year ) returns TRUE for any integer with any number of digits so changing the comparison from == to === fixes the issue.
     return $d && $date === $d->format($format);
+}
+
+/**
+ * URL-encode the image filename without affecting the query string
+ *
+ * @param string $url
+ *
+ * @return string
+ */
+function wpla_encode_image_url( $url ) {
+	// urlencode utf8 characters in image filename
+	$query_string       = parse_url( $url, PHP_URL_QUERY );
+	$url_without_query  = str_replace( '?'. $query_string, '', $url );
+
+	$filename_before = basename( $url_without_query );
+	$filename_after  = rawurlencode( $filename_before );
+	$url_without_query = str_replace( $filename_before, $filename_after, $url_without_query );
+	$url = ( $query_string ) ? $url_without_query .'?'. $query_string : $url_without_query;
+
+	$url = wpla_remove_https( $url );
+
+	return $url;
+}
+
+function wpla_remove_https( $url ) {
+	// fix relative urls
+	if ( '/wp-content/' == substr( $url, 0, 12 ) ) {
+		$url = str_replace('/wp-content', content_url(), $url);
+	}
+
+	// fix https urls
+	$url = str_replace( 'https://', 'http://', $url );
+	$url = str_replace( ':443', '', $url );
+
+	return $url;
 }

@@ -48,21 +48,40 @@ class WPLA_Product_Attributes {
      */
     public static function getConditionString( $conditionType ) {
         $string = $conditionType;
-        $map = array(
-            'New'                   => __( 'New', 'wp-lister-for-amazon' ),
-            'UsedLikeNew'           => __( 'Used - Like New', 'wp-lister-for-amazon' ),
-            'UsedVeryGood'          => __( 'Used - Very Good', 'wp-lister-for-amazon' ),
-            'UsedGood'              => __( 'Used - Good', 'wp-lister-for-amazon' ),
-            'UsedAcceptable'        => __( 'Used - Acceptable', 'wp-lister-for-amazon' ),
-            'Refurbished'           => __( 'Refurbished', 'wp-lister-for-amazon' ),
-            'CollectibleLikeNew'    => __( 'Collectible - Like New', 'wp-lister-for-amazon' ),
-            'CollectibleVeryGood'   => __( 'Collectible - Very Good', 'wp-lister-for-amazon' ),
-            'CollectibleGood'       => __( 'Collectible - Good', 'wp-lister-for-amazon' ),
-            'CollectibleAcceptable' => __( 'Collectible - Acceptable', 'wp-lister-for-amazon' ),
-        );
 
-        if ( isset( $map[ $conditionType ] ) ) {
-            $string = $map[ $conditionType ];
+	    $available_item_conditions = array(
+		    'club_club'                 => __( 'Club', 'wp-lister-for-amazon' ),
+		    'collectible_acceptable'    => __( 'Collectible - Acceptable', 'wp-lister-for-amazon' ),
+		    'collectible_good'          => __( 'Collectible - Good', 'wp-lister-for-amazon' ),
+		    'collectible_like_new'      => __( 'Collectible - Like New', 'wp-lister-for-amazon' ),
+		    'collectible_very_good'     => __( 'Collectible - Very Good', 'wp-lister-for-amazon' ),
+		    'new_new'                   => __( 'New', 'wp-lister-for-amazon' ),
+		    'new_oem'                   => __( 'New - OEM', 'wp-lister-for-amazon' ),
+		    'new_open_box'              => __( 'New - Open Box', 'wp-lister-for-amazon' ),
+		    'refurbished_refurbished'   => __( 'Refurbished', 'wp-lister-for-amazon' ),
+		    'used_acceptable'           => __( 'Used - Acceptable', 'wp-lister-for-amazon' ),
+		    'used_good'                 => __( 'Used - Good', 'wp-lister-for-amazon' ),
+		    'used_like_new'             => __( 'Used - Like New', 'wp-lister-for-amazon' ),
+		    'used_very_good'            => __( 'Used - Very Good', 'wp-lister-for-amazon' ),
+	    );
+
+	    $item_conditions_map = [
+		    'New'                       => 'new_new',
+		    'UsedLikeNew'               => 'used_like_new',
+		    'UsedVeryGood'              => 'used_very_good',
+		    'UsedGood'                  => 'used_good',
+		    'UsedAcceptable'            => 'used_acceptable',
+		    'Refurbished'               => 'refurbished_refurbished',
+		    'CollectibleLikeNew'        => 'collectible_like_new',
+		    'CollectibleVeryGood'       => 'collectible_very_good',
+		    'CollectibleGood'           => 'collectible_good',
+		    'CollectibleAcceptable'     => 'collectible_acceptable',
+	    ];
+
+        if ( isset( $item_conditions_map[ $conditionType ] ) ) {
+            $string = $item_conditions_map[ $conditionType ];
+        } elseif ( isset( $available_item_conditions[ $conditionType ] ) ) {
+			$string = $available_item_conditions[ $conditionType ];
         }
 
         return $string;

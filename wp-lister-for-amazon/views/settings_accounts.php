@@ -43,7 +43,7 @@
         font-size: 10px;
     }
 
-    table.accounts tbody tr {
+    table.accounts tbody td {
         position: relative;
     }
 
