@@ -1411,7 +1411,7 @@ class WPLA_UpgradeHelper {
 			if ( $column->Collation ) {
 				list( $charset ) = explode( '_', $column->Collation );
 				$charset = strtolower( $charset );
-				if ( 'armscii8' !== $charset && 'utf8mb3' !== $charset && 'utf8' !== $charset && 'utf8mb4' !== $charset && 'latin1' !== $charset && 'latin2' !== $charset ) {
+				if ( 'utf8' !== $charset && 'utf8mb4' !== $charset && 'latin1' !== $charset && 'latin2' !== $charset ) {
 					// Don't upgrade tables that have non-utf8 and non-latin1 columns.
 					wpla_show_message("skipped column {$column->Field} in table $table with charset: $charset",'error');
 					return false;

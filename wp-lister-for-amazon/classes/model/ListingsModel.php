@@ -2079,6 +2079,142 @@ class WPLA_ListingsModel extends WPLA_Model {
 		}
 	}
 
+	/**
+	 * Check a submitted listing for issues and update its status accordingly
+	 * 
+	 * @param array $listing The listing data array
+	 * @return array Result array with 'success' boolean and 'message' string
+	 */
+	public function checkSubmittedListingStatus( $listing ) {
+		$account = WPLA_AmazonAccount::getAccount( $listing['account_id'] );
+		$api = new WPLA_Amazon_SP_API( $account->id );
+		$result = $api->getListingsItem( $listing['sku'] );
+
+		if ( WPLA_Amazon_SP_API::isError( $result ) ) {
+			// Handle 429 rate limiting specially - don't treat as failure, just skip for now
+			if ( isset( $result->IsRateLimited ) && $result->IsRateLimited ) {
+				WPLA()->logger->debug( sprintf( 'Rate limited checking listing %s (ID: %d) - will retry on next run', $listing['sku'], $listing['id'] ) );
+				return [
+					'success' => true,
+					'message' => 'Rate limited - skipped for this run',
+					'skipped' => true
+				];
+			}
+			
+			WPLA()->logger->error( sprintf( 'Error checking submitted listing %s (ID: %d): %s', $listing['sku'], $listing['id'], $result->ErrorMessage ) );
+			return [
+				'success' => false,
+				'message' => sprintf( 'There was a problem fetching product details for %s. %s', $listing['sku'], $result->ErrorMessage )
+			];
+		}
+
+		$success = true;
+		$update_data = [];
+
+		// Check for issues
+		if ( $result->getIssues() ) {
+			$history = [
+				'errors' => [],
+				'warnings' => []
+			];
+
+			foreach ( $result->getIssues() as $issue ) {
+				$error = [
+					'error-code'    => $issue->getCode(),
+					'error-message' => $issue->getMessage(),
+					'error-type'    => $issue->getSeverity()
+				];
+
+				if ( $issue->getSeverity() == 'ERROR' ) {
+					$success = false;
+					$history['errors'][] = $error;
+				} elseif ( $issue->getSeverity() == 'WARNING' ) {
+					$history['warnings'][] = $error;
+				}
+			}
+
+			if ( !$success ) {
+				// Has errors - mark as failed
+				$update_data = [
+					'status' => self::STATUS_FAILED,
+					'history' => serialize( $history )
+				];
+				$this->updateListing( $listing['id'], $update_data );
+				
+				WPLA()->logger->info( sprintf( 'Listing %s (ID: %d) marked as failed due to %d errors', $listing['sku'], $listing['id'], count( $history['errors'] ) ) );
+				return [
+					'success' => false,
+					'message' => sprintf( 'Listing %s has %d errors and was marked as failed', $listing['sku'], count( $history['errors'] ) )
+				];
+			} else {
+				// Only warnings - continue to check for ASIN
+				$update_data['history'] = serialize( $history );
+				WPLA()->logger->info( sprintf( 'Listing %s (ID: %d) has %d warnings but no errors', $listing['sku'], $listing['id'], count( $history['warnings'] ) ) );
+			}
+		}
+
+		// No errors (warnings are fine) - check for ASIN and mark as online
+		$found_asin = false;
+		foreach ( $result->getSummaries() as $summary ) {
+			if ( $summary->getAsin() ) {
+				$found_asin = true;
+				$update_data['asin'] = $summary->getAsin();
+				$update_data['status'] = self::STATUS_ONLINE;
+				$this->updateListing( $listing['id'], $update_data );
+				
+				WPLA()->logger->info( sprintf( 'Listing %s (ID: %d) is now online with ASIN: %s', $listing['sku'], $listing['id'], $summary->getAsin() ) );
+				return [
+					'success' => true,
+					'message' => sprintf( 'Listing %s is now online with ASIN: %s', $listing['sku'], $summary->getAsin() )
+				];
+			}
+		}
+
+		if ( !$found_asin ) {
+			// No issues found but no ASIN either - keep as submitted for now
+			if ( isset( $update_data['history'] ) ) {
+				// Save warnings if any
+				$this->updateListing( $listing['id'], [ 'history' => $update_data['history'] ] );
+			}
+			
+			WPLA()->logger->info( sprintf( 'Listing %s (ID: %d) has no issues but no ASIN found yet - keeping as submitted', $listing['sku'], $listing['id'] ) );
+			return [
+				'success' => true,
+				'message' => sprintf( 'Listing %s has no issues but no ASIN found yet - keeping as submitted', $listing['sku'] )
+			];
+		}
+
+		return [
+			'success' => true,
+			'message' => 'Status check completed'
+		];
+	}
+
+	/**
+	 * Get all listings with submitted status, optionally for a specific account
+	 * 
+	 * @param int|null $account_id Optional account ID to filter by
+	 * @param int $limit Maximum number of listings to return
+	 * @return array Array of listing data
+	 */
+	public function getSubmittedListings( $account_id = null, $limit = 50 ) {
+		global $wpdb;
+		
+		$where_clause = "WHERE status = %s";
+		$params = [ self::STATUS_SUBMITTED ];
+		
+		if ( $account_id ) {
+			$where_clause .= " AND account_id = %d";
+			$params[] = $account_id;
+		}
+		
+		$params[] = $limit;
+		
+		$sql = "SELECT * FROM {$this->tablename} {$where_clause} ORDER BY date_created ASC LIMIT %d";
+		
+		return $wpdb->get_results( $wpdb->prepare( $sql, ...$params ), ARRAY_A );
+	}
+
 	public function prepareProductForListing( $post_id, $profile_id, $update_pending_feeds = true ) {
 		global $wpdb;
 

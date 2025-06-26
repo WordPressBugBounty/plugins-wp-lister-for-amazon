@@ -403,6 +403,7 @@ class WPLA_Setup extends WPLA_Core {
 			'amazon_reports',
 			'amazon_shipping',
 			'amazon_stock_log',
+			'amazon_product_types'
 		);
 
 		if ( defined( 'DB_NAME' ) ) {

@@ -54,6 +54,21 @@ Yes, there are. Please check out our growing knowledgebase at <https://www.wplab
 
 == Changelog ==
 
+= 2.8.1 - 2025-06-26 =
+  New: Background processing for checking the status of submitted listings
+  New: Throttling control for getItemOffers calls to prevent API rate limiting
+  Fix: Set the request type to Offer if putListingsItem is called with the PRODUCT product type
+  Fix: Product-level SP-API attributes not getting saved properly
+  Fix: Handling of arrays and strings in JSON feed data processing
+  Fix: Not being able to set a value to 0 in the JsonFeedDataBuilder class
+  Fix: Optimized the feeds page by excluding the data column from being fetched from the database
+  Fix: Uncaught RuntimeException during initAPI() initialization
+  Fix: Matching by EAN not finding matches when searching for products
+  Fix: Added exception handler to the saving of a ProductType object
+  Fix: UTF8-encode values before adding them to the JSON feed
+  Dev: Added amazon_product_types to the required tables to check for during runtime
+  Dev: Cleared console.log statements from debug code
+
 = 2.8 - 2025-06-19 =
 New: Implementation of the Product Types API to replace the Flat File Feed templates
 New: Added a Template Converter tool that converts and maps the fields used by Feed Templates to match their Product Types counterpart

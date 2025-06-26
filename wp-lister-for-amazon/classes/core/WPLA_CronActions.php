@@ -34,6 +34,7 @@ class WPLA_CronActions {
 		add_action('wpla_submit_pending_feeds', 				array( &$this, 'action_submit_pending_feeds' ) );
 		add_action('wpla_update_pricing_info',  				array( &$this, 'action_update_pricing_info' ) );
 		add_action('wpla_update_missing_asins', 				array( &$this, 'action_update_missing_asins' ) );
+		add_action('wpla_update_submitted_listings', 			array( &$this, 'action_update_submitted_listings' ) );
 		add_action('wpla_clean_log_table', 						array( &$this, 'action_clean_log_table' ) );
 		add_action('wpla_clean_tables', 						array( &$this, 'action_clean_tables' ) );
 		add_action('wpla_reprice_products', 					array( &$this, 'action_reprice_products' ) );
@@ -120,6 +121,13 @@ class WPLA_CronActions {
 
 	        // update missing ASINs
 			do_action('wpla_update_missing_asins');
+
+	        // schedule background task to check submitted listings
+			if ( function_exists( 'as_enqueue_async_action' ) ) {
+				as_enqueue_async_action( 'wpla_update_submitted_listings', [], 'WPLA' );
+			} else {
+				as_schedule_single_action( time(), 'wpla_update_submitted_listings', [], 'WPLA' );
+			}
 
 
 			// store timestamp
@@ -271,6 +279,104 @@ class WPLA_CronActions {
 	} // action_update_missing_asins ()
 
 
+	// check submitted listings for issues and status updates - called by Action Scheduler
+	public function action_update_submitted_listings() {
+		WPLA()->logger->info("do_action: wpla_update_submitted_listings (background task)");
+
+		$accounts = WPLA_AmazonAccount::getAll();
+		$listingsModel = new WPLA_ListingsModel();
+		$total_checked = 0;
+		$total_updated = 0;
+		$total_skipped = 0;
+		$api_calls_count = 0;
+		$start_time = time();
+		$max_execution_time = 45; // Stay under 45 seconds to allow buffer
+		$batch_size = 50; // Process up to 50 listings per account
+		$max_requests_per_run = 200; // Reasonable limit to avoid overwhelming the API
+
+		foreach ($accounts as $account) {
+			// Check if we're approaching time limit
+			$elapsed_time = time() - $start_time;
+			if ($elapsed_time >= $max_execution_time) {
+				WPLA()->logger->info("Approaching time limit ({$elapsed_time}s), scheduling continuation task");
+				// Schedule another task to continue processing
+				if ( function_exists( 'as_enqueue_async_action' ) ) {
+					as_enqueue_async_action( 'wpla_update_submitted_listings', [], 'WPLA' );
+				}
+				break;
+			}
+
+			WPLA()->logger->info("Checking submitted listings for account #".$account->id);
+
+			// Get submitted listings for this account
+			$submitted_listings = $listingsModel->getSubmittedListings($account->id, $batch_size);
+
+			if (empty($submitted_listings)) {
+				WPLA()->logger->info("No submitted listings found for account #".$account->id);
+				continue;
+			}
+
+			WPLA()->logger->info("Found ".count($submitted_listings)." submitted listings for account #".$account->id);
+
+			foreach ($submitted_listings as $listing) {
+				// Check execution time before each API call
+				$elapsed_time = time() - $start_time;
+				if ($elapsed_time >= $max_execution_time || $api_calls_count >= $max_requests_per_run) {
+					WPLA()->logger->info("Time/request limit reached ({$elapsed_time}s, {$api_calls_count} calls), scheduling continuation");
+					// Schedule another task to continue processing
+					if ( function_exists( 'as_enqueue_async_action' ) ) {
+						as_enqueue_async_action( 'wpla_update_submitted_listings', [], 'WPLA' );
+					}
+					break 2; // Exit both loops
+				}
+
+				WPLA()->logger->info('Checking submitted listing: '.$listing['sku'].' (ID: '.$listing['id'].')');
+
+				$result = $listingsModel->checkSubmittedListingStatus($listing);
+				$total_checked++;
+				
+				// Handle different result types
+				if ($result['success']) {
+					if (isset($result['skipped']) && $result['skipped']) {
+						// Rate limited - don't count as API call, will retry later
+						$total_skipped++;
+						WPLA()->logger->debug('Skipped listing '.$listing['sku'].': '.$result['message']);
+						continue; // Skip rate limiting sleep since no API call was made
+					} else {
+						// Successful API call
+						$api_calls_count++;
+						// Check if status was actually updated (not just warnings saved)
+						$updated_listing = $listingsModel->getItem($listing['id']);
+						if ($updated_listing['status'] !== WPLA_ListingsModel::STATUS_SUBMITTED) {
+							$total_updated++;
+							WPLA()->logger->info('Status updated for listing '.$listing['sku'].': '.$result['message']);
+						}
+					}
+				} else {
+					// Failed API call
+					$api_calls_count++;
+					$total_updated++;
+					WPLA()->logger->error('Failed to check listing '.$listing['sku'].': '.$result['message']);
+				}
+
+				// Rate limiting: 5 requests per second max, so sleep if we're going too fast
+				if ($api_calls_count % 5 == 0) {
+					$elapsed = time() - $start_time;
+					if ($elapsed < ($api_calls_count / 5)) {
+						$sleep_time = ($api_calls_count / 5) - $elapsed;
+						WPLA()->logger->debug("Rate limiting: sleeping for {$sleep_time} seconds");
+						sleep($sleep_time);
+					}
+				}
+			}
+		}
+
+		$total_time = time() - $start_time;
+		$avg_rate = $total_time > 0 ? round($api_calls_count / $total_time, 2) : 0;
+		WPLA()->logger->info("Checked {$total_checked} submitted listings ({$total_skipped} skipped due to rate limiting), {$total_updated} status updates made in {$total_time}s (avg {$avg_rate} req/s)");
+	} // action_update_submitted_listings()
+
+
 	// fetch lowest prices - called by do_action()
 	public function action_update_pricing_info() {
         WPLA()->logger->info("do_action: wpla_update_pricing_info");
@@ -297,22 +403,48 @@ class WPLA_CronActions {
         	if ( empty($listing_ASINs) ) continue;
 
 
-        	// process batches of 20 ASINs
-        	for ($page=0; $page < 10; $page++) {
-        		$page_size = 19;
+        	// process smaller batches due to 0.5 requests/second rate limit
+        	$batch_size = get_option( 'wpla_pricing_asin_batch_size', 10 ); // smaller batches
+        	$total_batches = ceil( count($listing_ASINs) / $batch_size );
+        	$successful_batches = 0;
+        	$base_delay = get_option( 'wpla_pricing_batch_delay', 3 ); // minimum 3 seconds for 0.5/sec rate
+        	
+        	for ($page=0; $page < $total_batches; $page++) {
+        		$page_size = $batch_size;
 
         		// splice ASINs
         		$offset = $page * $page_size;
         		$ASINs_for_this_batch = array_slice( $listing_ASINs, $offset, $page_size );
         		if ( empty($ASINs_for_this_batch) ) continue;
 
-        		// run update
-	        	$this->update_pricing_info_for_asins( $ASINs_for_this_batch, $account_id );
+        		WPLA()->logger->info( 'Processing batch ' . ($page + 1) . '/' . $total_batches . ' (' . count($ASINs_for_this_batch) . ' ASINs)' );
 
-				WPLA()->logger->info( sprintf( '%s ASINs had their pricing info updated - account %s.', sizeof($listing_ASINs), $account->title ) );
-				WPLA()->logger->info( 'Sleeping for 2s to prevent getting error 429 (rate limited)');
-				sleep(2);
+        		// run update with error handling
+	        	$result = $this->update_pricing_info_for_asins( $ASINs_for_this_batch, $account_id );
+	        	
+	        	if ( is_object($result) && isset($result->success) && !$result->success ) {
+	        		// If we got an error (including 429), increase delay for next batch
+	        		if ( isset($result->StatusCode) && $result->StatusCode == 429 ) {
+	        			$delay = max( $base_delay * 4, 10 ); // Increase delay significantly after 429
+	        			WPLA()->logger->info( 'Rate limiting detected, extending delay to ' . $delay . ' seconds' );
+	        			
+	        			// For large stores, consider breaking and resuming later
+	        			if ( $total_batches > 20 && ($page + 1) < $total_batches ) {
+	        				WPLA()->logger->info( 'Large store detected with rate limiting. Consider enabling background processing.' );
+	        			}
+	        		} else {
+	        			$delay = $base_delay;
+	        		}
+	        	} else {
+	        		$successful_batches++;
+	        		$delay = $base_delay;
+	        	}
+
+				WPLA()->logger->info( 'Sleeping for ' . $delay . 's to prevent rate limiting' );
+				sleep($delay);
         	}
+        	
+        	WPLA()->logger->info( sprintf( '%s/%s batches completed successfully for account %s.', $successful_batches, $total_batches, $account->title ) );
 
 
 		} // each account
@@ -328,6 +460,14 @@ class WPLA_CronActions {
 		$api = new WPLA_Amazon_SP_API( $account_id );
 		$result = $api->getCompetitivePricing( $listing_ASINs );
         $listingsModel->processBuyBoxPricingResult( $result, $account_id );
+        
+        // Check for errors in competitive pricing
+        if ( is_object($result) && isset($result->success) && !$result->success ) {
+        	WPLA()->logger->warn( 'getCompetitivePricing failed: ' . $result->ErrorMessage );
+        	if ( isset($result->StatusCode) && $result->StatusCode == 429 ) {
+        		return $result; // Return error to trigger delay adjustment
+        	}
+        }
 
 		// return if lowest offers are disabled
 		// if ( ! get_option('wpla_repricing_use_lowest_offer') ) return;
@@ -336,6 +476,9 @@ class WPLA_CronActions {
 		$api = new WPLA_Amazon_SP_API( $account_id );
         $result = $api->getItemOffers( $listing_ASINs );
         $listingsModel->processLowestOfferPricingResult( $result, $account_id );
+        
+        // Return the final result (could be error or success)
+        return $result;
 
 	} // update_pricing_info_for_asins ()
 

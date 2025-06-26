@@ -131,7 +131,7 @@ class WPLA_FeedsTable extends WP_List_Table {
 	        $title = $item['template_name'].' <i style="color:silver">JSON Feed</i>';
         } else {
 	        $title = $item['FeedTypeName'];
-	        if ( ! $item['line_count'] && ! $item['data'] ) {
+	        if ( ! $item['line_count'] ) {
 		        $title = ' <i style="color:silver">'.$title.'</i>';
 		        unset( $actions['view_amazon_feed_details'] );
 		        unset( $actions['process_amazon_feed_again'] );
@@ -288,8 +288,8 @@ class WPLA_FeedsTable extends WP_List_Table {
         $line_count = $item['line_count'];
         if ( $line_count ) {
             $line_count = ($line_count) . ' rows';
-            $line_count .= ' / ';
-            $line_count .= strlen($item['data']) > 1000 ? round(strlen( $item['data'] )/1024).' kb' : strlen( $item['data'] ) . ' bytes';
+            //$line_count .= ' / ';
+            //$line_count .= strlen($item['data']) > 1000 ? round(strlen( $item['data'] )/1024).' kb' : strlen( $item['data'] ) . ' bytes';
         }
 
         $extra = '';

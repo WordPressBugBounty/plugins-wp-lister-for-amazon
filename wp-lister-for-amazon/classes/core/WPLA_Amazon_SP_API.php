@@ -140,12 +140,20 @@ class WPLA_Amazon_SP_API {
             $account->update();
         };
 
-        // Use our own Request Signer since we don't sign requests here
-        $authenticator = new WPLA_Amazon_SP_API_Authentication( $authenticator_config );
+		try {
+			// Use our own Request Signer since we don't sign requests here
+			$authenticator = new WPLA_Amazon_SP_API_Authentication( $authenticator_config );
 
-        $config_options['requestSigner'] = $authenticator;
-        $config = new WPLab\Amazon\SellingPartnerApi\Configuration( $config_options );
-        $config->setUserAgent( $this->constructUserAgentString('WP-Lister for Amazon', WPLA_VERSION ) );
+			$config_options['requestSigner'] = $authenticator;
+			$config = new WPLab\Amazon\SellingPartnerApi\Configuration( $config_options );
+			$config->setUserAgent( $this->constructUserAgentString('WP-Lister for Amazon', WPLA_VERSION ) );
+		} catch ( \RuntimeException $e ) {
+			WPLA()->logger->error( 'RuntimeException caught: '. $e->getMessage() );
+
+			if ( ! wp_doing_cron() && !wpla_request_is_rest() ) {
+				wpla_show_message( 'A RuntimeException occurred that prevented initAPI from completing. Please check your logs for details.' );
+			}
+		}
 
         if ( 'FBAOutbound' == $section ) {
 
@@ -788,9 +796,15 @@ class WPLA_Amazon_SP_API {
 				$product_type = get_post_meta( $listing['post_id'], '_wpla_custom_product_type', true );
 			}
 
+			// If there's still no product type at this point, use the generic PRODUCT product type and
+			// assume that this is ListingLoader or PnQ feed type
+			if ( !$product_type ) {
+				$product_type = 'PRODUCT';
+			}
+
 			$body_data = [
 				'productType'  => $product_type,
-				'requirements' => 'LISTING',
+				'requirements' => $product_type === 'PRODUCT' ? 'LISTING_OFFER_ONLY' : 'LISTING',
 				'attributes'   => $builder->getAttributes( $listing, $profile )
 			];
 
@@ -821,6 +835,14 @@ class WPLA_Amazon_SP_API {
             $error = new stdClass();
             $error->ErrorMessage = $ex->getMessage();
             $error->ErrorCode = $ex->getCode();
+            
+            // Handle 429 rate limiting specially
+            if ($ex->getCode() == 429) {
+                $error->IsRateLimited = true;
+                $error->ErrorMessage = 'Rate limited - retry later';
+                WPLA()->logger->debug("Rate limited on getListingsItem for SKU: $sku");
+            }
+            
             return $error;
         }
     }
@@ -1137,8 +1159,8 @@ class WPLA_Amazon_SP_API {
      * @param string $item_condition Possible values: New, Used, Collectible, Refurbished, Club
      * @return ProductPricing\GetOffersResult[]
      */
-    public function getItemOffers( $asins, $item_condition = 'New' ) {
-         WPLA()->logger->info('getItemOffers() - '.join(', ',$asins));
+    public function getItemOffers( $asins, $item_condition = 'New', $retry_count = 0 ) {
+         WPLA()->logger->info('getItemOffers() - '.join(', ',$asins) . ' (retry: ' . $retry_count . ')');
 
         $this->initAPI( 'Pricing' );
         $api = new ProductPricingApi( $this->config, $this->client );
@@ -1177,7 +1199,16 @@ class WPLA_Amazon_SP_API {
             $error = new stdClass();
             $error->ErrorMessage = $ex->getMessage();
             $error->ErrorCode    = $ex->getCode();
+            $error->StatusCode   = $ex->getCode();
             $error->HeaderMeta   = $ex->getResponseHeaders();
+
+            // Handle 429 rate limiting with exponential backoff
+            if ( $ex->getCode() == 429 && $retry_count < 3 ) {
+                $delay = pow(2, $retry_count) * 5; // 5, 10, 20 seconds
+                WPLA()->logger->info("Rate limited (429), retrying in {$delay} seconds (attempt " . ($retry_count + 1) . "/3)");
+                sleep($delay);
+                return $this->getItemOffers( $asins, $item_condition, $retry_count + 1 );
+            }
 
             $error->success      = false;
             WPLA()->logger->error( $ex->getMessage() );

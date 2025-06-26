@@ -598,7 +598,7 @@ class WPLA_AjaxHandler extends WPLA_Core {
 					$api = new WPLA_Amazon_SP_API( $account->id );
 
 					if ( $query_type == 'sku' || $query_type == 'ean' ) {
-					    $result = $api->searchCatalogItems( '', $query, 'SKU,EAN', $account->merchant_id );
+					    $result = $api->searchCatalogItems( '', $query, 'EAN', $account->merchant_id );
                     } else {
                         $result = $api->searchCatalogItems( $query );
                     }
@@ -995,10 +995,20 @@ class WPLA_AjaxHandler extends WPLA_Core {
 				'message'   => $product_type->get_error_message()
 			];
 		} else {
-			$product_type->setDisplayName( $name );
-			$product_type->save();
 
-			$result = ['success' => true, 'id' => $product_type->getId()];
+			try {
+				$product_type->setDisplayName( $name );
+				$product_type->save();
+
+				$result = ['success' => true, 'id' => $product_type->getId()];
+			} catch (\Exception $e ) {
+				WPLA()->logger->error( 'Product type save failed. '. $e->getMessage() );
+				$result = [
+					'success' => false,
+					'message'   => 'Product Type save failed!'
+				];
+			}
+
 		}
 
 		echo json_encode( $result );
@@ -1187,10 +1197,18 @@ class WPLA_AjaxHandler extends WPLA_Core {
 					'message' => $attribute->get_error_message()
 				]));
 			} else {
-				$attribute->setDisplayName( $display_name );
-				$attribute->save();
+				try {
+					$attribute->setDisplayName( $display_name );
+					$attribute->save();
 
-				//$result = ['success' => true, 'id' => $attribute->getId()];
+					//$result = ['success' => true, 'id' => $attribute->getId()];
+				} catch ( \Exception $e ) {
+					WPLA()->logger->error( 'Product type save failed! '. $e->getMessage() );
+					die(json_encode([
+						'success' => false,
+						'message' => 'Product Type save failed!'
+					]));
+				}
 			}
 		}
 
@@ -1293,67 +1311,11 @@ class WPLA_AjaxHandler extends WPLA_Core {
 				// init
 				$lm      = new WPLA_ListingsModel();
 				$listing = $lm->getItem( $task['id'] );
-				$account = WPLA_AmazonAccount::getAccount( $listing['account_id'] );
-
-				$api = new WPLA_Amazon_SP_API( $account->id );
-				//$result = $api->getListingsItem( $task['sku'] );
-				$result = $api->getListingsItem( $task['sku'] );
-
-				if ( !WPLA_Amazon_SP_API::isError( $result ) ) {
-					$success = true;
-
-					if ( $result->getIssues() ) {
-						$history = [
-							'errors' => [],
-							'warnings' => []
-						];
-						foreach ( $result->getIssues() as $issue ) {
-							$error = [
-								'error-code'    => $issue->getCode(),
-								'error-message' => $issue->getMessage(),
-								'error-type'    => $issue->getSeverity()
-							];
-
-							if ( $issue->getSeverity() == 'ERROR' ) {
-								$success = false;
-								$history['errors'][] = $error;
-							} elseif ( $issue->getSeverity() == 'WARNING' ) {
-								$history['warnings'][] = $error;
-							}
-						}
-
-						$data = [
-							'status' => WPLA_ListingsModel::STATUS_FAILED,
-							'history' => serialize( $history )
-						];
-						$lm->updateListing( $listing['id'], $data );
-
-					}
-
-					if ( $success ) {
-						$found_asin = false;
-						foreach ( $result->getSummaries() as $summary ) {
-							if ( $summary->getAsin() ) {
-								$found_asin = true;
-								$lm->updateWhere(array('id' => $listing['id']), array('asin' => $summary->getAsin(), 'status' => WPLA_ListingsModel::STATUS_ONLINE));
-								WPLA()->logger->info('new ASIN for listing #' . $listing['id'] . ': ' . $summary->getAsin());
-								break;
-							}
-						}
-
-						if ( !$found_asin ) {
-							$errors = 'No issues found but no ASIN was found either. Please try again later.';
-							$success = false;
-						}
-					} else {
-						$listings_url = admin_url( 'admin.php?page=wpla&listing_status=failed' );
-						$errors = sprintf(__('There were issues found for the listing %s. Check the <a href="%s">Failed listings page</a> for more information.', 'wp-lister-for-amazon'), $listing['sku'], $listings_url);
-					}
-				} else {
-					$errors = sprintf(__('There was a problem fetching product details for %s.', 'wp-lister-for-amazon'), $listing['sku']);
-					$errors .= ' ' . $result->ErrorMessage;
-					$success = false;
-				}
+				
+				// Use the reusable method
+				$result = $lm->checkSubmittedListingStatus( $listing );
+				$success = $result['success'];
+				$errors = $success ? '' : $result['message'];
 
 				// build response
 				$response = new stdClass();

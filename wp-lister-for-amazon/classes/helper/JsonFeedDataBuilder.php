@@ -187,6 +187,11 @@ class JsonFeedDataBuilder extends \WPLA_FeedDataBuilder {
 
 			if ( $value ) {
 				$value = str_replace( array("\t","\n","\r"), ' ', $value ); // make sure there are no tabs or line breaks in any field
+
+				// Clean any malformed UTF-8 sequences
+				if ( is_string($value) ) {
+					$value = \WPLA_ListingsModel::convertToUTF8( $value );
+				}
 			}
 
 			// assign the processed $value back to the $fields array
@@ -297,6 +302,8 @@ class JsonFeedDataBuilder extends \WPLA_FeedDataBuilder {
 			];
 
 			$messages[] = apply_filters( 'wpla_json_builder_message_array', $message, $item, $profile, $attributes );
+
+			WPLA()->logger->info( 'Total messages generated: '. count( $messages ) );
 
 			if ( $msg_id >= $max_feed_size ) {
 				WPLA()->logger->info( 'max_feed_size reached. Breaking.');
@@ -1462,15 +1469,21 @@ class JsonFeedDataBuilder extends \WPLA_FeedDataBuilder {
 	}
 
 	private function replaceShortcodes( $value, $property, $listing, $product_id, $profile ) {
-
 		// use profile value as it is - if $value is still empty (ie. there is no product level value for this column)
-		if ( empty($value) && $value !== 0 ) {
+		if ( $value === null || $value === '' ) {
 			$value = $profile_fields[ $property ] ?? '';
 		}
 
-		$product = wc_get_product( $listing['post_id'] );
+		// If value is an array, process each element recursively
+		if (is_array($value)) {
+			foreach ($value as $k => $v) {
+				$value[$k] = $this->replaceShortcodes($v, $property, $listing, $product_id, $profile);
+			}
+			return $value;
+		}
 
-		// find and parse all placeholders
+		// Now $value is a string, so process shortcodes
+		$product = wc_get_product( $listing['post_id'] );
 		if ( preg_match_all( '/\[([^\]]+)\]/', $value, $matches ) ) {
 			foreach ($matches[0] as $placeholder) {
 				wpla_logger_start_timer('parseProfileShortcode');
@@ -1504,9 +1517,9 @@ class JsonFeedDataBuilder extends \WPLA_FeedDataBuilder {
 		 */
 		if ( $value ) {
 			$custom_size_map = get_option( 'wpla_custom_size_map', array() );
-			WPLA()->logger->info( 'Handling size columns: '. $property );
+			WPLA()->logger->info( 'Handling size columns: '. print_r( $property, true ) );
 			//if ( isset( $profile_fields[$column] ) && ! empty( $profile_fields[$column] ) ) $value = $profile_fields[$column];
-			WPLA()->logger->info( 'Current value: '. $value );
+			WPLA()->logger->info( 'Current value: '. print_r($value, true) );
 
 			if ( !empty( $custom_size_map[ $property ] ) ) {
 				WPLA()->logger->info( 'Found size map for column' );
@@ -1585,7 +1598,13 @@ class JsonFeedDataBuilder extends \WPLA_FeedDataBuilder {
 
 		if ( $fields ) {
 			foreach ( $fields as $key => $value ) {
-				$str .= $key .'='. $value .'&';
+				if (is_array($value)) {
+					foreach ($value as $v) {
+						$str .= $key . '[]=' . $v . '&';
+					}
+				} else {
+					$str .= $key . '=' . $value . '&';
+				}
 			}
 			$str = rtrim( $str, '&' );
 		}

@@ -54,7 +54,7 @@ class WPLA_AmazonFeed {
 			
 			// load data into object
 			$feed = self::getFeed( $id );
-			foreach( $feed AS $key => $value ){
+			if ( $feed ) foreach( $feed AS $key => $value ){
 			    $this->$key = $value;
 			}
 
@@ -1545,6 +1545,11 @@ class WPLA_AmazonFeed {
 					// get profile
 					$profile  = new WPLA_AmazonProfile( $profile_id );
 
+					WPLA()->logger->info('profile_id=' . $profile_id);
+					WPLA()->logger->info('product_type=[' . $profile->product_type . ']');
+					WPLA()->logger->info('empty=' . (empty($profile->product_type) ? 'true' : 'false'));
+					WPLA()->logger->info('condition result=' . ($profile->product_type ? 'true' : 'false'));
+
 					if ( $profile->product_type ) {
 						// Use JSON feeds now for listing loader feeds
 						self::buildJsonFeed( $items, $account, JsonFeedDataBuilder::OPERATION_PARTIAL_UPDATE, $profile->product_type, null, $profile->product_type );
@@ -2234,7 +2239,6 @@ class WPLA_AmazonFeed {
                                     ( id = '$query' ) OR
                                     ( FeedSubmissionId = '$query' ) OR 
                                     ( FeedType = '$query' ) OR
-                                    ( data LIKE '%$query%' ) OR
                                     ( results LIKE '%$query%' ) OR
                                     ( FeedProcessingStatus LIKE '%$query%' ) OR
                                     ( success LIKE '%$query%' ) 
@@ -2245,7 +2249,9 @@ class WPLA_AmazonFeed {
 
         // get items
 		$items = $wpdb->get_results("
-			SELECT id
+			SELECT id, FeedSubmissionId, FeedType, product_type, template_name, FeedProcessingStatus, 
+	        results, success, status, SubmittedDate, CompletedProcessingDate, 
+	        date_created, account_id, line_count, feedOptions, MarketplaceIdList
 			FROM $table
             $where_sql
 			ORDER BY $orderby $order
@@ -2266,7 +2272,9 @@ class WPLA_AmazonFeed {
 
 		$results = [];
 		foreach( $items as $item ) {
-		    $row = self::getFeed( $item['id'] );
+		    //$row = self::getFeed( $item['id'] );
+			// Convert array to object to maintain compatibility
+			$row = (object)$item;
 			$row->FeedTypeName = $this->getRecordTypeName( $row->FeedType );
 			$results[] = (array)$row;
 		}

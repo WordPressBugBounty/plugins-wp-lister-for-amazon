@@ -164,7 +164,6 @@ jQuery( document ).ready( function () {
     }
 
      function render_product_attributes() {
-        console.log('render_product_attributes');
         let product_type    = product_type_select.val();
         let marketplace_id  = marketplace_select.val();
 

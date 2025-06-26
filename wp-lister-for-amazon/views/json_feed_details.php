@@ -486,7 +486,11 @@ function wpla_flatten_row(array $item, array &$flat, string $prefix = '') {
 			} else {
 				// If indexed array, process each item with its index
 				foreach ($value as $i => $sub_value) {
-					wpla_flatten_row($sub_value, $flat, $new_prefix . '[' . $i . ']');
+					if (is_array($sub_value)) {
+						wpla_flatten_row($sub_value, $flat, $new_prefix . '[' . $i . ']');
+					} else {
+						$flat[$new_prefix . '[' . $i . ']'] = $sub_value;
+					}
 				}
 			}
 		} else {

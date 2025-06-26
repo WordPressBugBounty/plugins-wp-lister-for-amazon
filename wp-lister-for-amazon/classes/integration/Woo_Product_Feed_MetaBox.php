@@ -364,6 +364,8 @@ class WPLA_Product_Feed_MetaBox {
 		}
 
         if ( isset( $_POST['wpla_product_type'] ) ) {
+	        $tpl_columns = $this->getPreprocessedProductTypeColumns();
+	        update_post_meta( $post_id, '_wpla_custom_feed_columns', $tpl_columns );
 	        update_post_meta( $post_id, '_wpla_custom_product_type',    wpla_clean( $_POST['wpla_product_type'] ) );
 	        update_post_meta( $post_id, '_wpla_custom_marketplace_id',  wpla_clean( $_POST['wpla_marketplace_id'] ) );
         }
@@ -389,6 +391,31 @@ class WPLA_Product_Feed_MetaBox {
 		return $field_data;
 	} // getPreprocessedPostData()
 
+	public function getPreprocessedProductTypeColumns() {
+
+        $converter = new WPLab\Amazon\Helper\ProfileProductTypeConverter();
+		$prefix     = 'tpl_col_';
+		$field_data = array();
+
+		foreach ( $_POST as $key => $val ) {
+			if ( $this->isEffectivelyEmpty( $val ) ) continue;
+			if ( substr( $key, 0, strlen($prefix) ) == $prefix ) {
+				$field = substr( $key, strlen($prefix) );
+				$val   = $this->processNestedValue( $val );
+				
+				// If the value is a nested array, flatten it to form field format
+				if ( is_array( $val ) ) {
+					$flattened = $converter->flattenNestedArrayToFormFields( $val, $field );
+					$field_data = array_merge( $field_data, $flattened );
+				} else {
+					$field_data[$field] = $val;
+				}
+			}
+		}
+
+		return $field_data;
+	} // getPreprocessedPostData()
+
 
     public function returnJSON( $data ) {
         header('content-type: application/json; charset=utf-8');
@@ -398,6 +425,61 @@ class WPLA_Product_Feed_MetaBox {
     private function usesFeedTemplate( $product_id ) {
 	    return (bool)get_post_meta( $product_id, '_wpla_custom_feed_tpl_id' , true );
     }
+
+	/**
+	 * Recursively process nested array values, applying stripslashes and filtering empty values
+	 *
+	 * @param mixed $value The value to process
+	 * @param bool $skip_empty Whether to skip empty values
+	 * @return mixed Processed value
+	 */
+	private function processNestedValue( $value, $skip_empty = true ) {
+		if ( is_array( $value ) ) {
+			$processed = array();
+			
+			foreach ( $value as $key => $item ) {
+				$processed_item = $this->processNestedValue( $item, $skip_empty );
+				
+				// Skip empty values if configured to do so
+				if ( $skip_empty && $this->isEffectivelyEmpty( $processed_item ) ) {
+					continue;
+				}
+				
+				$processed[$key] = $processed_item;
+			}
+			
+			return $processed;
+		} else {
+			// Process scalar values
+			return is_string( $value ) ? stripslashes( $value ) : $value;
+		}
+	}
+
+	/**
+	 * Check if a value is effectively empty (handles nested arrays)
+	 *
+	 * @param mixed $value The value to check
+	 * @return bool True if the value is effectively empty
+	 */
+	private function isEffectivelyEmpty( $value ) {
+		if ( is_array( $value ) ) {
+			// An array is empty if it has no elements or all elements are effectively empty
+			if ( empty( $value ) ) {
+				return true;
+			}
+			
+			foreach ( $value as $item ) {
+				if ( ! $this->isEffectivelyEmpty( $item ) ) {
+					return false;
+				}
+			}
+			
+			return true;
+		} else {
+			// For scalar values, use standard empty check but treat '0' as non-empty
+			return empty( $value ) && $value !== '0' && $value !== 0;
+		}
+	}
 
 
 } // class WPLA_Product_Feed_MetaBox

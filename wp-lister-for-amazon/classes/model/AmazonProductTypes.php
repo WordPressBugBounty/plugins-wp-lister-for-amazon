@@ -28,8 +28,9 @@ class AmazonProductTypesModel {
 					$attribute->setDisplayName( 'PRODUCT' );
 					$attribute->save();
 				}
-			} catch (Exception $e) {
+			} catch (\Exception $e) {
 				// just skip
+				WPLA()->logger->error( 'Exception caught! '. $e->getMessage() );
 			}
 
 		}
@@ -377,6 +378,10 @@ class AmazonProductTypesModel {
 			if ( $new_id ) {
 				$product_type->setId( $new_id );
 				return $product_type;
+			} else {
+				WPLA()->logger->error( 'Could not create new product type. SQL Error: ' . $wpdb->last_error );
+				WPLA()->logger->debug( print_r($data,1) );
+				return new WP_Error( 'wpla_error', 'Could not create new product type.' );
 			}
 		} else {
 			// update
@@ -455,15 +460,20 @@ class AmazonProductTypesModel {
 			$attr_obj->setDisplayName( $this->getDisplayNameForProductType( $product_type, $marketplace ) );
 		}
 
-		$attr_obj
-			->setProductType( $product_type )
-			->setMarketplaceId( $marketplace )
-			->setVersion( $definition->getProductTypeVersion()->getVersion() )
-			->setPropertyGroups( $definition->getPropertyGroups() )
-			->setSchema( $schema );
+		try {
+			$attr_obj
+				->setProductType( $product_type )
+				->setMarketplaceId( $marketplace )
+				->setVersion( $definition->getProductTypeVersion()->getVersion() )
+				->setPropertyGroups( $definition->getPropertyGroups() )
+				->setSchema( $schema );
 
-		$attr_obj->save();
-		return $attr_obj;
+			$attr_obj->save();
+			return $attr_obj;
+		} catch ( \Exception $e ) {
+			WPLA()->logger->error( 'Product Type save failed! '. $e->getMessage() );
+		}
+
 	}
 
 	protected function downloadSchemaFromUrl( $schema_url ) {

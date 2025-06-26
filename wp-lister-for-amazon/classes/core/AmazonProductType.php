@@ -129,10 +129,15 @@ class AmazonProductType {
 
 	/**
 	 * @return int ID of the Product Type saved
+	 * @throws \Exception
 	 */
 	public function save() {
 		$mdl    = new AmazonProductTypesModel();
 		$result = $mdl->saveProductType( $this );
+
+		if ( is_wp_error( $result ) ) {
+			throw new \Exception( $result->get_error_message(), 500 );
+		}
 
 		return $result->getId();
 	}

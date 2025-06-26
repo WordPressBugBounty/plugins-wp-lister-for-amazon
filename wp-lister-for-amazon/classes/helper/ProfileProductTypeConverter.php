@@ -19,6 +19,12 @@ class ProfileProductTypeConverter {
 
 	private $product_type;
 
+	/**
+	 * Initialize the converter with optional profile and product type
+	 *
+	 * @param \WPLA_AmazonProfile|null $profile The Amazon profile instance
+	 * @param string|null $product_type The product type identifier
+	 */
 	public function __construct( $profile = null, $product_type = null ) {
 		$this->file_path = $this->getFilePath();
 
@@ -33,20 +39,42 @@ class ProfileProductTypeConverter {
 		$this->profile = $profile;
 	}
 
+	/**
+	 * Set the Amazon profile instance
+	 *
+	 * @param \WPLA_AmazonProfile $profile The Amazon profile instance
+	 * @return $this For method chaining
+	 */
 	public function setProfile( $profile ) {
 		$this->profile = $profile;
 		return $this;
 	}
 
+	/**
+	 * Get the current Amazon profile instance
+	 *
+	 * @return \WPLA_AmazonProfile The Amazon profile instance
+	 */
 	public function getProfile() {
 		return $this->profile;
 	}
 
+	/**
+	 * Set the product type identifier
+	 *
+	 * @param string $product_type The product type identifier
+	 * @return $this For method chaining
+	 */
 	public function setProductType( $product_type ) {
 		$this->product_type = $product_type;
 		return $this;
 	}
 
+	/**
+	 * Get the current product type identifier
+	 *
+	 * @return string|null The product type identifier
+	 */
 	public function getProductType() {
 		return $this->product_type;
 	}
@@ -69,6 +97,11 @@ class ProfileProductTypeConverter {
 		return $this->profile;
 	}
 
+	/**
+	 * Convert an entire profile from old format to new product type format and save it
+	 *
+	 * @return \WPLA_AmazonProfile The converted and updated profile
+	 */
 	public function convertProfile() {
 		// handle double-serialized fields
 		$this->profile->fields = maybe_unserialize( $this->profile->fields );
@@ -121,6 +154,12 @@ class ProfileProductTypeConverter {
 		return $fields;
 	}
 
+	/**
+	 * Get the field mapping array from CSV file
+	 * Downloads the mapping file if it doesn't exist locally
+	 *
+	 * @return array Associative array mapping old field names to new field names
+	 */
 	public function getMap() {
 		if ( !$this->mapFileExists() ) {
 			$this->downloadMapFile();
@@ -129,6 +168,12 @@ class ProfileProductTypeConverter {
 		return $this->loadMapFile();
 	}
 
+	/**
+	 * Get the marketplace ID for a given feed template
+	 *
+	 * @param int $tpl_id The feed template ID
+	 * @return string|null The marketplace ID or null if not found
+	 */
 	public function getFeedTemplateMarketplace( $tpl_id ) {
 		global $wpdb;
 
@@ -199,7 +244,8 @@ class ProfileProductTypeConverter {
 
 	/**
 	 * Look for products that use custom feed templates and return them grouped by the template ID
-	 * @return array
+	 * 
+	 * @return array Associative array with template IDs as keys and arrays of product IDs as values
 	 */
 	public function getAllProductsUsingFeedTemplates() {
 		global $wpdb;
@@ -219,7 +265,9 @@ class ProfileProductTypeConverter {
 
 	/**
 	 * Look for products that use a specific custom feed template
-	 * @return array
+	 * 
+	 * @param int $tpl_id The feed template ID to search for
+	 * @return array Array of product IDs using the specified template
 	 */
 	public function getProductsUsingFeedTemplate( $tpl_id ) {
 		global $wpdb;
@@ -242,6 +290,11 @@ class ProfileProductTypeConverter {
 		return $products;
 	}
 
+	/**
+	 * Set the marketplace ID on the profile based on the associated feed template
+	 * 
+	 * @return void
+	 */
 	private function setMarketplaceFromTemplate() {
 		global $wpdb;
 
@@ -260,9 +313,10 @@ class ProfileProductTypeConverter {
 	}
 
 	/**
-	 * @param \WPLA_AmazonProfile $profile
+	 * Extract and return the product type from the profile's feed_product_type field
+	 * Removes the field from the profile fields after extraction
 	 *
-	 * @return \WPLA_AmazonProfile
+	 * @return string|null The product type in uppercase, or null if not found
 	 */
 	private function getProductTypeFromProfile() {
 		$product_type = null;
@@ -276,6 +330,14 @@ class ProfileProductTypeConverter {
 		return $product_type;
 	}
 
+	/**
+	 * Replace the last occurrence of a string in the given string
+	 *
+	 * @param string $search The string to search for
+	 * @param string $replace The replacement string
+	 * @param string $str The string to search in
+	 * @return string The modified string
+	 */
 	private function replaceLastString( $search , $replace , $str ) {
 	    if( ( $pos = strrpos( $str , $search ) ) !== false ) {
 	        $search_length  = strlen( $search );
@@ -285,8 +347,10 @@ class ProfileProductTypeConverter {
 	}
 
 	/**
+	 * Download the field mapping CSV file from the remote server
+	 * 
 	 * @todo Add a routine to check for CSV updates
-	 * @return bool
+	 * @return bool True if download and file move was successful, false otherwise
 	 */
 	private function downloadMapFile() {
 		require_once(ABSPATH . 'wp-admin/includes/file.php');
@@ -300,10 +364,20 @@ class ProfileProductTypeConverter {
 		return rename( $filename, $this->file_path );
 	}
 
+	/**
+	 * Check if the mapping CSV file exists locally
+	 *
+	 * @return bool True if the file exists, false otherwise
+	 */
 	private function mapFileExists() {
 		return file_exists( $this->file_path );
 	}
 
+	/**
+	 * Load and parse the mapping CSV file into an associative array
+	 * 
+	 * @return array Associative array mapping old field names to new field names
+	 */
 	private function loadMapFile() {
 		if ( !$this->mapFileExists() ) {
 			return [];
@@ -355,6 +429,12 @@ class ProfileProductTypeConverter {
 		return apply_filters( 'wpla_product_type_converter_map', $csv );
 	}
 
+	/**
+	 * Convert a JSON path from the API schema to a form field name
+	 * 
+	 * @param string $path The JSON path (e.g., '/attributes/purchasable_offer/0/our_price')
+	 * @return string The converted field name (e.g., 'purchasable_offer[0][our_price]')
+	 */
 	private function convertPathToFieldname( $path ) {
 		// remove the /attributes/ prefix
 		$path = str_replace( '/attributes/', '', $path );
@@ -372,10 +452,123 @@ class ProfileProductTypeConverter {
 		return $fields;
 	}
 
+	/**
+	 * Get the local file path for the mapping CSV file
+	 *
+	 * @return string The full path to the mapping file
+	 */
 	private function getFilePath() {
 		$upload_dir   = wp_upload_dir();
 		$basedir_name = 'wp-lister/';
 		return $upload_dir['basedir'].'/'.$basedir_name .'product-types-map.csv';
+	}
+
+	/**
+	 * Transform nested arrays into flat form field names
+	 * 
+	 * This method converts nested array structures back into the flat field names
+	 * that the form expects. For example:
+	 * ['purchasable_offer' => [0 => ['our_price' => ['schedule' => [0 => ['value_with_tax' => '[product_price]']]]]]]
+	 * becomes:
+	 * ['purchasable_offer[0][our_price][schedule][0][value_with_tax]' => '[product_price]']
+	 *
+	 * @param array $data The nested array data
+	 * @param string $prefix Current field prefix for recursion
+	 * @return array Flattened array with form field names as keys
+	 */
+	public function flattenNestedArrayToFormFields( $data, $prefix = '' ) {
+		$flattened = [];
+		
+		if ( !is_array( $data ) ) {
+			return [ $prefix => $data ];
+		}
+		
+		foreach ( $data as $key => $value ) {
+			$current_key = $prefix === '' ? $key : $prefix . '[' . $key . ']';
+			
+			if ( is_array( $value ) && !empty( $value ) ) {
+				// Recursively flatten nested arrays
+				$nested_flattened = $this->flattenNestedArrayToFormFields( $value, $current_key );
+				$flattened = array_merge( $flattened, $nested_flattened );
+			} else {
+				// This is a leaf value
+				$flattened[ $current_key ] = $value;
+			}
+		}
+		
+		return $flattened;
+	}
+
+	/**
+	 * Transform flat form field names into nested arrays
+	 * 
+	 * This method converts flat field names back into nested array structures.
+	 * For example:
+	 * ['purchasable_offer[0][our_price][schedule][0][value_with_tax]' => '[product_price]']
+	 * becomes:
+	 * ['purchasable_offer' => [0 => ['our_price' => ['schedule' => [0 => ['value_with_tax' => '[product_price]']]]]]]
+	 *
+	 * @param array $data The flat array data with form field names as keys
+	 * @return array Nested array structure
+	 */
+	public function expandFormFieldsToNestedArray( $data ) {
+		$nested = [];
+		
+		foreach ( $data as $field_name => $value ) {
+			$this->setNestedValue( $nested, $field_name, $value );
+		}
+		
+		return $nested;
+	}
+
+	/**
+	 * Set a value in a nested array using a field name path
+	 * 
+	 * @param array &$array The array to modify (passed by reference)
+	 * @param string $field_name The field name path (e.g., 'purchasable_offer[0][our_price]')
+	 * @param mixed $value The value to set
+	 */
+	private function setNestedValue( &$array, $field_name, $value ) {
+		// Parse the field name to extract the path components
+		$path = $this->parseFieldNamePath( $field_name );
+		
+		// Navigate through the nested array, creating structure as needed
+		$current = &$array;
+		foreach ( $path as $key ) {
+			if ( !isset( $current[ $key ] ) ) {
+				$current[ $key ] = [];
+			}
+			$current = &$current[ $key ];
+		}
+		
+		// Set the final value
+		$current = $value;
+	}
+
+	/**
+	 * Parse a field name path into its components
+	 * 
+	 * @param string $field_name The field name (e.g., 'purchasable_offer[0][our_price][schedule][0][value_with_tax]')
+	 * @return array Array of path components
+	 */
+	private function parseFieldNamePath( $field_name ) {
+		$path = [];
+		
+		// Split on brackets to get the main field and sub-fields
+		if ( preg_match('/^([^\[]+)(.*)$/', $field_name, $matches) ) {
+			$path[] = $matches[1]; // Main field name
+			
+			// Extract all bracketed components
+			if ( !empty( $matches[2] ) ) {
+				preg_match_all('/\[([^\]]+)\]/', $matches[2], $bracket_matches);
+				foreach ( $bracket_matches[1] as $component ) {
+					// Convert numeric strings to integers for array indices
+					$path[] = is_numeric( $component ) ? (int)$component : $component;
+				}
+			}
+		}
+		
+		return $path;
 	}
 
 	/**
