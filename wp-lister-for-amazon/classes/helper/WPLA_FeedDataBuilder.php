@@ -2044,6 +2044,7 @@ class WPLA_FeedDataBuilder {
 	 */
 
 	// generate csv feed for trashed products
+	// DEPRECATED: Use JsonFeedDataBuilder::buildDeleteListingsJson() instead for SP-API compliance
 	static function buildProductRemovalFeedData( $items, $account_id ) {
 		// echo "<pre>";print_r($items);echo"</pre>";#die();
 

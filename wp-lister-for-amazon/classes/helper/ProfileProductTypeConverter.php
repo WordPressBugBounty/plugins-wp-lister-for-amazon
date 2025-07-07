@@ -142,12 +142,21 @@ class ProfileProductTypeConverter {
 				$new_key            = $map[ $key ];
 				$old_fields[ $key ] = $value;
 
+				// Apply unit conversion for unit fields
+				if ( strpos( $key, '_unit_of_measure' ) !== false ) {
+					$value = $this->convertUnit( $value );
+				}
+
 				$fields[ $new_key ] = $value;
 			} else {
 				$unmapped[ $key ] = $value;
 			}
 			unset( $fields[ $key ] );
 		}
+		
+		// Handle ASIN conversion after all fields are processed
+		$this->handleAsinConversion( $fields );
+		
 		$fields['__unmapped']   = $unmapped;
 		$fields['__old_fields'] = $old_fields;
 
@@ -421,7 +430,15 @@ class ProfileProductTypeConverter {
 		}
 
 		// add fields that are not in the map file
-		$csv[ 'fulfillment_latency' ] = 'fulfillment_availability[0][lead_time_to_ship_max_days]';
+		$csv[ 'fulfillment_latency' ]               = 'fulfillment_availability[0][lead_time_to_ship_max_days]';
+		$csv[ 'standard_price' ]                    = 'purchasable_offer[0][our_price][0][schedule][0][value_with_tax]';
+		$csv[ 'sale_price' ]                        = 'purchasable_offer[0][discounted_price][0][schedule][0][value_with_tax]';
+		$csv[ 'sale_from_date' ]                    = 'purchasable_offer[0][discounted_price][0][schedule][0][start_at]';
+		$csv[ 'sale_end_date' ]                     = 'purchasable_offer[0][discounted_price][0][schedule][0][end_at]';
+		$csv[ 'package_height_unit_of_measure' ]    = 'item_package_dimensions[0][height][unit]';
+		$csv[ 'package_width_unit_of_measure' ]     = 'item_package_dimensions[0][width][unit]';
+		$csv[ 'package_length_unit_of_measure' ]    = 'item_package_dimensions[0][length][unit]';
+		$csv[ 'package_weight_unit_of_measure' ]    = 'item_weight[0][unit]';
 
 		// remove the header
 		array_shift($csv);
@@ -450,6 +467,75 @@ class ProfileProductTypeConverter {
 		}
 
 		return $fields;
+	}
+
+	/**
+	 * Convert old unit values to new unit values
+	 * 
+	 * @param string $old_unit The old unit value
+	 * @return string The new unit value
+	 */
+	private function convertUnit( $old_unit ) {
+		$unit_mapping = [
+			// Length/Distance units (old => new)
+			'Angstrom'                  => 'angstrom',
+			'Mils'                      => 'mils',
+			'Yards'                     => 'yards', 
+			'Picometer'                 => 'picometer',
+			'Miles'                     => 'miles',
+			'DM'                        => 'decimeters',
+			'MM'                        => 'millimeters',
+			'M'                         => 'meters',
+			'IN'                        => 'inches',
+			'FT'                        => 'feet',
+			'CM'                        => 'centimeters',
+			'Hundredths-Inches'         => 'hundredths_inches',
+			'Nanometer'                 => 'nanometer',
+			'uM'                        => 'micrometer',
+			'Kilometers'                => 'kilometers',
+			'Millimeters'               => 'millimeters',
+			'Meters'                    => 'meters',
+			'Inches'                    => 'inches',
+			'Feet'                      => 'feet',
+			'Centimeters'               => 'centimeters',
+			'Micron'                    => 'micrometer',
+			'Decimeters'                => 'decimeters',
+			
+			// Weight units (old => new)
+			'LB'                        => 'pounds',
+			'KG'                        => 'kilograms',
+			'GR'                        => 'grams',
+			'Hundredths Pounds'         => 'hundredths_pounds',
+			'MG'                        => 'milligrams',
+			'Tons'                      => 'tons',
+			'OZ'                        => 'ounces',
+		];
+
+		return isset( $unit_mapping[ $old_unit ] ) ? $unit_mapping[ $old_unit ] : strtolower( $old_unit );
+	}
+
+	/**
+	 * Handle ASIN conversion special case
+	 * If external_product_id_type is ASIN, move the external_product_id value to merchant_suggested_asin
+	 * 
+	 * @param array &$fields Reference to the fields array
+	 */
+	private function handleAsinConversion( &$fields ) {
+		// Check if we have ASIN type and external product ID
+		$external_id_type_field  = 'externally_assigned_product_identifier[0][type]';
+		$external_id_value_field = 'externally_assigned_product_identifier[0][value]';
+		
+		if ( isset( $fields[ $external_id_type_field ] ) && 
+			 $fields[ $external_id_type_field ] === 'ASIN' && 
+			 isset( $fields[ $external_id_value_field ] ) ) {
+			
+			// Move the ASIN value to merchant_suggested_asin
+			$fields['merchant_suggested_asin[0][value]'] = $fields[ $external_id_value_field ];
+			
+			// Remove the external_product_id fields since ASIN is now in its own field
+			unset( $fields[ $external_id_type_field ] );
+			unset( $fields[ $external_id_value_field ] );
+		}
 	}
 
 	/**

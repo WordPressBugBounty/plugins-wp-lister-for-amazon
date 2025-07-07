@@ -24,7 +24,7 @@ class AmazonProductTypesModel {
 				$type_obj = new \WPLab\Amazon\Models\AmazonProductTypesModel();
 				$attribute = $type_obj->getDefinitionsProductType( 'PRODUCT', $marketplace_id, false, $account->id );
 
-				if ( !is_wp_error( $attribute ) ) {
+				if ( !is_wp_error( $attribute ) && $attribute !== false ) {
 					$attribute->setDisplayName( 'PRODUCT' );
 					$attribute->save();
 				}
@@ -280,6 +280,33 @@ class AmazonProductTypesModel {
 				// No cached schema found. Download and store
 				$api            = new \WPLA_Amazon_SP_API( $account_id );
 				$resp           = $api->getDefinitionsProductType( $product_type, $marketplace );
+				
+				// Check for SP-API errors
+				if ( \WPLA_Amazon_SP_API::isError( $resp ) ) {
+					\WPLA_Amazon_SP_API::handleApiError( 
+						$resp, 
+						sprintf( 'Product Type Definition Retrieval for "%s"', $product_type )
+					);
+					return false;
+				}
+				
+				// Validate response structure
+				if ( ! is_object($resp) || ! method_exists($resp, 'getSchema') ) {
+					WPLA()->logger->error( 'Invalid response structure from getDefinitionsProductType for ' . $product_type );
+					
+					if ( ! wp_doing_cron() && ! wpla_request_is_rest() ) {
+						wpla_show_message( 
+							sprintf( 
+								'Received invalid data for product type "%s". Please try again or contact support.', 
+								$product_type 
+							), 
+							'error' 
+						);
+					}
+					
+					return false;
+				}
+				
 				//$remote_version = $resp->getProductTypeVersion()->getVersion();
 
 				$schema_url = $resp->getSchema()->getLink()->getResource();

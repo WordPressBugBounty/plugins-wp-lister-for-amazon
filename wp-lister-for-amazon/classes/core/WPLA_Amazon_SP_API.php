@@ -153,6 +153,15 @@ class WPLA_Amazon_SP_API {
 			if ( ! wp_doing_cron() && !wpla_request_is_rest() ) {
 				wpla_show_message( 'A RuntimeException occurred that prevented initAPI from completing. Please check your logs for details.' );
 			}
+			
+			// Return early to prevent using null $config in API instantiation
+			return false;
+		}
+
+		// Validate that config was successfully created
+		if ( ! isset( $config ) || ! $config instanceof WPLab\Amazon\SellingPartnerApi\Configuration ) {
+			WPLA()->logger->error( 'Configuration object not properly initialized in initAPI()' );
+			return false;
 		}
 
         if ( 'FBAOutbound' == $section ) {
@@ -643,7 +652,12 @@ class WPLA_Amazon_SP_API {
      * @return array|Feeds\Feed|stdClass
      */
     public function getFeed( $feed_id ) {
-        $this->initAPI( 'Feeds' );
+        if ( $this->initAPI( 'Feeds' ) === false ) {
+            $error = new stdClass();
+            $error->ErrorMessage = 'Failed to initialize SP-API configuration';
+            $error->ErrorCode = 'INIT_API_FAILED';
+            return $error;
+        }
 
         $api = new FeedsApi( $this->config, $this->client );
 
@@ -784,7 +798,12 @@ class WPLA_Amazon_SP_API {
 	 * @return stdClass|\WPLab\Amazon\SellingPartnerApi\Model\ListingsV20210801\ListingsItemSubmissionResponse
 	 */
 	public function putListingsItem( $listing, $profile ) {
-		$this->initAPI( 'Listings' );
+		if ( $this->initAPI( 'Listings' ) === false ) {
+			$error = new stdClass();
+			$error->ErrorMessage = 'Failed to initialize SP-API configuration';
+			$error->ErrorCode = 'INIT_API_FAILED';
+			return $error;
+		}
 
 		$api = new ListingsApi( $this->config, $this->client );
 		$builder = new \WPLab\Amazon\Helper\JsonFeedDataBuilder();
@@ -826,7 +845,13 @@ class WPLA_Amazon_SP_API {
      * @return \WPLab\Amazon\SellingPartnerApi\Model\ListingsV20210801\Item|stdClass
      */
     public function getListingsItem( $sku ) {
-        $this->initAPI( 'Listings' );
+        if ( $this->initAPI( 'Listings' ) === false ) {
+            $error = new stdClass();
+            $error->ErrorMessage = 'Failed to initialize SP-API configuration';
+            $error->ErrorCode = 'INIT_API_FAILED';
+            return $error;
+        }
+        
         $api = new ListingsApi( $this->config, $this->client );
 
         try {
@@ -856,7 +881,13 @@ class WPLA_Amazon_SP_API {
      * @return array|Catalog\Item|stdClass
      */
     public function getCatalogItem( $asin, $included_data = [] ) {
-        $this->initAPI( 'Catalog' );
+        if ( $this->initAPI( 'Catalog' ) === false ) {
+            $error = new stdClass();
+            $error->ErrorMessage = 'Failed to initialize SP-API configuration';
+            $error->ErrorCode = 'INIT_API_FAILED';
+            return $error;
+        }
+        
         $api = new CatalogApi( $this->config, $this->client );
 
         if ( empty( $included_data ) ) {
@@ -968,7 +999,7 @@ class WPLA_Amazon_SP_API {
         try {
             $results = $api->searchCatalogItems(
                 $this->account->marketplace_id,
-                $identifiers,
+                is_array($identifiers) ? implode(',', $identifiers) : $identifiers,
                 $identifier_type,
                 'summaries,attributes,identifiers,images,productTypes,relationships',
                 null,
@@ -1874,7 +1905,13 @@ class WPLA_Amazon_SP_API {
 	}
 
 	public function getDefinitionsProductType( $product_type, $marketplace = null ) {
-		$this->initAPI();
+		if ( $this->initAPI() === false ) {
+			$error = new stdClass();
+			$error->ErrorMessage = 'Failed to initialize SP-API configuration';
+			$error->ErrorCode = 'INIT_API_FAILED';
+			return $error;
+		}
+		
 		$api = new ProductTypeDefinitionsApi( $this->config, $this->client );
 
 		if ( is_null($marketplace) ) {
@@ -1891,6 +1928,91 @@ class WPLA_Amazon_SP_API {
         }
 
         return false;
+    }
+
+    /**
+     * Handle SP-API errors with user-friendly messaging
+     * @param object $error_response Error response from SP-API
+     * @param string $context Context of the operation (e.g., 'Product Type Retrieval', 'Listing Creation')
+     * @param bool $show_to_user Whether to show message to user (default: only if not cron/REST)
+     */
+    public static function handleApiError( $error_response, $context = 'Amazon API Operation', $show_to_user = null ) {
+        if ( ! self::isError( $error_response ) ) {
+            return;
+        }
+
+        // Log the error
+        WPLA()->logger->error( sprintf( 
+            '%s failed: %s (Code: %s)', 
+            $context, 
+            $error_response->ErrorMessage, 
+            isset( $error_response->ErrorCode ) ? $error_response->ErrorCode : 'Unknown'
+        ) );
+
+        // Determine if we should show to user
+        if ( $show_to_user === null ) {
+            $show_to_user = ! wp_doing_cron() && ! wpla_request_is_rest();
+        }
+
+        if ( $show_to_user ) {
+            $user_message = self::getFriendlyErrorMessage( $error_response, $context );
+            wpla_show_message( $user_message, 'error' );
+        }
+    }
+
+    /**
+     * Convert SP-API error codes to user-friendly messages
+     * @param object $error_response Error response from SP-API
+     * @param string $context Context of the operation
+     * @return string User-friendly error message
+     */
+    public static function getFriendlyErrorMessage( $error_response, $context = 'Operation' ) {
+        $error_code = isset( $error_response->ErrorCode ) ? $error_response->ErrorCode : '';
+        $error_message = $error_response->ErrorMessage;
+
+        switch ( $error_code ) {
+            case 'INIT_API_FAILED':
+                return sprintf( 
+                    '%s failed due to Amazon account configuration issues. Please check your Amazon account settings and SP-API credentials.',
+                    $context
+                );
+
+            case 'InvalidInput':
+            case 'InvalidParameterValue':
+                return sprintf( 
+                    '%s failed due to invalid input data. Please verify your product information and try again.',
+                    $context
+                );
+
+            case 'Unauthorized':
+            case 'InvalidAccessKeyId':
+            case 'SignatureDoesNotMatch':
+                return sprintf( 
+                    '%s failed due to authentication issues. Please check your Amazon account credentials.',
+                    $context
+                );
+
+            case 'QuotaExceeded':
+            case 'Throttled':
+                return sprintf( 
+                    '%s failed due to Amazon rate limits. Please wait a few minutes and try again.',
+                    $context
+                );
+
+            case 'InternalError':
+            case 'ServiceUnavailable':
+                return sprintf( 
+                    '%s failed due to Amazon service issues. Please try again later.',
+                    $context
+                );
+
+            default:
+                return sprintf( 
+                    '%s failed: %s. Please check the logs for more details or contact support if the issue persists.',
+                    $context,
+                    $error_message
+                );
+        }
     }
 
     public function setMerchantId( $merchant_id ) {

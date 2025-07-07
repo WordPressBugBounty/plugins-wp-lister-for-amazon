@@ -81,10 +81,6 @@ class ProfileConverterPage extends \WPLA_Page {
 				$profiles = \WPLA_AmazonProfile::getAllUsingTemplate( $tpl_id );
 
 				foreach ( $profiles as $profile ) {
-					if ( in_array( $profile->profile_id, array_keys( $converted_profiles ) ) ) {
-						continue;
-					}
-
 					$new_id = \WPLA_AmazonProfile::duplicateProfile( $profile->profile_id );
 					$converted_profiles[ $profile->profile_id ] = $new_id;
 

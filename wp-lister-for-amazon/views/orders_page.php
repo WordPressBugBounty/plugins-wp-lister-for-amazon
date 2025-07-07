@@ -85,7 +85,7 @@
     if (  $last_run ) :
     ?>
 		<?php echo __( 'Last run', 'wp-lister-for-amazon' ); ?>:
-		<?php echo human_time_diff( get_option('wpla_cron_last_run'), current_time('timestamp',1) ) ?> ago &ndash;
+		<?php echo human_time_diff( $last_run, current_time('timestamp',1) ) ?> ago &ndash;
 	<?php endif; ?>
 
 	<?php if ( wp_next_scheduled( 'wpla_update_schedule' ) ) : ?>
@@ -100,7 +100,7 @@
 	</p>
 
 
-	<form method="post" action="<?php echo $wpl_form_action; ?>">
+	<form method="post" action="<?php echo $wpl_form_action; ?>" id="wpla-update-orders-form">
         <div class="submit1" style="">
             <?php wp_nonce_field( 'wpla_update_orders' ); ?>
             <input type="hidden" name="action" value="update_amazon_orders" />
@@ -187,6 +187,24 @@
                 event.preventDefault();
             }
             $(this).addClass("disabled");
+        });
+
+        // Prevent double-submission of Update Orders form
+        var formSubmitted = false;
+        $('#wpla-update-orders-form').on('submit', function(event) {
+            if (formSubmitted) {
+                event.preventDefault();
+                return false;
+            }
+            
+            formSubmitted = true;
+            
+            // Disable all submit buttons and show processing state
+            $(this).find('input[type="submit"]').each(function() {
+                $(this).prop('disabled', true);
+                $(this).val('<?php echo __( 'Processing...', 'wp-lister-for-amazon' ) ?>');
+                $(this).css('opacity', '0.6');
+            });
         });
 
         $(".datepicker").datepicker({

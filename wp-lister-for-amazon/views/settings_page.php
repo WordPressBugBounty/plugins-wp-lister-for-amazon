@@ -170,7 +170,7 @@
 							</p>
 							<?php endif; ?>
 
-                            <?php if ( get_option('wpla_orders_cron_last_run') ) : ?>
+                            <?php if ( get_option('wpla_dedicated_orders_cron', 0) && get_option('wpla_orders_cron_last_run') ) : ?>
                                 <p>
                                     <?php echo __( 'Orders last checked', 'wp-lister-for-amazon' ); ?>:
                                     <?php echo human_time_diff( get_option('wpla_orders_cron_last_run'), current_time('timestamp',1) ) ?> ago

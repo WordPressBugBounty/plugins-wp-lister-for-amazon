@@ -13,7 +13,7 @@ class JsonFeedDataBuilder extends \WPLA_FeedDataBuilder {
 	public const OPERATION_UPDATE           = 'UPDATE';
 	public const OPERATION_PARTIAL_UPDATE   = 'PARTIAL_UPDATE';
 	public const OPERATION_PATCH            = 'PARTIAL_PATCH';
-	public const OPERATION_DELETE           = 'PARTIAL_DELETE';
+	public const OPERATION_DELETE           = 'DELETE';
 
 	public static function getMarketplaceIdFromTemplateId( $tpl_id ) {
 		global $wpdb;
@@ -91,6 +91,61 @@ class JsonFeedDataBuilder extends \WPLA_FeedDataBuilder {
 	}
 
 	/**
+	 * Build JSON feed for deleting listings (similar to CSV add-delete column with 'x' value)
+	 *
+	 * @param array $items
+	 * @param \WPLA_AmazonAccount $account
+	 * @return string|false
+	 */
+	public function buildDeleteListingsJson( $items, $account ) {
+		$data = [
+			'header' => [
+				'sellerId' => $account->merchant_id,
+				'version'   => '2.0'
+			],
+			'messages' => []
+		];
+
+		$max_feed_size = get_option( 'wpla_max_feed_size', 1000 );
+		$msg_id = 0;
+
+		foreach ( $items as $item ) {
+			if ( $msg_id >= $max_feed_size ) {
+				WPLA()->logger->info( 'max_feed_size reached. Breaking.');
+				break;
+			}
+
+			// Only process items with trash status
+			if ( $item['status'] != 'trash' ) {
+				continue;
+			}
+
+			if ( ! $item['sku'] ) {
+				WPLA()->logger->info('Skipping item without SKU for deletion: ID ' . $item['id']);
+				continue;
+			}
+
+			$msg_id++;
+			$message = [
+				'messageId'     => $msg_id,
+				'sku'           => $item['sku'],
+				'operationType' => self::OPERATION_DELETE
+			];
+			$data['messages'][] = $message;
+
+			WPLA()->logger->info('Added deletion message for SKU: ' . $item['sku']);
+		}
+
+		if ( empty( $data['messages'] ) ) {
+			WPLA()->logger->info('No items to delete found in buildDeleteListingsJson()');
+			return false;
+		}
+
+		WPLA()->logger->info('Built delete feed with ' . count($data['messages']) . ' messages');
+		return json_encode( $data );
+	}
+
+	/**
 	 * Add pending items to a JSON feed. This method will add items until the feed reaches its max feed size limit
 	 *
 	 * @param array $items
@@ -158,6 +213,10 @@ class JsonFeedDataBuilder extends \WPLA_FeedDataBuilder {
 		$this->disableCountryBasedPricing();
 
 		$schema = $this->getSchemaFromCache( $product_type, $marketplace_id );
+		
+		if ( ! $schema ) {
+			return [];
+		}
 
 		$language = $this->getLanguageFromCache($marketplace_id, $schema );
 
@@ -207,6 +266,7 @@ class JsonFeedDataBuilder extends \WPLA_FeedDataBuilder {
 		parse_str( $fields_str, $fields_arr );
 
 		$fields_arr = $this->filterEmptyFields( $fields_arr );
+		$fields_arr = $this->reindexArrays( $fields_arr );
 		$fields_arr = $this->insertMarketData( $fields_arr, $marketplace_id, $language );
 
 		//$fields_arr = ['attributes' => $fields_arr];
@@ -232,7 +292,10 @@ class JsonFeedDataBuilder extends \WPLA_FeedDataBuilder {
 			'fulfillment_availability[0][quantity]'                     => 'Quantity',
 			'fulfillment_availability[0][lead_time_to_ship_max_days]'   => 'Handling Time',
 			'fulfillment_availability[0][restock_date]'                 => 'Restock Date',
-			'purchasable_offer[0][our_price][0][schedule][0][value_with_tax]' => 'Price',
+			'purchasable_offer[0][our_price][0][schedule][0][value_with_tax]'           => 'Price',
+			'purchasable_offer[0][discounted_price][0][schedule][0][value_with_tax]'    => 'Sale Price',
+			'purchasable_offer[0][discounted_price][0][schedule][0][start_at]'          => 'Sale Start Date',
+			'purchasable_offer[0][discounted_price][0][schedule][0][end_at]'            => 'Sale End Date',
 			'purchasable_offer[0][minimum_seller_allowed_price][0][schedule][0][value_with_tax]' => 'Minimum Price',
 			'purchasable_offer[0][maximum_seller_allowed_price][0][schedule][0][value_with_tax]' => 'Maximum Price',
 		);
@@ -283,23 +346,39 @@ class JsonFeedDataBuilder extends \WPLA_FeedDataBuilder {
 				continue;
 			}
 
-			$attributes = $this->getAttributes( $item, $profile, $feed_attributes );
+			// Determine operation type based on item status (similar to CSV add-delete column)
+			$item_operation = $operation;
+			if ( $item['status'] == 'trash' ) {
+				$item_operation = self::OPERATION_DELETE;
+				WPLA()->logger->info('Item status is trash - setting operation to DELETE');
+			}
 
-			// skip empty attributes
-			if ( $attributes == '[]' ) {
-				WPLA()->logger->info('No attributes found for this item. Skipping');
-				continue;
+			// For DELETE operations, we don't need complex attributes
+			if ( $item_operation == self::OPERATION_DELETE ) {
+				$attributes = [];
+			} else {
+				$attributes = $this->getAttributes( $item, $profile, $feed_attributes );
+
+				// skip empty attributes for non-delete operations
+				if ( $attributes == '[]' ) {
+					WPLA()->logger->info('No attributes found for this item. Skipping');
+					continue;
+				}
 			}
 
 			$msg_id++;
 			$message = [
 				'messageId'     => $msg_id,
 				'sku'           => $item['sku'],
-				'operationType' => $operation,
+				'operationType' => $item_operation,
 				//'requirements'  => 'LISTING',
-				'productType'   => $product_type ?? $this->getListingProductType( $item, $profile ),
-				'attributes'    => $attributes
 			];
+
+			// Only add productType and attributes for non-delete operations
+			if ( $item_operation != self::OPERATION_DELETE ) {
+				$message['productType'] = $product_type ?? $this->getListingProductType( $item, $profile );
+				$message['attributes'] = $attributes;
+			}
 
 			$messages[] = apply_filters( 'wpla_json_builder_message_array', $message, $item, $profile, $attributes );
 
@@ -1424,6 +1503,11 @@ class JsonFeedDataBuilder extends \WPLA_FeedDataBuilder {
 
 		$types_mdl  = new \WPLab\Amazon\Models\AmazonProductTypesModel();
 		$type_obj   = $types_mdl->getDefinitionsProductType( $product_type, $marketplace_id, true );
+		
+		if ( ! $type_obj ) {
+			return null;
+		}
+		
 		$schema     = json_decode( $type_obj->getSchema(), true );
 
 		$this->schema_cache[ $key ] = $schema;
@@ -1569,6 +1653,48 @@ class JsonFeedDataBuilder extends \WPLA_FeedDataBuilder {
 	}
 
 	/**
+	 * This fixes bullet_point and similar arrays from having gaps like [0,1,4] to [0,1,2]
+	 * 
+	 * @param array $array
+	 * @return array
+	 */
+	private function reindexArrays( $array ) {
+		// Arrays that should be converted from associative to indexed
+		$arrays_to_reindex = [
+			'bullet_point',
+			'generic_keyword', 
+			'special_features',
+			'department',
+			'lifestyle',
+			'target_audience_keyword',
+			'ingredients',
+			'other_product_image_locator',
+			'other_offer_image_locator'
+		];
+		
+		foreach ( $array as $key => $value ) {
+			if ( is_array( $value ) && in_array( $key, $arrays_to_reindex ) ) {
+				// Check if this is an array with numeric keys (string or int)
+				$keys = array_keys( $value );
+				$has_numeric_keys = !empty( $keys ) && array_reduce( $keys, function( $carry, $k ) {
+					return $carry && is_numeric( $k );
+				}, true );
+				
+				if ( $has_numeric_keys ) {
+					// Build a new indexed array
+					$indexed_array = [];
+					foreach ( $value as $item ) {
+						$indexed_array[] = $item;
+					}
+					$array[ $key ] = $indexed_array;
+				}
+			}
+		}
+		
+		return $array;
+	}
+
+	/**
 	 * Recursively insert marketplace_id and language_tag values
 	 * @param $fields
 	 * @param $marketplace
@@ -1600,10 +1726,10 @@ class JsonFeedDataBuilder extends \WPLA_FeedDataBuilder {
 			foreach ( $fields as $key => $value ) {
 				if (is_array($value)) {
 					foreach ($value as $v) {
-						$str .= $key . '[]=' . $v . '&';
+						$str .= $key . '[]=' . urlencode($v) . '&';
 					}
 				} else {
-					$str .= $key . '=' . $value . '&';
+					$str .= $key . '=' . urlencode($value) . '&';
 				}
 			}
 			$str = rtrim( $str, '&' );
@@ -1652,6 +1778,11 @@ class JsonFeedDataBuilder extends \WPLA_FeedDataBuilder {
 			$this->disableCountryBasedPricing();
 
 			$schema      = $this->getSchemaFromCache( $product_type, $marketplace_id );
+			
+			if ( ! $schema ) {
+				return [];
+			}
+			
 			$form_gen    = new AmazonSchemaFormGenerator( $schema );
 			$json_fields = $form_gen->getFields();
 		}

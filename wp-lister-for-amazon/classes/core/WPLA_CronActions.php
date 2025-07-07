@@ -546,6 +546,12 @@ class WPLA_CronActions {
 
         // store timestamp
         update_option( 'wpla_orders_cron_last_run', time() );
+        
+        // If dedicated orders cron is disabled, also update main cron timestamp
+        // since orders are part of the main cron process
+        if ( ! get_option( 'wpla_dedicated_orders_cron', 0 ) ) {
+            update_option( 'wpla_cron_last_run', time() );
+        }
 
 	} // action_update_orders()
 

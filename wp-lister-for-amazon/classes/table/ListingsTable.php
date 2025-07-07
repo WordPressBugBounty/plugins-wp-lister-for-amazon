@@ -245,8 +245,8 @@ class WPLA_ListingsTable extends WP_List_Table {
     function displayMessageRow( $item ){
         $listing_title = '';
 
-        // show errors and warning on online and failed items
-        if ( in_array( $item['status'], array( 'online', 'failed' ) ) ) {
+        // show errors and warning on online, failed, submitted, and matched items
+        if ( in_array( $item['status'], array( 'online', 'failed', 'submitted', 'matched' ) ) ) {
 
             $history = maybe_unserialize( $item['history'] );
             $tips_errors   = array();

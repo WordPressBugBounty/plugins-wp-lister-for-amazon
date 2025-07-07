@@ -451,7 +451,7 @@ class AmazonSchemaFormGenerator {
 	 */
 	private function getValueFromProfile( $name ) {
 		$value = '';
-		if ( isset($this->profile->fields) && $this->profile->fields[$name] !== '' ) {
+		if ( isset($this->profile->fields) && isset($this->profile->fields[$name]) && $this->profile->fields[$name] !== '' ) {
 			$value = $this->profile->fields[ $name ];
 		}
 

@@ -241,7 +241,8 @@ class WPLA_AmazonProfile {
 		$profiles_mdl   = new \WPLA_AmazonProfile();
 		$all_profiles   = $profiles_mdl->getAll();
 
-		$converted_profiles = get_option( 'wpla_json_converted_profiles', [] );
+		//$converted_profiles = get_option( 'wpla_json_converted_profiles', [] );
+		$converted_profiles = self::getConvertedProfiles();
 
 		foreach ( $all_profiles as $idx => $profile ) {
 			if ( $profile->product_type ) {
@@ -252,6 +253,26 @@ class WPLA_AmazonProfile {
 		}
 
 		return $all_profiles;
+	}
+
+	public static function getConvertedProfiles() {
+		global $wpdb;
+
+		$converted_profiles = get_option( 'wpla_json_converted_profiles', [] );
+		$found_profiles = [];
+
+		if ( !empty( $converted_profiles ) ) {
+			$placeholders = implode( ',', array_fill( 0, count( $converted_profiles ), '%d' ) );
+			$sql = $wpdb->prepare(
+				"SELECT profile_id FROM {$wpdb->prefix}amazon_profiles WHERE profile_id IN ($placeholders)",
+				...$converted_profiles
+			);
+			$found_profiles = $wpdb->get_col(
+				$sql
+			);
+		}
+
+		return $found_profiles;
 	}
 
 	public static function duplicateProfile($id) {

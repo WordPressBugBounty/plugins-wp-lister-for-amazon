@@ -280,9 +280,29 @@ class WPLA_ListingsPage extends WPLA_Page {
 		            }
 
 		            $data = [
-			            //'status' => WPLA_ListingsModel::STATUS_FAILED,
 			            'history' => serialize( $history )
 		            ];
+
+		            // Update status based on errors and ASIN availability
+		            if ( !$success ) {
+			            // Has errors - mark as failed
+			            $data['status'] = WPLA_ListingsModel::STATUS_FAILED;
+		            } else {
+			            // No errors - check for ASIN and update status for submitted/matched listings
+			            $found_asin = false;
+			            foreach ( $result->getSummaries() as $summary ) {
+				            if ( $summary->getAsin() ) {
+					            $found_asin = true;
+					            $data['asin'] = $summary->getAsin();
+					            // Update status to online if currently submitted (matched listings are handled by feed processing)
+					            if ( $listing['status'] === WPLA_ListingsModel::STATUS_SUBMITTED ) {
+						            $data['status'] = WPLA_ListingsModel::STATUS_ONLINE;
+					            }
+					            break;
+				            }
+			            }
+		            }
+
 		            $lm->updateListing( $listing['id'], $data );
 	            }
             }

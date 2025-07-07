@@ -1637,11 +1637,14 @@ class WPLA_AmazonFeed {
 		$items = $lm->getPendingProductsForAccountByProductType( $account->id );
 		WPLA_AmazonFeed::buildJsonFeed( $items, $account );
 
-
-		// build delete products feed for this account
-		$items = $lm->getAllProductsInTrashForAccount( $account->id );
-		WPLA()->logger->info('listings in trash: '.sizeof($items));
-		WPLA_AmazonFeed::buildFeed( 'POST_FLAT_FILE_INVLOADER_DATA', $items, $account, false, false, 'ProductRemoval' );
+		// Build unified JSON delete feed for ALL trash items (regardless of original listing type)
+		// This replaces the old CSV delete feed system for SP-API compliance
+		$trash_items = $lm->getAllProductsInTrashForAccount( $account->id );
+		WPLA()->logger->info('listings in trash: '.sizeof($trash_items));
+		if ( !empty($trash_items) ) {
+			WPLA()->logger->info('Building unified JSON delete feed for all trash items');
+			WPLA_AmazonFeed::buildJsonFeed( $trash_items, $account, \WPLab\Amazon\Helper\JsonFeedDataBuilder::OPERATION_DELETE, null, [], 'DELETE_FEED' );
+		}
 
 
 	} // updatePendingFeedForAccount()
@@ -1747,12 +1750,19 @@ class WPLA_AmazonFeed {
 				break;
 			
 			case 'POST_FLAT_FILE_INVLOADER_DATA__PRODUCT_REMOVAL':
-				// delete products feed (Inventory Loader)
-				WPLA()->logger->info('building Product Removal feed...');			
-				WPLA()->logger->start('buildProductRemovalFeedData');
-				$csv_object = WPLA_FeedDataBuilder::buildProductRemovalFeedData( $items, $account->id );
-			   	WPLA()->logger->logTime('buildProductRemovalFeedData');
-   				$feed_type = 'POST_FLAT_FILE_INVLOADER_DATA';
+				// delete products feed - now using JSON feeds for SP-API compliance
+				WPLA()->logger->info('building JSON Delete feed (replaces old CSV Product Removal feed)...');			
+				WPLA()->logger->start('buildJsonDeleteFeed');
+				// Use the new unified JSON delete system instead of CSV
+				$result = self::buildJsonFeed( $items, $account, \WPLab\Amazon\Helper\JsonFeedDataBuilder::OPERATION_DELETE, null, [], 'PRODUCT_REMOVAL' );
+				
+				// Create a dummy CSV object for compatibility with existing code flow
+				$csv_object = new stdClass();
+				$csv_object->data = '';
+				$csv_object->template_type = 'JSON_DELETE';
+				$csv_object->line_count = is_array($items) ? count($items) : 0;
+			   	WPLA()->logger->logTime('buildJsonDeleteFeed');
+   				$feed_type = 'JSON_LISTINGS_FEED';
 				break;
 
 
@@ -2241,17 +2251,25 @@ class WPLA_AmazonFeed {
                                     ( FeedType = '$query' ) OR
                                     ( results LIKE '%$query%' ) OR
                                     ( FeedProcessingStatus LIKE '%$query%' ) OR
-                                    ( success LIKE '%$query%' ) 
+                                    ( success LIKE '%$query%' ) OR
+                                    ( data LIKE '%$query%' )
                                 )
                             /* AND NOT amazon_id = 0 */
                             ";
         }
 
         // get items
-		$items = $wpdb->get_results("
-			SELECT id, FeedSubmissionId, FeedType, product_type, template_name, FeedProcessingStatus, 
+        $select_columns = "id, FeedSubmissionId, FeedType, product_type, template_name, FeedProcessingStatus, 
 	        results, success, status, SubmittedDate, CompletedProcessingDate, 
-	        date_created, account_id, line_count, feedOptions, MarketplaceIdList
+	        date_created, account_id, line_count, feedOptions, MarketplaceIdList";
+        
+        // Include data column only when searching (for ASIN/SKU search functionality)
+        if ( isset( $_REQUEST['s'] ) && !empty( $_REQUEST['s'] ) ) {
+            $select_columns .= ", data";
+        }
+        
+		$items = $wpdb->get_results("
+			SELECT $select_columns
 			FROM $table
             $where_sql
 			ORDER BY $orderby $order

@@ -80,12 +80,13 @@ class WPLA_ReportProcessor {
 
             $meta = array(
 		        array(
-			        'tracking_id'   => '',
-			        'custom_tracking_provider' => '',
-			        'tracking_provider' => $carrier,
-			        'tracking_number'   => $tracking_number,
-			        'tracking_product_code' => '',
-			        'date_shipped' => strtotime( $shipment_date )
+			        'tracking_id'               => '',
+			        'custom_tracking_provider'  => '',
+			        'custom_tracking_link'      => '',
+			        'tracking_provider'         => $carrier,
+			        'tracking_number'           => $tracking_number,
+			        'tracking_product_code'     => '',
+			        'date_shipped'              => strtotime( $shipment_date )
 		        )
 	        );
 	        $_order->update_meta_data( '_wc_shipment_tracking_items', $meta );
