@@ -769,9 +769,21 @@ class WPLA_FeedDataBuilder {
 			/* Listing Loader feed columns */
 			case 'product-id':
 				$value = get_post_meta( $post_id, '_wpla_asin', true );
+				
+				// Fallback to listing ASIN if _wpla_asin is empty
+				if ( empty( $value ) && ! empty( $item['asin'] ) ) {
+					$value = $item['asin'];
+				}
 				break;
 			case 'product-id-type':
-				if ( $matched_asin = get_post_meta( $post_id, '_wpla_asin', true ) ) {
+				$matched_asin = get_post_meta( $post_id, '_wpla_asin', true );
+				
+				// Check fallback ASIN from listing if _wpla_asin is empty
+				if ( empty( $matched_asin ) && ! empty( $item['asin'] ) ) {
+					$matched_asin = $item['asin'];
+				}
+				
+				if ( $matched_asin ) {
 					$value = 'ASIN';
 				} elseif ( $custom_id_type = get_post_meta( $post_id, '_amazon_id_type', true ) ) {
 					$value = $custom_id_type;
@@ -1469,7 +1481,7 @@ class WPLA_FeedDataBuilder {
 
 			case '[product_weight]':
 				$value = wpla_get_product_meta( $post_id, 'weight' );
-				$value = $value ? number_format( floatval($value) ,2, null, '' ) : $value;
+				$value = $value ? number_format( floatval($value) ,2, null, '' ) : '';
 				break;
 
 			case '[product_length]':

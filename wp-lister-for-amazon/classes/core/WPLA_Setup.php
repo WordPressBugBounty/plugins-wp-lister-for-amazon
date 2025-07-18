@@ -62,6 +62,9 @@ class WPLA_Setup extends WPLA_Core {
 		// check for outdated accounts
 		self::checkForAccountsWithoutAuthToken( $page );
 
+		// check if profile converter map file exists
+		$this->checkProfileConverterMapFile( $page );
+
 	} // checkSetup()
 
 
@@ -757,6 +760,26 @@ class WPLA_Setup extends WPLA_Core {
 		}
 
 		return false;
+	}
+
+	// check if profile converter map file exists
+	public function checkProfileConverterMapFile( $page = false ) {
+		
+		// Only show on relevant admin pages
+		if ( ! in_array( $page, ['tools', 'profiles', 'settings'] ) ) return;
+		
+		// Check if the mapping file exists
+		$converter = new \WPLab\Amazon\Helper\ProfileProductTypeConverter();
+		if ( ! $converter->mapFileExists() ) {
+			$tools_url = admin_url( 'admin.php?page=wpla-tools&tab=developer' );
+			wpla_show_message(
+				'<b>Profile Converter Map File Missing</b><br><br>' .
+				'The mapping file required for converting old profiles to new Product Types is missing. ' .
+				'This may cause all attributes to appear as unmapped during profile conversion.<br><br>' .
+				'<a href="' . $tools_url . '" class="button">Download Map File in Tools</a>',
+				'warn'
+			);
+		}
 	}
 
 

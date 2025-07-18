@@ -102,6 +102,12 @@ class WPLA_ProfilesPage extends WPLA_Page {
 			$this->deleteProfiles( wpla_clean($_REQUEST['amazon_profile']) );
 		}
 
+		// handle reconvert profile fields action
+		if ( $this->requestAction() == 'wpla_reconvert_profile_fields' ) {
+		    check_admin_referer( 'bulk-profiles' );
+			$this->reconvertProfileFields( wpla_clean($_REQUEST['amazon_profile']) );
+		}
+
 	}
 
 	public function displayProfilesPage() {
@@ -401,6 +407,58 @@ class WPLA_ProfilesPage extends WPLA_Page {
 
 		if ( $count )
 			$this->showMessage( sprintf( __( '%s profile(s) were removed.', 'wp-lister-for-amazon' ), $count ) );
+	}
+
+	/**
+	 * Re-convert profile fields using stored old field data and updated mappings
+	 *
+	 * @param array|int $profiles Profile ID(s) to reconvert
+	 */
+	public function reconvertProfileFields( $profiles ) {
+		if ( ! is_array($profiles) ) $profiles = array( $profiles );
+		$count = 0;
+		$skipped = 0;
+
+		foreach ($profiles as $id) {
+			if ( ! $id ) continue;
+			
+			$profile = new WPLA_AmazonProfile( $id );
+			if ( ! $profile->profile_id ) {
+				$skipped++;
+				continue;
+			}
+
+			// Check if profile has old fields data
+			$fields = maybe_unserialize( $profile->fields );
+			if ( empty( $fields['__old_fields'] ) ) {
+				$skipped++;
+				continue;
+			}
+
+			// Reconstruct original fields from old data
+			$old_fields = $fields['__old_fields'];
+			
+			// Create converter instance
+			$converter = new \WPLab\Amazon\Helper\ProfileProductTypeConverter( $profile, $profile->product_type );
+			
+			// Re-run conversion with updated mappings
+			$converted_fields = $converter->convertFromArray( $old_fields );
+			
+			// Update profile with new converted fields
+			$profile->fields = maybe_serialize( $converted_fields );
+			$profile->update();
+			
+			$count++;
+		}
+
+		// Show results
+		if ( $count ) {
+			$this->showMessage( sprintf( __( '%s profile(s) were re-converted with updated field mappings.', 'wp-lister-for-amazon' ), $count ) );
+		}
+		
+		if ( $skipped ) {
+			$this->showMessage( sprintf( __( '%s profile(s) were skipped (no conversion data available or not converted profiles).', 'wp-lister-for-amazon' ), $skipped ), 'warn' );
+		}
 	}
 	
 	public function onWpPrintStyles() {

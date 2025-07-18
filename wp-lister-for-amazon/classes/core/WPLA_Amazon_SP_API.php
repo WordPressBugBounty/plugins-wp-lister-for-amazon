@@ -868,6 +868,13 @@ class WPLA_Amazon_SP_API {
                 WPLA()->logger->debug("Rate limited on getListingsItem for SKU: $sku");
             }
             
+            // Handle 404 Not Found errors - extract detailed error information
+            if ($ex->getCode() == 404 && $ex instanceof \WPLab\Amazon\SellingPartnerApi\ApiException) {
+                $error->IsNotFound = true;
+				$error->ErrorMessage = "SKU not found on Amazon: $sku";
+                WPLA()->logger->debug("SKU not found on Amazon: $sku");
+            }
+            
             return $error;
         }
     }

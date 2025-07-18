@@ -26,23 +26,12 @@ class ProfileConverterPage extends \WPLA_Page {
 
 		$action = $_POST['action'] ?? '';
 
-		/* @todo perhaps we need to run this in the background */
 		if ( $action == 'wpla_convert_profiles' ) {
 			check_admin_referer( 'wpla_convert_profiles' );
 
-			/**
-			 * 1. Fetch old profiles and group them by their template type. This needs to be sorted by Marketplace as well.
-			 * 2. List all the individual template types along with a dropdown list of recommended Product Type substitute
-			 * 3. There needs to be an option to keep a profile untouched to give them time to run tests
-			 * 4. Upon form submission, duplicate all affected profiles, affixing a suffix to the new profiles
-			 * 5. Process each profile, converting all profile fields from their feed template attributes to their Product Type counterpart
-			 * 6. Provide a button that the user can click on to begin assigning listings over to the new profile/s. This can be individual or bulk action.
-			 */
-
-			$converter      = new \WPLab\Amazon\Helper\ProfileProductTypeConverter();
-
-			$tpl_actions = $_POST['tpl_actions'] ?? [];
-			$new_product_types = $_POST['tpl_replacements'] ?? [];
+			$converter          = new \WPLab\Amazon\Helper\ProfileProductTypeConverter();
+			$tpl_actions        = $_POST['tpl_actions'] ?? [];
+			$new_product_types  = $_POST['tpl_replacements'] ?? [];
 
 			$converted_profiles = get_option( 'wpla_json_converted_profiles', [] );
 

@@ -178,31 +178,31 @@
 					</div>
 				</div> <!-- postbox -->
 
-
-				<?php if ( get_option('wpla_log_level') > 1 ): ?>
-				<div class="postbox" id="DebuggingToolBox">
-					<h3 class="hndle"><span><?php echo __( 'Debug Log', 'wp-lister-for-amazon' ); ?></span></h3>
+				<div class="postbox" id="ProfileConverterMapBox">
+					<h3 class="hndle"><span><?php echo __( 'Profile Converter Map File', 'wp-lister-for-amazon' ); ?></span></h3>
 					<div class="inside">
-
-						<form method="post" action="admin-ajax.php" target="_blank">
-								<?php wp_nonce_field( 'wpla_tools_page' ); ?>
-								<input type="hidden" name="action" value="wpla_tail_log" />
-                                <?php wp_nonce_field( 'wpla_tail_log' ); ?>
-								<input type="submit" value="<?php echo __( 'View debug log', 'wp-lister-for-amazon' ); ?>" name="submit" class="button button-primary">
-								<p><?php echo __( 'Open logfile viewer in new tab', 'wp-lister-for-amazon' ); ?></p>
-						</form>
-						<br style="clear:both;"/>
 
 						<form method="post" action="<?php echo $wpl_form_action; ?>">
 								<?php wp_nonce_field( 'wpla_tools_page' ); ?>
-								<input type="hidden" name="action" value="wpla_clear_log" />
-								<input type="submit" value="<?php echo __( 'Clear debug log', 'wp-lister-for-amazon' ); ?>" name="submit" class="button button-primary">
+								<input type="hidden" name="action" value="wpla_download_profile_converter_map" />
+								<input type="submit" value="<?php echo __( 'Download/Update Map File', 'wp-lister-for-amazon' ); ?>" class="button button-primary">
+								<p>
+									<?php echo __( 'Downloads the latest field mapping file required for converting old feed template profiles to new Product Type profiles. This will overwrite any existing map file.', 'wp-lister-for-amazon' ); ?>
+								</p>
+								<p>
+									<?php 
+									$converter = new \WPLab\Amazon\Helper\ProfileProductTypeConverter();
+									if ( $converter->mapFileExists() ) {
+										echo '<span style="color: green;">✓ Map file exists</span>';
+									} else {
+										echo '<span style="color: red;">✗ Map file missing</span>';
+									}
+									?>
+								</p>
 						</form>
-						<!-- <br style="clear:both;"/> -->
 
 					</div>
 				</div> <!-- postbox -->
-				<?php endif; ?>
 
 				<div class="postbox dev_box" id="DeveloperToolBox" style="display:none;">
 					<h3 class="hndle"><span><?php echo __( 'Debug', 'wp-lister-for-amazon' ); ?></span></h3>

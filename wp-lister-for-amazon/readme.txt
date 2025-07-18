@@ -54,6 +54,30 @@ Yes, there are. Please check out our growing knowledgebase at <https://www.wplab
 
 == Changelog ==
 
+= 2.8.3 - 2025-07-18 =
+New: Added Re-convert action for profiles to re-run the conversion process and fix any missed mappings from previous versions
+New: Lock All and Unlock All added to the Tools page
+New: Added a check and a download tool for the CSV Map File that is required to convert feed templates to product types
+Fix: SKU Not Found handler for the Check for Listing Errors action
+Fix: getListingProductType must prioritize the product-level Product Type
+Fix: Sale Price dates not getting included in the feeds
+Fix: Variation attributes not getting fetched correctly
+Fix: $parent_var_columns whitelist for variables not getting executed
+Fix: Implemented caching to prevent memory errors during the mapping of Product Types properties
+Fix: DELETE feeds changing listing status back to SUBMITTED
+Fix: Shortcodes not getting replaced
+Fix: Handling of nested composites in items (e.g. Color Map)
+Fix: Matched listings not getting the condition value causing them to fail
+Fix: Country of Origin not mapping correctly
+Fix: Converted profiles still showing on the list of available to convert
+Fix: New Merchant Shipping Groups values not getting found
+Fix: Map the old Merchant Shipping Group value to the new dropdown ID
+Fix: Fallback to using the ASIN from the listings table if the meta _wpla_asin is empty
+Fix: _wpla_asin sync when inserting and matching listings
+Fix: Encoding issue in the JSON feeds causing values to get cut off
+Tweak: Only fail matched and submitted listings on Listings Check
+Tweak: Unhide variation-related properties
+
 = 2.8.2 - 2025-07-07 =
 New: Replace CSV delete feeds with JSON delete feed
 Fix: Check the result of initAPI to prevent fatal errors

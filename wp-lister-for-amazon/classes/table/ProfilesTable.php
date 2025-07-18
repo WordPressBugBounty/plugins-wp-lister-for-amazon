@@ -266,7 +266,8 @@ class WPLA_ProfilesTable extends WP_List_Table {
      **************************************************************************/
     function get_bulk_actions() {
         $actions = array(
-            'wpla_delete_profile' => __( 'Delete selected profiles', 'wp-lister-for-amazon' )
+            'wpla_delete_profile' => __( 'Delete selected profiles', 'wp-lister-for-amazon' ),
+            'wpla_reconvert_profile_fields' => __( 'Re-convert Fields', 'wp-lister-for-amazon' )
         );
         return $actions;
     }

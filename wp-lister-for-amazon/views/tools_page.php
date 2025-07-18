@@ -133,6 +133,26 @@
 						</form>
 						<br style="clear:both;"/>
 
+						<!-- lock all listings --> 
+						<form method="post" action="<?php echo $wpl_form_action; ?>">
+								<?php wp_nonce_field( 'wpla_tools_page' ); ?>
+								<input type="hidden" name="action" value="wpla_lock_all_listings" />
+								<input type="submit" value="<?php echo __( 'Lock All Listings', 'wp-lister-for-amazon' ); ?>" name="submit" class="button button-primary">
+								<p><?php echo __( 'Lock all active listings to prevent automatic updates. Only inventory and price changes will be processed.', 'wp-lister-for-amazon' ); ?>
+								</p>
+						</form>
+						<br style="clear:both;"/>
+
+						<!-- unlock all listings --> 
+						<form method="post" action="<?php echo $wpl_form_action; ?>">
+								<?php wp_nonce_field( 'wpla_tools_page' ); ?>
+								<input type="hidden" name="action" value="wpla_unlock_all_listings" />
+								<input type="submit" value="<?php echo __( 'Unlock All Listings', 'wp-lister-for-amazon' ); ?>" name="submit" class="button button-primary">
+								<p><?php echo __( 'Unlock all locked listings to allow full automatic updates and changes.', 'wp-lister-for-amazon' ); ?>
+								</p>
+						</form>
+						<br style="clear:both;"/>
+
 					</div>
 				</div> <!-- postbox -->
 

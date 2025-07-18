@@ -1152,6 +1152,10 @@ class WPLA_ListingsModel extends WPLA_Model {
 			$wpdb->insert( $this->tablename, $data );
 			$this->last_insert_id = $wpdb->insert_id;
 			$this->imported_count++;
+			
+			// Sync ASIN to product meta field
+			update_post_meta( $post_id, '_wpla_asin', trim( $asin ) );
+			
 			$this->lastError = 'Matched listing created for ASIN '.$asin.' (#'.$post_id.')';
 			return $wpdb->insert_id;
 		}
@@ -2101,6 +2105,44 @@ class WPLA_ListingsModel extends WPLA_Model {
 				];
 			}
 			
+			// Handle 404 NOT_FOUND errors - mark as failed since SKU doesn't exist on Amazon
+			if ( isset( $result->IsNotFound ) && $result->IsNotFound ) {
+				$history = [
+					'errors' => [],
+					'warnings' => []
+				];
+				
+				// Add detailed error information if available
+				if ( isset( $result->DetailedErrors ) && is_array( $result->DetailedErrors ) ) {
+					foreach ( $result->DetailedErrors as $errorDetail ) {
+						$history['errors'][] = [
+							'error-code'    => $errorDetail['code'] ?? 'NOT_FOUND',
+							'error-message' => $errorDetail['message'] ?? $result->ErrorMessage,
+							'error-type'    => 'ERROR'
+						];
+					}
+				} else {
+					// Fallback to basic error info
+					$history['errors'][] = [
+						'error-code'    => 'NOT_FOUND',
+						'error-message' => $result->ErrorMessage,
+						'error-type'    => 'ERROR'
+					];
+				}
+				
+				$update_data = [
+					'status' => self::STATUS_FAILED,
+					'history' => serialize( $history )
+				];
+				$this->updateListing( $listing['id'], $update_data );
+				
+				WPLA()->logger->info( sprintf( 'Listing %s (ID: %d) marked as failed - SKU not found on Amazon', $listing['sku'], $listing['id'] ) );
+				return [
+					'success' => false,
+					'message' => sprintf( 'Listing %s marked as failed - SKU not found on Amazon', $listing['sku'] )
+				];
+			}
+			
 			WPLA()->logger->error( sprintf( 'Error checking submitted listing %s (ID: %d): %s', $listing['sku'], $listing['id'], $result->ErrorMessage ) );
 			return [
 				'success' => false,
@@ -2161,6 +2203,9 @@ class WPLA_ListingsModel extends WPLA_Model {
 				$update_data['asin'] = $summary->getAsin();
 				$update_data['status'] = self::STATUS_ONLINE;
 				$this->updateListing( $listing['id'], $update_data );
+				
+				// Sync ASIN back to product meta field
+				update_post_meta( $listing['post_id'], '_wpla_asin', $summary->getAsin() );
 				
 				WPLA()->logger->info( sprintf( 'Listing %s (ID: %d) is now online with ASIN: %s', $listing['sku'], $listing['id'], $summary->getAsin() ) );
 				return [

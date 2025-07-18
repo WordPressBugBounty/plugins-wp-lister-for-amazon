@@ -265,72 +265,73 @@ class AmazonProductTypesModel {
 	public function getDefinitionsProductType( $product_type, $marketplace, $store_locally = false, $account_id = null ) {
 		try {
 
+			if ( !$account_id ) {
+				$local = $this->getProductType( $product_type, $marketplace );
+
+				if ( $local ) {
+					return $local;
+				}
+			}
+
 			$account_id = $account_id ?? \WPLA_AmazonAccount::getAccountWithMarketplace( $marketplace );
 
 			if ( ! $account_id ) {
 				$account_id = get_option( 'wpla_default_account_id' );
 			}
 
-			$local = $this->getProductType( $product_type, $marketplace );
+			// No cached schema found. Download and store
+			$api            = new \WPLA_Amazon_SP_API( $account_id );
+			$resp           = $api->getDefinitionsProductType( $product_type, $marketplace );
 
-			//if ( $local && $local->getVersion() == $remote_version ) {
-			if ( $local  ) {
-				$attribute = $local;
-			} else {
-				// No cached schema found. Download and store
-				$api            = new \WPLA_Amazon_SP_API( $account_id );
-				$resp           = $api->getDefinitionsProductType( $product_type, $marketplace );
-				
-				// Check for SP-API errors
-				if ( \WPLA_Amazon_SP_API::isError( $resp ) ) {
-					\WPLA_Amazon_SP_API::handleApiError( 
-						$resp, 
-						sprintf( 'Product Type Definition Retrieval for "%s"', $product_type )
+			// Check for SP-API errors
+			if ( \WPLA_Amazon_SP_API::isError( $resp ) ) {
+				\WPLA_Amazon_SP_API::handleApiError(
+					$resp,
+					sprintf( 'Product Type Definition Retrieval for "%s"', $product_type )
+				);
+				return false;
+			}
+
+			// Validate response structure
+			if ( ! is_object($resp) || ! method_exists($resp, 'getSchema') ) {
+				WPLA()->logger->error( 'Invalid response structure from getDefinitionsProductType for ' . $product_type );
+
+				if ( ! wp_doing_cron() && ! wpla_request_is_rest() ) {
+					wpla_show_message(
+						sprintf(
+							'Received invalid data for product type "%s". Please try again or contact support.',
+							$product_type
+						),
+						'error'
 					);
-					return false;
 				}
-				
-				// Validate response structure
-				if ( ! is_object($resp) || ! method_exists($resp, 'getSchema') ) {
-					WPLA()->logger->error( 'Invalid response structure from getDefinitionsProductType for ' . $product_type );
-					
-					if ( ! wp_doing_cron() && ! wpla_request_is_rest() ) {
-						wpla_show_message( 
-							sprintf( 
-								'Received invalid data for product type "%s". Please try again or contact support.', 
-								$product_type 
-							), 
-							'error' 
-						);
-					}
-					
-					return false;
-				}
-				
-				//$remote_version = $resp->getProductTypeVersion()->getVersion();
 
-				$schema_url = $resp->getSchema()->getLink()->getResource();
-				$schema     = $this->downloadSchemaFromUrl( $schema_url );
+				return false;
+			}
 
-				if ( $schema ) {
-					$schema = $this->filterSchemaProperties( $schema );
+			//$remote_version = $resp->getProductTypeVersion()->getVersion();
 
-					if ( $store_locally ) {
-						$attribute = $this->storeLocalSchemaForProductType( $product_type, $marketplace, $resp, $schema );
-					} else {
-						$attribute = new AmazonProductType();
+			$schema_url = $resp->getSchema()->getLink()->getResource();
+			$schema     = $this->downloadSchemaFromUrl( $schema_url );
 
-						$attribute
-							->setId( 0 )
-							->setProductType( $product_type )
-							->setMarketplaceId( $marketplace )
-							->setVersion( $resp->getProductTypeVersion()->getVersion() )
-							->setPropertyGroups( $resp->getPropertyGroups() )
-							->setSchema( $schema );
-					}
+			if ( $schema ) {
+				$schema = $this->filterSchemaProperties( $schema );
+
+				if ( $store_locally ) {
+					$attribute = $this->storeLocalSchemaForProductType( $product_type, $marketplace, $resp, $schema );
 				} else {
-					return new WP_Error( 'wpla_error', 'Could not download schema. Please try again later.' );
+					$attribute = new AmazonProductType();
+
+					$attribute
+						->setId( 0 )
+						->setProductType( $product_type )
+						->setMarketplaceId( $marketplace )
+						->setVersion( $resp->getProductTypeVersion()->getVersion() )
+						->setPropertyGroups( $resp->getPropertyGroups() )
+						->setSchema( $schema );
 				}
+			} else {
+				return new WP_Error( 'wpla_error', 'Could not download schema. Please try again later.' );
 			}
 
 

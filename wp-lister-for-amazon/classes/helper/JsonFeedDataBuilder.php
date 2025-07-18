@@ -533,25 +533,25 @@ class JsonFeedDataBuilder extends \WPLA_FeedDataBuilder {
 				if ( $date ) $value = date( 'Y-m-d', $date );
 
 				$has_sale_price = $this->withActiveSalePrice( $child_id, $parent_id, $listing, $profile );
+				$sale_price = $this->getSalePriceValue( $child_id, $parent_id, $listing, $profile );
 
+				// Use profile value if set
 				if ( ! $value && $has_sale_price ) {
-					// check for profile shortcodes/values before using filler dates
-					if ( ! empty( $profile_fields[$property] ) ) {
+					if (! empty( $profile_fields[$property] ) ) {
 						$value = $profile_fields[$property];
 					}
 				}
 
-				// if sale price exists but no start date, fill in 2011-01-01
-				if ( ! $value && $has_sale_price ) $value = '2011-01-01';
-
-				// fall back to default past date if standard price is set
-				$standard_price = $this->getRegularPriceValue( $child_id, $parent_id, $listing, $profile );
-				if ( ! $value && $standard_price ) $value = '2000-01-01';  // default past date
-
 				// if sale price is intentionally left blank by [---] shortcode, leave sale date blank as well
-				$sale_price = $this->getSalePriceValue( $child_id, $parent_id, $listing, $profile );
-
-				if ( ! $sale_price ) $value = '';
+				if ( ! $sale_price ) {
+					$value = '';
+				} else {
+					// We have a discounted price, so we need a schedule
+					if ( ! $value ) {
+						// Use consistent start date for both active sales and clearing previous sales
+						$value = '2011-01-01';
+					}
+				}
 
 				break;
 
@@ -560,25 +560,28 @@ class JsonFeedDataBuilder extends \WPLA_FeedDataBuilder {
 				if ( $date ) $value = date( 'Y-m-d', $date );
 
 				$has_sale_price = $this->withActiveSalePrice( $child_id, $parent_id, $listing, $profile );
+				$sale_price = $this->getSalePriceValue( $child_id, $parent_id, $listing, $profile );
 
+				// Use profile value if set
 				if ( ! $value && $has_sale_price ) {
-					// check for profile shortcodes/values before using filler dates
-					if ( ! empty( $profile_fields[$property] ) ) {
+					if (! empty( $profile_fields[$property] ) ) {
 						$value = $profile_fields[$property];
 					}
 				}
 
-				// if sale price exists but no end date, fill in 2029-12-31
-				if ( ! $value && $has_sale_price ) $value = '2029-12-31';
-
-				// fall back to default past date if standard price is set
-				$standard_price = $this->getRegularPriceValue( $child_id, $parent_id, $listing, $profile );
-				if ( ! $value && $standard_price ) $value = '2000-01-02';  // default past date
-
 				// if sale price is intentionally left blank by [---] shortcode, leave sale date blank as well
-				$sale_price = $this->getSalePriceValue( $child_id, $parent_id, $listing, $profile );
-
-				if ( ! $sale_price ) $value = '';
+				if ( ! $sale_price ) {
+					$value = '';
+				} else {
+					// We have a discounted price, so we need a schedule
+					if ( $has_sale_price ) {
+						// Active sale: if no end date, use future date
+						if ( ! $value ) $value = '2029-12-31';
+					} else {
+						// No active sale (clearing previous sales): use past date to indicate promotion ended
+						if ( ! $value ) $value = '2011-01-01';
+					}
+				}
 
 				break;
 
@@ -692,7 +695,7 @@ class JsonFeedDataBuilder extends \WPLA_FeedDataBuilder {
 				$key = $this->getProductMetaKeyFromProperty( $property );
 
 				if ( $key ) {
-					$value = get_post_meta( $product_id, '_amazon_'. $key, true );
+					$value = get_post_meta( $parent_id, '_amazon_'. $key, true );
 				}
 
 
@@ -852,6 +855,11 @@ class JsonFeedDataBuilder extends \WPLA_FeedDataBuilder {
 
 			case 'merchant_suggested_asin[0][value]':
 				$value = get_post_meta( $child_id, '_wpla_asin', true );
+				
+				// Fallback to listing ASIN if _wpla_asin is empty
+				if ( empty( $value ) && ! empty( $listing['asin'] ) ) {
+					$value = $listing['asin'];
+				}
 				break;
 
 			case 'condition_type[0][value]':
@@ -870,8 +878,13 @@ class JsonFeedDataBuilder extends \WPLA_FeedDataBuilder {
 					}
 				}
 
+				// New is not a valid value anymore
+				if ( $value === 'New' ) {
+					$value = 'new_new';
+				}
+
 				if ( ! $value && ! isset( $profile_fields[$property] ) ) {
-					$value = 'New';	// avoid an empty value for Offer feeds without profile
+					$value = 'new_new';	// avoid an empty value for Offer feeds without profile
 				}
 				break;
 
@@ -933,16 +946,26 @@ class JsonFeedDataBuilder extends \WPLA_FeedDataBuilder {
 
 					switch ( strtolower( $value ) ) {
 						case 'colour':
-							$value = 'Color';
+							$value = 'COLOR';
 							break;
 
 						case 'colorsize':
 						case 'coloursize':
-							$value = 'SizeColor';
+							$value = 'COLOR/SIZE';
+							break;
+
+						case 'colour/size':
+						case 'color/size':
+							$value = 'COLOR/SIZE';
+							break;
+
+						case 'size/colour':
+						case 'size/color':
+							$value = 'SIZE/COLOR';
 							break;
 
 						case 'materialcolor':
-							$value = 'Color-Material';
+							$value = 'COLOR/MATERIAL';
 							break;
 					}
 
@@ -968,7 +991,6 @@ class JsonFeedDataBuilder extends \WPLA_FeedDataBuilder {
 				break;
 
 			case 'color[0][standardized_values]':
-			case 'color[0][value]':
 				if ( $product_type == 'variation' || $product_type == 'product-part-variation' ) {
 					$color_name = WPLA()->memcache->getColumnValue( $product_sku, 'color_name' );
 
@@ -1073,23 +1095,11 @@ class JsonFeedDataBuilder extends \WPLA_FeedDataBuilder {
 			return '';
 		}
 
-		// process profile fields - if not empty
-		// Checking only against an empty string because using empty() will return TRUE for 0 values, and we need to be able to submit 0 to Amazon
-		if ( !isset( $profile_fields[ $property ] ) || $profile_fields[ $property ] == '' ) {
-			return $value;
+		// Process shortcodes in product-level values before checking profile fields
+		// This ensures shortcodes set at product level (Edit Product → Amazon tab) are processed
+		if ( !empty($value) && is_string($value) && strpos($value, '[') !== false ) {
+			$value = $this->replaceShortcodes( $value, $property, $listing, $child_id, $profile );
 		}
-
-		// empty shortcode overrides default value
-		if ( '[---]' === $profile_fields[$property] )
-			return '';
-
-		// use profile value as it is - if $value is still empty (ie. there is no product level value for this column)
-		if ( empty($value) && $value !== 0 ) {
-			$value = $profile_fields[$property];
-		}
-
-		$value = $this->replaceShortcodes( $value, $property, $listing, $parent_id, $profile );
-		$value = $this->handleSizeAttributes( $value, $property, $listing, $profile );
 
 		// parent variations should only have certain columns
 		// these three seem to work on Amazon CA / Automotive: item_sku, parent_child, variation_theme
@@ -1164,10 +1174,35 @@ class JsonFeedDataBuilder extends \WPLA_FeedDataBuilder {
 			'country_of_origin[0][value]', // added for 52180
 			'age_range_description[0][value]', // added for 52839
 			'fabric_type[0][value]', // added for 52839
+			'supplier_declared_dg_hz_regulation[0][value]',
+
 		), $property, $listing, $profile );
 		if ( ($product_type == 'variable' || $product_type == 'variable-product-part') && ! in_array( $property, $parent_var_columns ) ) {
 			$value = '';
 		}
+
+		// process profile fields - if not empty
+		// Checking only against an empty string because using empty() will return TRUE for 0 values, and we need to be able to submit 0 to Amazon
+		if ( !isset( $profile_fields[ $property ] ) || $profile_fields[ $property ] == '' ) {
+			return $value;
+		}
+
+		// empty shortcode overrides default value
+		if ( '[---]' === $profile_fields[$property] )
+			return '';
+
+		// use profile value as it is - if $value is still empty (ie. there is no product level value for this column)
+		$used_profile_value = false;
+		if ( empty($value) && $value !== 0 ) {
+			$value = $profile_fields[$property];
+			$used_profile_value = true;
+		}
+
+		// Only process shortcodes if we used a profile value (product-level shortcodes already processed above)
+		if ( $used_profile_value ) {
+			$value = $this->replaceShortcodes( $value, $property, $listing, $child_id, $profile );
+		}
+		$value = $this->handleSizeAttributes( $value, $property, $listing, $profile );
 
 		return $value;
 	}
@@ -1362,11 +1397,14 @@ class JsonFeedDataBuilder extends \WPLA_FeedDataBuilder {
 		WPLA()->logger->debug('getProductValues for '.$listing['sku'].' - ID '.$product_id);
 
 		// set correct variation_id for variations
+		$wc_product = wc_get_product( $product_id );
+		$product_type = $wc_product->get_type();
 		$variation_id = $product_id;
-		/*if ( $product_type == 'variation' || $product_type == 'product-part-variation' ) {
+
+		if ( $product_type == 'variation' || $product_type == 'product-part-variation' ) {
 			// set the $product_id to the parent's ID
 			$product_id = \WPLA_ProductWrapper::getVariationParent( $variation_id );
-		}*/
+		}
 
 		// get custom parent product level feed properties - and merge with profile columns
 		$product_level_properties = $this->getProductCustomProperties( $product_id );
@@ -1380,14 +1418,14 @@ class JsonFeedDataBuilder extends \WPLA_FeedDataBuilder {
 	 *
 	 * @return string
 	 */
-	private function getListingProductType( $listing, $profile ) {
-		$product_type   = $profile->product_type;
+	public function getListingProductType( $listing, $profile ) {
+		$product_id = $listing['parent_id'] ?: $listing['post_id'];
 
-		if ( !$profile->id ) {
-			$product_id = $listing['parent_id'] ?: $listing['post_id'];
+		// load the product type from the product
+		$product_type = get_post_meta( $product_id, '_wpla_custom_product_type', true );
 
-			// load the product type from the product
-			$product_type = get_post_meta( $product_id, '_wpla_custom_product_type', true );
+		if ( !$product_type && $profile->id ) {
+			$product_type   = $profile->product_type;
 		}
 
 		// If there's still no product type at this point, use the generic PRODUCT product type and
@@ -1555,6 +1593,8 @@ class JsonFeedDataBuilder extends \WPLA_FeedDataBuilder {
 	private function replaceShortcodes( $value, $property, $listing, $product_id, $profile ) {
 		// use profile value as it is - if $value is still empty (ie. there is no product level value for this column)
 		if ( $value === null || $value === '' ) {
+			//$profile_fields  = $profile ? maybe_unserialize( $profile->fields )  : array();
+			$profile_fields = !empty($profile->fields) ? maybe_unserialize($profile->fields) : array();
 			$value = $profile_fields[ $property ] ?? '';
 		}
 

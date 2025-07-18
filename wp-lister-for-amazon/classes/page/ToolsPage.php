@@ -114,6 +114,11 @@ class WPLA_ToolsPage extends WPLA_Page {
 					$this->matchAllUnlistedWithASIN();
 				}
 
+				// wpla_download_profile_converter_map
+				if ( $_REQUEST['action'] == 'wpla_download_profile_converter_map') {
+					$this->downloadProfileConverterMap();
+				}
+
 
 				// check_wc_out_of_sync
 				if ( $_REQUEST['action'] == 'check_wc_out_of_sync') {				
@@ -288,6 +293,16 @@ class WPLA_ToolsPage extends WPLA_Page {
 				// wpla_repair_crashed_tables
 				if ( $_REQUEST['action'] == 'wpla_repair_crashed_tables') {				
 					$this->repairCrashedTables();
+				}
+
+				// wpla_lock_all_listings
+				if ( $_REQUEST['action'] == 'wpla_lock_all_listings') {
+					$this->lockAllListings();
+				}
+
+				// wpla_unlock_all_listings
+				if ( $_REQUEST['action'] == 'wpla_unlock_all_listings') {
+					$this->unlockAllListings();
 				}
 
 	
@@ -786,6 +801,48 @@ class WPLA_ToolsPage extends WPLA_Page {
 
 	} // repairCrashedTables()
 
+	public function lockAllListings() {
+		$this->setBulkLockedStatus( true );
+	}
+
+	public function unlockAllListings() {
+		$this->setBulkLockedStatus( false );
+	}
+
+	private function setBulkLockedStatus( $locked ) {
+		global $wpdb;
+		
+		$locked_value = $locked ? 1 : 0;
+		$current_value = $locked ? 0 : 1;
+		$action = $locked ? 'locked' : 'unlocked';
+		
+		$affected_rows = $wpdb->query( $wpdb->prepare("
+			UPDATE {$wpdb->prefix}amazon_listings 
+			SET locked = %d 
+			WHERE locked = %d 
+			AND status NOT IN ('trash', 'deleted')
+		", $locked_value, $current_value) );
+		
+		if ( $affected_rows === false ) {
+			wpla_show_message( __( 'Database error occurred while updating listings.', 'wp-lister-for-amazon' ), 'error' );
+			return;
+		}
+		
+		if ( $affected_rows === 0 ) {
+			$no_items_message = $locked 
+				? __( 'No unlocked listings found to lock.', 'wp-lister-for-amazon' )
+				: __( 'No locked listings found to unlock.', 'wp-lister-for-amazon' );
+			wpla_show_message( $no_items_message );
+			return;
+		}
+		
+		wpla_show_message( sprintf( 
+			__( '%d listings have been %s successfully.', 'wp-lister-for-amazon' ), 
+			$affected_rows,
+			$action
+		) );
+	}
+
 
 
 
@@ -899,6 +956,21 @@ class WPLA_ToolsPage extends WPLA_Page {
     	// wp_enqueue_style( 'wp-jquery-ui-dialog' );
 	    // wp_enqueue_script ( 'jquery-ui-dialog' ); 
 
+	}
+
+	// download profile converter map file
+	private function downloadProfileConverterMap() {
+		$converter = new \WPLab\Amazon\Helper\ProfileProductTypeConverter();
+		$success = $converter->downloadMapFile();
+		
+		if ( $success ) {
+			wpla_show_message( 'Profile converter mapping file downloaded successfully.', 'info', ['persistent' => true]  );
+		} else {
+			wpla_show_message( 'Failed to download profile converter mapping file. Please check your internet connection.', 'error', ['persistent' => true] );
+		}
+
+		wp_safe_redirect( 'admin.php?page=wpla-tools&tab=developer' );
+		exit;
 	}
 
 

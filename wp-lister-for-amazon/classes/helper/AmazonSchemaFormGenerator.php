@@ -30,9 +30,9 @@ class AmazonSchemaFormGenerator {
 		//'update_delete',
 		//'item_sku',
 		//'quantity',
-		'parentage_level',
-		'child_parent_sku_relationship',
-		'child_parent_sku_relationship_type',
+		//'parentage_level',
+		//'child_parent_sku_relationship',
+		//'child_parent_sku_relationship_type',
 	);
 
 	/**
@@ -566,7 +566,7 @@ class AmazonSchemaFormGenerator {
 		// detect any enum definitions (direct or composite) → treat as dropdown
 		if ( $type === 'string' ) {
 			$enumOptions = $this->extractEnumOptions( $property );
-			if ( $enumOptions !== null ) {
+			if ( ! empty( $enumOptions ) ) {
 				$type = 'select';
 				// stash options into the property for renderSelectbox()
 				$property['_enumOptions'] = $enumOptions;
@@ -607,7 +607,10 @@ class AmazonSchemaFormGenerator {
 
 			case 'array':
 				// Check if it's an array of enums (like features field)
-				if (isset($property['items']['enum'])) {
+				$enumOptions = $this->extractEnumOptions( $property );
+				if ( ! empty( $enumOptions ) ) {
+					// stash options into the property for renderSelectbox()
+					$property['_enumOptions'] = $enumOptions;
 					$html = $this->renderSelectbox($name, $property, $value, true);
 				}
 				break;
@@ -865,28 +868,73 @@ class AmazonSchemaFormGenerator {
 	 * Extracts allowed values from enum, anyOf, oneOf or allOf.
 	 *
 	 * @param array $schema  The property schema.
-	 * @return array|null    [value => label, …] or null if none found.
+	 * @return array    [value => label, …] or empty array if none found.
 	 */
-	protected function extractEnumOptions( array $schema ): ?array {
-		// direct enum
+	protected function extractEnumOptions( array $schema ) {
+		return self::extractEnumOptionsFromSchema( $schema );
+	}
+
+	/**
+	 * Static utility to extract enum options from schema.
+	 * Used by both AmazonSchemaFormGenerator and ProfileProductTypeConverter.
+	 *
+	 * @param array $schema The field schema
+	 * @return array Array of [value => label] or empty array if none found
+	 */
+	public static function extractEnumOptionsFromSchema( array $schema ) {
+		// Direct enum
 		if ( isset( $schema['enum'] ) ) {
 			$labels = $schema['enumNames'] ?? $schema['enum'];
 			return array_combine( $schema['enum'], $labels );
 		}
-		// composites
-		foreach ( ['anyOf','oneOf','allOf'] as $c ) {
-			if ( ! empty( $schema[ $c ] ) && is_array( $schema[ $c ] ) ) {
-				$opts = [];
-				foreach ( $schema[ $c ] as $entry ) {
+		
+		// Direct items enum (items.enum)
+		if ( isset( $schema['items']['enum'] ) ) {
+			$enum_values = $schema['items']['enum'];
+			$enum_labels = $schema['items']['enumNames'] ?? $enum_values;
+			return array_combine( $enum_values, $enum_labels );
+		}
+		
+		// Nested enum (items.properties.value.enum)
+		if ( isset( $schema['items']['properties']['value']['enum'] ) ) {
+			$enum_values = $schema['items']['properties']['value']['enum'];
+			$enum_labels = $schema['items']['properties']['value']['enumNames'] ?? $enum_values;
+			return array_combine( $enum_values, $enum_labels );
+		}
+		
+		// Composites (anyOf, oneOf, allOf)
+		foreach ( ['anyOf', 'oneOf', 'allOf'] as $composite ) {
+			if ( ! empty( $schema[ $composite ] ) && is_array( $schema[ $composite ] ) ) {
+				$options = [];
+				foreach ( $schema[ $composite ] as $entry ) {
 					if ( isset( $entry['enum'] ) ) {
 						$labels = $entry['enumNames'] ?? $entry['enum'];
-						$opts += array_combine( $entry['enum'], $labels );
+						$options += array_combine( $entry['enum'], $labels );
 					}
 				}
-				return $opts ?: null;
+				return $options;
 			}
 		}
-		return null;
+		
+		// Nested composites in items (items.anyOf, items.oneOf, items.allOf)
+		if ( isset( $schema['items'] ) && is_array( $schema['items'] ) ) {
+			foreach ( ['anyOf', 'oneOf', 'allOf'] as $composite ) {
+				if ( ! empty( $schema['items'][ $composite ] ) && is_array( $schema['items'][ $composite ] ) ) {
+					$options = [];
+					foreach ( $schema['items'][ $composite ] as $entry ) {
+						if ( isset( $entry['enum'] ) ) {
+							$labels = $entry['enumNames'] ?? $entry['enum'];
+							$options += array_combine( $entry['enum'], $labels );
+						}
+					}
+					if ( ! empty( $options ) ) {
+						return $options;
+					}
+				}
+			}
+		}
+		
+		return [];
 	}
 
 

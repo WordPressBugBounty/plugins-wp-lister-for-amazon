@@ -3,6 +3,7 @@
 namespace WPLab\Amazon\Helper;
 
 use WPLab\Amazon\Core\AmazonProductType;
+use WPLab\Amazon\Models\AmazonProductTypesModel;
 use WPLab\Amazon\SellingPartnerApi\Model\ProductTypeDefinitionsV20200901\ProductType;
 
 /**
@@ -18,6 +19,12 @@ class ProfileProductTypeConverter {
 	private \WPLA_AmazonProfile $profile;
 
 	private $product_type;
+	
+	/**
+	 * Static cache for the mapping array to prevent multiple loads during the same request
+	 * @var array|null
+	 */
+	private static $map_cache = null;
 
 	/**
 	 * Initialize the converter with optional profile and product type
@@ -143,9 +150,17 @@ class ProfileProductTypeConverter {
 				$old_fields[ $key ] = $value;
 
 				// Apply unit conversion for unit fields
-				if ( strpos( $key, '_unit_of_measure' ) !== false ) {
-					$value = $this->convertUnit( $value );
+				$unit_keys = [
+					'_unit_of_measure', '_measurement', 'weight', 'dimensions',
+				];
+				foreach ( $unit_keys as $unit_key ) {
+					if ( strpos( $key, $unit_key ) !== false ) {
+						$value = $this->convertUnit( $value );
+					}
 				}
+				
+				// Apply field-specific conversions
+				$value = $this->convertFieldValue( $key, $value );
 
 				$fields[ $new_key ] = $value;
 			} else {
@@ -175,6 +190,41 @@ class ProfileProductTypeConverter {
 		}
 
 		return $this->loadMapFile();
+	}
+
+	/**
+	 * Get a specific field mapping without loading the entire map
+	 * More memory-efficient for single key lookups
+	 *
+	 * @param string $old_field_name The old field name to look up
+	 * @return string|null The new field name or null if not found
+	 */
+	public function getFieldMapping( $old_field_name ) {
+		if ( !$this->mapFileExists() ) {
+			$this->downloadMapFile();
+		}
+
+		// Check static cache first
+		if ( self::$map_cache !== null ) {
+			return self::$map_cache[ $old_field_name ] ?? null;
+		}
+
+		// Check hardcoded mappings first (fast lookup)
+		$hardcoded = $this->getHardcodedMapping( $old_field_name );
+		if ( $hardcoded !== null ) {
+			return $hardcoded;
+		}
+
+		// Check cache file
+		$cache_file = $this->getCacheFilePath();
+		if ( $this->isCacheFileValid( $cache_file ) ) {
+			$cached_data = unserialize( file_get_contents( $cache_file ) );
+			self::$map_cache = $cached_data;
+			return $cached_data[ $old_field_name ] ?? null;
+		}
+
+		// Last resort: search in CSV file directly (avoid full load if possible)
+		return $this->searchInCsvFile( $old_field_name );
 	}
 
 	/**
@@ -357,11 +407,12 @@ class ProfileProductTypeConverter {
 
 	/**
 	 * Download the field mapping CSV file from the remote server
+	 * Invalidates the cache when a new file is downloaded
 	 * 
 	 * @todo Add a routine to check for CSV updates
 	 * @return bool True if download and file move was successful, false otherwise
 	 */
-	private function downloadMapFile() {
+	public function downloadMapFile() {
 		require_once(ABSPATH . 'wp-admin/includes/file.php');
 		\WP_Filesystem();
 		$filename = download_url( $this->remote_file );
@@ -370,7 +421,15 @@ class ProfileProductTypeConverter {
 			return false;
 		}
 
-		return rename( $filename, $this->file_path );
+		$success = rename( $filename, $this->file_path );
+		
+		if ( $success ) {
+			// Invalidate the cache when new file is downloaded
+			$this->clearMapCache();
+			WPLA()->logger->info( 'Product type converter map file downloaded and cache cleared' );
+		}
+
+		return $success;
 	}
 
 	/**
@@ -378,12 +437,35 @@ class ProfileProductTypeConverter {
 	 *
 	 * @return bool True if the file exists, false otherwise
 	 */
-	private function mapFileExists() {
+	public function mapFileExists() {
 		return file_exists( $this->file_path );
 	}
 
 	/**
+	 * Clear the cached mapping data
+	 * 
+	 * @return bool True if cache was cleared successfully
+	 */
+	public function clearMapCache() {
+		// Clear static cache
+		self::$map_cache = null;
+		
+		// Clear file cache
+		$cache_file = $this->getCacheFilePath();
+		if ( file_exists( $cache_file ) ) {
+			$deleted = unlink( $cache_file );
+			if ( $deleted ) {
+				WPLA()->logger->info( 'Product type converter map cache file cleared' );
+			}
+			return $deleted;
+		}
+		
+		return true;
+	}
+
+	/**
 	 * Load and parse the mapping CSV file into an associative array
+	 * Uses file-based caching and static properties to prevent memory issues
 	 * 
 	 * @return array Associative array mapping old field names to new field names
 	 */
@@ -392,22 +474,26 @@ class ProfileProductTypeConverter {
 			return [];
 		}
 
-		//$csv = str_getcsv( file_get_contents( $this->file_path ) );
+		// Check static cache first (request-level caching)
+		if ( self::$map_cache !== null ) {
+			return self::$map_cache;
+		}
 
-		/*$fp  = fopen( $this->file_path, 'r' );
+		// Check for serialized cache file
+		$cache_file = $this->getCacheFilePath();
+		if ( $this->isCacheFileValid( $cache_file ) ) {
+			WPLA()->logger->info( 'Using cached product type converter map from file' );
+			$cached_data = unserialize( file_get_contents( $cache_file ) );
+			self::$map_cache = $cached_data;
+			return $cached_data;
+		}
+
+		// Log memory usage before loading
+		$memory_before = memory_get_usage( true );
+		WPLA()->logger->info( 'Loading product type converter map from CSV. Memory before: ' . size_format( $memory_before ) );
+
 		$csv = [];
-		if ( $fp ) {
-			while ( $row = fgetcsv( $fp, '1024' ) ) {
-				$old_key = $row[0];
-				$new_key = $this->convertPathToFieldname( $row[2] );
-				$csv[ $old_key ] = $new_key;
-			}
-
-			fclose( $fp );
-		}*/
-
-		$fp  = fopen( $this->file_path, 'r' );
-		$csv = [];
+		$fp = fopen( $this->file_path, 'r' );
 
 		if ( $fp ) {
 			while ( ! feof( $fp ) ) {
@@ -429,21 +515,165 @@ class ProfileProductTypeConverter {
 			fclose( $fp );
 		}
 
-		// add fields that are not in the map file
-		$csv[ 'fulfillment_latency' ]               = 'fulfillment_availability[0][lead_time_to_ship_max_days]';
-		$csv[ 'standard_price' ]                    = 'purchasable_offer[0][our_price][0][schedule][0][value_with_tax]';
-		$csv[ 'sale_price' ]                        = 'purchasable_offer[0][discounted_price][0][schedule][0][value_with_tax]';
-		$csv[ 'sale_from_date' ]                    = 'purchasable_offer[0][discounted_price][0][schedule][0][start_at]';
-		$csv[ 'sale_end_date' ]                     = 'purchasable_offer[0][discounted_price][0][schedule][0][end_at]';
-		$csv[ 'package_height_unit_of_measure' ]    = 'item_package_dimensions[0][height][unit]';
-		$csv[ 'package_width_unit_of_measure' ]     = 'item_package_dimensions[0][width][unit]';
-		$csv[ 'package_length_unit_of_measure' ]    = 'item_package_dimensions[0][length][unit]';
-		$csv[ 'package_weight_unit_of_measure' ]    = 'item_weight[0][unit]';
+		// Add fields that are not in the map file
+		$csv = $this->addHardcodedMappings( $csv );
 
-		// remove the header
-		array_shift($csv);
+		// Remove the header
+		array_shift( $csv );
 
-		return apply_filters( 'wpla_product_type_converter_map', $csv );
+		// Apply filters
+		$csv = apply_filters( 'wpla_product_type_converter_map', $csv );
+
+		// Cache the result to a file
+		$this->saveCacheFile( $cache_file, $csv );
+
+		// Cache in static property for this request
+		self::$map_cache = $csv;
+
+		// Log memory usage after loading
+		$memory_after = memory_get_usage( true );
+		$memory_used = $memory_after - $memory_before;
+		WPLA()->logger->info( 'Product type converter map loaded. Memory used: ' . size_format( $memory_used ) . ', Total entries: ' . count( $csv ) );
+
+		return $csv;
+	}
+
+	/**
+	 * Get the path to the cache file
+	 * 
+	 * @return string The full path to the cache file
+	 */
+	private function getCacheFilePath() {
+		$upload_dir = wp_upload_dir();
+		$basedir_name = 'wp-lister/';
+		return $upload_dir['basedir'] . '/' . $basedir_name . 'product-types-map.cache';
+	}
+
+	/**
+	 * Check if the cache file is valid based on modification time
+	 * 
+	 * @param string $cache_file The cache file path
+	 * @return bool True if cache is still valid, false otherwise
+	 */
+	private function isCacheFileValid( $cache_file ) {
+		// Always return false when debug mode is enabled (level 7)
+		if ( defined('WPLA_DEBUG') && WPLA_DEBUG >= 7 ) {
+			WPLA()->logger->info( 'Product type converter map cache disabled due to DEBUG mode' );
+			return false;
+		}
+		
+		if ( !file_exists( $cache_file ) ) {
+			return false;
+		}
+
+		// Check if CSV file has been modified since cache was created
+		$csv_mtime = filemtime( $this->file_path );
+		$cache_mtime = filemtime( $cache_file );
+		
+		if ( $csv_mtime > $cache_mtime ) {
+			WPLA()->logger->info( 'Product type converter map cache invalidated due to CSV file modification' );
+			return false;
+		}
+
+		return true;
+	}
+
+	/**
+	 * Save the mapping data to a cache file
+	 * 
+	 * @param string $cache_file The cache file path
+	 * @param array $data The mapping data to cache
+	 * @return bool True if cache was saved successfully
+	 */
+	private function saveCacheFile( $cache_file, $data ) {
+		// Ensure directory exists
+		$cache_dir = dirname( $cache_file );
+		if ( !is_dir( $cache_dir ) ) {
+			wp_mkdir_p( $cache_dir );
+		}
+
+		$serialized_data = serialize( $data );
+		$bytes_written = file_put_contents( $cache_file, $serialized_data );
+		
+		if ( $bytes_written !== false ) {
+			WPLA()->logger->info( 'Product type converter map cached to file. Size: ' . size_format( $bytes_written ) );
+			return true;
+		}
+
+		return false;
+	}
+
+	/**
+	 * Add hardcoded field mappings that are not in the CSV file
+	 * 
+	 * @param array $csv The current CSV mappings
+	 * @return array The CSV mappings with hardcoded mappings added
+	 */
+	private function addHardcodedMappings( $csv ) {
+		$hardcoded = $this->getHardcodedMappings();
+		return array_merge( $csv, $hardcoded );
+	}
+
+	/**
+	 * Get hardcoded field mappings as an array
+	 * 
+	 * @return array Hardcoded field mappings
+	 */
+	private function getHardcodedMappings() {
+		return [
+			'fulfillment_latency'               => 'fulfillment_availability[0][lead_time_to_ship_max_days]',
+			'standard_price'                    => 'purchasable_offer[0][our_price][0][schedule][0][value_with_tax]',
+			'sale_price'                        => 'purchasable_offer[0][discounted_price][0][schedule][0][value_with_tax]',
+			'sale_from_date'                    => 'purchasable_offer[0][discounted_price][0][schedule][0][start_at]',
+			'sale_end_date'                     => 'purchasable_offer[0][discounted_price][0][schedule][0][end_at]',
+			'package_height_unit_of_measure'   => 'item_package_dimensions[0][height][unit]',
+			'package_width_unit_of_measure'    => 'item_package_dimensions[0][width][unit]',
+			'package_length_unit_of_measure'   => 'item_package_dimensions[0][length][unit]',
+			'package_weight_unit_of_measure'   => 'item_package_weight[0][unit]',
+		];
+	}
+
+	/**
+	 * Get a specific hardcoded mapping
+	 * 
+	 * @param string $old_field_name The old field name to look up
+	 * @return string|null The new field name or null if not found
+	 */
+	private function getHardcodedMapping( $old_field_name ) {
+		$hardcoded = $this->getHardcodedMappings();
+		return $hardcoded[ $old_field_name ] ?? null;
+	}
+
+	/**
+	 * Search for a specific field mapping in the CSV file without loading the entire file
+	 * 
+	 * @param string $old_field_name The old field name to search for
+	 * @return string|null The new field name or null if not found
+	 */
+	private function searchInCsvFile( $old_field_name ) {
+		$fp = fopen( $this->file_path, 'r' );
+		if ( !$fp ) {
+			return null;
+		}
+
+		// Skip header line
+		fgets( $fp );
+
+		while ( !feof( $fp ) ) {
+			$line = fgets( $fp );
+			if ( $line === false || trim( $line ) === '' ) {
+				continue;
+			}
+
+			$row = explode( ',', trim( $line ) );
+			if ( count( $row ) >= 3 && $row[0] === $old_field_name ) {
+				fclose( $fp );
+				return $this->convertPathToFieldname( $row[2] );
+			}
+		}
+
+		fclose( $fp );
+		return null;
 	}
 
 	/**
@@ -513,6 +743,327 @@ class ProfileProductTypeConverter {
 
 		return isset( $unit_mapping[ $old_unit ] ) ? $unit_mapping[ $old_unit ] : strtolower( $old_unit );
 	}
+
+	/**
+	 * Convert the Supplier Dangerous Goods values to their new format
+	 *
+	 * @param string $value The display value from old feed template
+	 * @return string The corresponding value for the new system
+	 */
+	private function convertSupplierDeclaredDangerousGoods( $value ) {
+		if ( empty( $value ) ) {
+			return $value;
+		}
+
+		// The new value just needs to be lowercase and the spaces replaced by an underscore
+		return strtolower( str_replace( ' ', '_', $value) );
+	}
+
+	/**
+	 * Convert merchant shipping group display values to IDs using schema-based lookup
+	 * 
+	 * @param string $display_value The display value from old feed template
+	 * @return string The corresponding ID for the new system
+	 */
+	private function convertShippingGroupValue( $display_value ) {
+		if ( empty( $display_value ) ) {
+			return $display_value;
+		}
+		
+		// Get the allowed values from the product type schema
+		$allowed_values = $this->getFieldEnumOptions( 'merchant_shipping_group' );
+		
+		if ( empty( $allowed_values ) ) {
+			// Fallback to original value if no schema options found
+			return $display_value;
+		}
+		
+		// Try exact match against display names
+		foreach ( $allowed_values as $id => $display_name ) {
+			if ( $display_name === $display_value ) {
+				return $id;
+			}
+		}
+		
+		// Try case-insensitive match against display names
+		$display_value_lower = strtolower( $display_value );
+		foreach ( $allowed_values as $id => $display_name ) {
+			if ( strtolower( $display_name ) === $display_value_lower ) {
+				return $id;
+			}
+		}
+		
+		// Try partial matches for common patterns
+		foreach ( $allowed_values as $id => $display_name ) {
+			$display_name_lower = strtolower( $display_name );
+			if ( stripos( $display_name_lower, $display_value_lower ) !== false || 
+				 stripos( $display_value_lower, $display_name_lower ) !== false ) {
+				return $id;
+			}
+		}
+		
+		// If no match found, return original value (might already be an ID)
+		return $display_value;
+	}
+	
+	/**
+	 * Convert field values based on field type requirements
+	 * 
+	 * @param string $key The field key
+	 * @param string $value The original value
+	 * @return string The converted value
+	 */
+	private function convertFieldValue( $key, $value ) {
+		// Merchant Shipping Group conversion
+		if ( strpos( $key, 'merchant_shipping_group' ) !== false ) {
+			return $this->convertShippingGroupValue( $value );
+		}
+		
+		// Country of Origin conversion  
+		if ( strpos( $key, 'country_of_origin' ) !== false ) {
+			return $this->convertCountryOfOriginValue( $value );
+		}
+
+		// Country of Origin conversion
+		if ( strpos( $key, 'supplier_declared_dg_hz_regulation' ) !== false ) {
+			return $this->convertSupplierDeclaredDangerousGoods( $value );
+		}
+		
+		// Future field conversions can be added here
+		// if ( strpos( $key, 'another_field' ) !== false ) {
+		//     return $this->convertAnotherFieldValue( $value );
+		// }
+		
+		return $value; // No conversion needed
+	}
+	
+	/**
+	 * Convert country names to ISO 2-letter codes using schema-based lookup
+	 * 
+	 * @param string $country_value The country name or code from old feed template
+	 * @return string The corresponding ISO code for SP-API
+	 */
+	private function convertCountryOfOriginValue( $country_value ) {
+		if ( empty( $country_value ) ) {
+			return $country_value;
+		}
+		
+		// Get the allowed values from the product type schema
+		$allowed_values = $this->getFieldEnumOptions( 'country_of_origin' );
+		
+		if ( empty( $allowed_values ) ) {
+			// Fallback to hardcoded mapping if no schema options found
+			return $this->getCountryCodeFallback( $country_value );
+		}
+		
+		// Try exact match against display names
+		foreach ( $allowed_values as $code => $country_name ) {
+			if ( $country_name === $country_value ) {
+				return $code;
+			}
+		}
+		
+		// Try case-insensitive match against display names
+		$country_value_lower = strtolower( $country_value );
+		foreach ( $allowed_values as $code => $country_name ) {
+			if ( strtolower( $country_name ) === $country_value_lower ) {
+				return $code;
+			}
+		}
+		
+		// Try partial matches for common patterns
+		foreach ( $allowed_values as $code => $country_name ) {
+			$country_name_lower = strtolower( $country_name );
+			if ( stripos( $country_name_lower, $country_value_lower ) !== false || 
+				 stripos( $country_value_lower, $country_name_lower ) !== false ) {
+				return $code;
+			}
+		}
+		
+		// Fallback to hardcoded mapping
+		$fallback_code = $this->getCountryCodeFallback( $country_value );
+		if ( $fallback_code !== $country_value ) {
+			return $fallback_code;
+		}
+		
+		// If no match found, return original value (might already be a code)
+		return $country_value;
+	}
+	
+	/**
+	 * Fallback country name to ISO code mapping for common cases
+	 * 
+	 * @param string $country_value The country name
+	 * @return string The ISO code or original value if not found
+	 */
+	private function getCountryCodeFallback( $country_value ) {
+		$country_mapping = [
+			// Common country names to ISO codes
+			'United States' => 'US',
+			'United States of America' => 'US',
+			'USA' => 'US',
+			'Canada' => 'CA',
+			'Mexico' => 'MX',
+			'United Kingdom' => 'GB',
+			'Great Britain' => 'GB',
+			'UK' => 'GB',
+			'Germany' => 'DE',
+			'France' => 'FR',
+			'Italy' => 'IT',
+			'Spain' => 'ES',
+			'Japan' => 'JP',
+			'China' => 'CN',
+			'India' => 'IN',
+			'Australia' => 'AU',
+			'Brazil' => 'BR',
+			'Netherlands' => 'NL',
+			'Belgium' => 'BE',
+			'Switzerland' => 'CH',
+			'Austria' => 'AT',
+			'Sweden' => 'SE',
+			'Norway' => 'NO',
+			'Denmark' => 'DK',
+			'Finland' => 'FI',
+			'Poland' => 'PL',
+			'South Korea' => 'KR',
+			'Singapore' => 'SG',
+			'Taiwan' => 'TW',
+			'Hong Kong' => 'HK',
+			'Thailand' => 'TH',
+			'Malaysia' => 'MY',
+			'Indonesia' => 'ID',
+			'Philippines' => 'PH',
+			'Vietnam' => 'VN',
+			'Turkey' => 'TR',
+			'Israel' => 'IL',
+			'South Africa' => 'ZA',
+			'Egypt' => 'EG',
+			'United Arab Emirates' => 'AE',
+			'Saudi Arabia' => 'SA',
+			'Russia' => 'RU',
+			'Czech Republic' => 'CZ',
+			'Hungary' => 'HU',
+			'Romania' => 'RO',
+			'Bulgaria' => 'BG',
+			'Croatia' => 'HR',
+			'Slovakia' => 'SK',
+			'Slovenia' => 'SI',
+			'Estonia' => 'EE',
+			'Latvia' => 'LV',
+			'Lithuania' => 'LT',
+			'Ireland' => 'IE',
+			'Portugal' => 'PT',
+			'Greece' => 'GR',
+			'Cyprus' => 'CY',
+			'Malta' => 'MT',
+			'Luxembourg' => 'LU',
+		];
+		
+		// Try exact match
+		if ( isset( $country_mapping[ $country_value ] ) ) {
+			return $country_mapping[ $country_value ];
+		}
+		
+		// Try case-insensitive match
+		$country_value_lower = strtolower( $country_value );
+		foreach ( $country_mapping as $name => $code ) {
+			if ( strtolower( $name ) === $country_value_lower ) {
+				return $code;
+			}
+		}
+		
+		// Return original value if no match found
+		return $country_value;
+	}
+	
+	/**
+	 * Get enum options for a specific field from the product type schema
+	 * 
+	 * @param string $field_name The field name to look for
+	 * @return array Array of [id => display_name] or empty array if not found
+	 */
+	private function getFieldEnumOptions( $field_name ) {
+		// Get current product type
+		$product_type = $this->product_type ?? $this->getProductTypeFromProfile();
+		
+		if ( empty( $product_type ) ) {
+			return [];
+		}
+		
+		// Get marketplace from profile
+		$marketplace_id = $this->profile->marketplace_id ?? 'ATVPDKIKX0DER'; // Default to US
+		
+		// Load product type schema
+		try {
+			$type_mdl = new AmazonProductTypesModel();
+			$type_obj = $type_mdl->getDefinitionsProductType( $product_type, $marketplace_id, false, $this->profile->account_id );
+
+			$schema = $type_obj->getSchema();
+			/*global $wpdb;
+			$table = $wpdb->prefix . 'amazon_product_types';
+			$row = $wpdb->get_row( $wpdb->prepare(
+				"SELECT schema FROM $table WHERE product_type = %s AND marketplace_id = %s",
+				$product_type,
+				$marketplace_id
+			));
+			
+			if ( ! $row || empty( $row->schema ) ) {
+				return [];
+			}*/
+			
+			$schema = json_decode( $schema, true );
+			if ( ! $schema ) {
+				return [];
+			}
+			
+			// Find the field in the schema properties
+			$field_schema = $this->findFieldInSchema( $schema, $field_name );
+			
+			if ( ! $field_schema ) {
+				return [];
+			}
+			
+			// Extract enum options using shared utility method
+			return AmazonSchemaFormGenerator::extractEnumOptionsFromSchema( $field_schema );
+			
+		} catch ( Exception $e ) {
+			return [];
+		}
+	}
+	
+	/**
+	 * Find a field definition in the schema
+	 * 
+	 * @param array $schema The full schema array
+	 * @param string $field_name The field name to find
+	 * @return array|null The field schema or null if not found
+	 */
+	private function findFieldInSchema( $schema, $field_name ) {
+		// Check direct properties
+		if ( isset( $schema['properties'][ $field_name ] ) ) {
+			return $schema['properties'][ $field_name ];
+		}
+		
+		// Check nested properties recursively
+		if ( isset( $schema['properties'] ) ) {
+			foreach ( $schema['properties'] as $prop_name => $prop_schema ) {
+				if ( strpos( $prop_name, $field_name ) !== false ) {
+					return $prop_schema;
+				}
+				
+				// Check nested properties
+				if ( isset( $prop_schema['properties'] ) ) {
+					$nested_result = $this->findFieldInSchema( $prop_schema, $field_name );
+					if ( $nested_result ) {
+						return $nested_result;
+					}
+				}
+			}
+		}
+		
+		return null;
+	}
+	
 
 	/**
 	 * Handle ASIN conversion special case

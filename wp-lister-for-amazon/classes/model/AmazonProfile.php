@@ -247,7 +247,7 @@ class WPLA_AmazonProfile {
 		foreach ( $all_profiles as $idx => $profile ) {
 			if ( $profile->product_type ) {
 				unset( $all_profiles[ $idx ] );
-			} elseif ( in_array( $profile->profile_id, array_keys($converted_profiles)) ) {
+			} elseif ( in_array( $profile->profile_id, $converted_profiles ) ) {
 				unset( $all_profiles[ $idx ] );
 			}
 		}
@@ -259,20 +259,27 @@ class WPLA_AmazonProfile {
 		global $wpdb;
 
 		$converted_profiles = get_option( 'wpla_json_converted_profiles', [] );
-		$found_profiles = [];
+		$old_profiles_to_hide = [];
 
 		if ( !empty( $converted_profiles ) ) {
-			$placeholders = implode( ',', array_fill( 0, count( $converted_profiles ), '%d' ) );
+			// Get the new profile IDs (values) to check if they still exist
+			$new_profile_ids = array_values( $converted_profiles );
+			$placeholders = implode( ',', array_fill( 0, count( $new_profile_ids ), '%d' ) );
 			$sql = $wpdb->prepare(
 				"SELECT profile_id FROM {$wpdb->prefix}amazon_profiles WHERE profile_id IN ($placeholders)",
-				...$converted_profiles
+				...$new_profile_ids
 			);
-			$found_profiles = $wpdb->get_col(
-				$sql
-			);
+			$existing_new_profiles = $wpdb->get_col( $sql );
+			
+			// Return old profile IDs whose new profiles still exist
+			foreach ( $converted_profiles as $old_id => $new_id ) {
+				if ( in_array( $new_id, $existing_new_profiles ) ) {
+					$old_profiles_to_hide[] = $old_id;
+				}
+			}
 		}
 
-		return $found_profiles;
+		return $old_profiles_to_hide;
 	}
 
 	public static function duplicateProfile($id) {

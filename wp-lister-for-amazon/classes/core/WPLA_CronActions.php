@@ -261,6 +261,9 @@ class WPLA_CronActions {
                     foreach( $result->getItems() as $product ) {
                         // update listing ASIN
                         $listingsModel->updateWhere( array( 'id' => $listing->id ), array( 'asin' => $product->getAsin() ) );
+                        
+                        // Sync ASIN to product meta field
+                        update_post_meta( $listing->post_id, '_wpla_asin', $product->getAsin() );
 
                         WPLA()->logger->info('new ASIN for listing #'.$listing->id . ': '.$product->getAsin() );
                     }

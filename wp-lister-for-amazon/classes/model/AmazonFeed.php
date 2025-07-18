@@ -622,9 +622,18 @@ class WPLA_AmazonFeed {
 								if ( $this->template_name == 'Price & Quantity' ) {
 									$listing_data['pnq_status'] = '2'; // submitted
 								} else {
-									$listing_data['status']  = 'submitted';
+									// Check if this is a DELETE operation
+									$is_delete_operation = isset($row['operationType']) && $row['operationType'] === 'DELETE';
+									
+									if ( $is_delete_operation ) {
+										$listing_data['status']  = 'trashed';  // submitted for deletion
+										WPLA()->logger->info('changing status to trashed for SKU '.$listing_sku);
+									} else {
+										$listing_data['status']  = 'submitted';  // regular submission
+										WPLA()->logger->info('changing status to submitted for SKU '.$listing_sku);
+									}
+									
 									$listing_data['history'] = '';
-									WPLA()->logger->info('changing status to submitted for SKU '.$listing_sku);
 
 									// update date_published - only if not set
 									if ( ! $listing_item->date_published )
@@ -1551,8 +1560,22 @@ class WPLA_AmazonFeed {
 					WPLA()->logger->info('condition result=' . ($profile->product_type ? 'true' : 'false'));
 
 					if ( $profile->product_type ) {
-						// Use JSON feeds now for listing loader feeds
-						self::buildJsonFeed( $items, $account, JsonFeedDataBuilder::OPERATION_PARTIAL_UPDATE, $profile->product_type, null, $profile->product_type );
+						// Group items by their resolved product type to ensure proper feed separation
+						$builder = new JsonFeedDataBuilder();
+						$grouped_by_product_type = array();
+						
+						foreach ( $items as $item ) {
+							$resolved_product_type = $builder->getListingProductType( $item, $profile );
+							if ( !isset( $grouped_by_product_type[$resolved_product_type] ) ) {
+								$grouped_by_product_type[$resolved_product_type] = array();
+							}
+							$grouped_by_product_type[$resolved_product_type][] = $item;
+						}
+						
+						// Build separate feeds for each product type
+						foreach ( $grouped_by_product_type as $resolved_product_type => $grouped_items ) {
+							self::buildJsonFeed( $grouped_items, $account, JsonFeedDataBuilder::OPERATION_PARTIAL_UPDATE, $resolved_product_type, null, $resolved_product_type );
+						}
 						continue;
 					}
 				}

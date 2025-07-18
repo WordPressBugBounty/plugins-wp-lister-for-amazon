@@ -285,8 +285,10 @@ class WPLA_ListingsPage extends WPLA_Page {
 
 		            // Update status based on errors and ASIN availability
 		            if ( !$success ) {
-			            // Has errors - mark as failed
-			            $data['status'] = WPLA_ListingsModel::STATUS_FAILED;
+                        if ( !in_array( $listing['status'], [WPLA_ListingsModel::STATUS_ONLINE, WPLA_ListingsModel::STATUS_CHANGED] ) ) {
+	                        // Has errors - mark as failed
+	                        $data['status'] = WPLA_ListingsModel::STATUS_FAILED;
+                        }
 		            } else {
 			            // No errors - check for ASIN and update status for submitted/matched listings
 			            $found_asin = false;
@@ -304,6 +306,28 @@ class WPLA_ListingsPage extends WPLA_Page {
 		            }
 
 		            $lm->updateListing( $listing['id'], $data );
+	            } else {
+		            // Handle API errors - check for NOT_FOUND errors specifically
+		            if ( isset( $result->IsNotFound ) && $result->IsNotFound ) {
+			            $history = [
+				            'errors' => [
+					            [
+						            'error-code'    => 'NOT_FOUND',
+						            'error-message' => $result->ErrorMessage,
+						            'error-type'    => 'ERROR'
+					            ]
+				            ],
+				            'warnings' => []
+			            ];
+			            
+			            $data = [
+				            'status' => WPLA_ListingsModel::STATUS_FAILED,
+				            'history' => serialize( $history )
+			            ];
+			            
+			            $lm->updateListing( $listing['id'], $data );
+		            }
+		            // For other errors (like rate limiting), we don't update the listing
 	            }
             }
 

@@ -222,6 +222,10 @@
         <div class="container">
 		    <?php
 		    foreach ( $wpl_templates as $tpl_id => $template ):
+                if ( empty( $template->site_id ) ) {
+                    continue;
+                }
+
 			    $count = count( $wpl_old_profiles[ $tpl_id ]?? [] );
 			    $market = new WPLA_AmazonMarket( $template->site_id );
 
@@ -281,7 +285,7 @@
                         <?php
                         if ( isset( $wpl_all_products[ $tpl_id ] ) ) {
                             $count = count($wpl_all_products[ $tpl_id ]);
-	                        printf( '<a href="#" class="toggle-product-link">'. _n('<br>%d product without a profile', 'and<br>%d products without a profile', $count, 'wp-lister-for-amazon' ) .'</a>', $count );
+	                        printf( '<a href="#" class="toggle-product-link">'. _n('<br>%d product without a profile', '<br>%d products without a profile', $count, 'wp-lister-for-amazon' ) .'</a>', $count );
                         }
                         ?>
                     </p>
@@ -306,11 +310,13 @@
 	                        foreach( $wpl_all_products[ $tpl_id ] as $product_id ):
 		                        $i++;
 		                        $wc_product = wc_get_product( $product_id );
+                                if ( $wc_product ):
 		                        ?>
                                 <div class="product">
                                     <a href="post.php?post=<?php echo $wc_product->get_id(); ?>&action=edit" target="_blank"><?php echo $wc_product->get_title(); ?></a>
                                 </div>
 		                        <?php
+                                endif;
 		                        if ( $i >= 10 ) break;
 	                        endforeach;
                         }

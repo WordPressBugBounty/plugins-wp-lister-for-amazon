@@ -3,10 +3,10 @@
 Plugin Name: WP-Lister Lite for Amazon
 Plugin URI: https://www.wplab.com/plugins/wp-lister-for-amazon/
 Description: List your products on Amazon the easy way.
-Version: 2.8.2
+Version: 2.8.3
 Author: WP Lab
 Author URI: https://www.wplab.com/ 
-Max WP Version: 6.7.2
+Max WP Version: 6.8
 WC requires at least: 6.0.0
 WC tested up to: 9.8
 Text Domain: wp-lister-for-amazon
@@ -16,7 +16,7 @@ License: GPL2+
 
 if ( class_exists('WPLA_WPLister') ) die(sprintf( 'WP-Lister for Amazon %s is already installed and activated. Please deactivate any other version before you activate this one.', WPLA_VERSION ));
 
-define('WPLA_VERSION', '2.8.2' );
+define('WPLA_VERSION', '2.8.3' );
 define('WPLA_PATH', realpath( dirname(__FILE__) ) );
 define('WPLA_URL', plugins_url() . '/' . basename(dirname(__FILE__)) . '/' );
 
