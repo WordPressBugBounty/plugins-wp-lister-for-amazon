@@ -44,6 +44,9 @@ if ( ! class_exists('WPLA_StocksLogger') ) :
 
             $new_stock  = $meta_value;
 
+	        $stock_message = sprintf( "Stock updated from %d to %d for product_id: %d (%s via %s)\n", $old_stock, $new_stock, $object_id, $caller, $method );
+	        WPLA()->logger->info( $stock_message );
+
             if ( $old_stock == $new_stock ) {
                 return;
             }
@@ -58,9 +61,6 @@ if ( ! class_exists('WPLA_StocksLogger') ) :
             $data['method']     = $method;
             $data['backtrace']  = get_option('wpla_stock_log_backtrace', 1) ? $this->getFormattedBacktrace() : '';
             $this->insertLogRecord( $data );
-
-            $stock_message = sprintf( "Stock updated from %d to %d for product_id: %d (%s via %s)\n", $old_stock, $new_stock, $object_id, $caller, $method );
-            WPLA()->logger->notice( $stock_message );
         }
 
         /**
@@ -80,6 +80,10 @@ if ( ! class_exists('WPLA_StocksLogger') ) :
 
             $product_id = $product->get_id();
 
+	        // In WC 3.0, product->variation_id is now the product->id
+	        $stock_message = sprintf( "New stock quantity: %d for product_id: %d (%s via %s)\n", $product->get_stock_quantity(), $product_id, $caller, $method );
+	        WPLA()->logger->info( $stock_message );
+
             // built log record
             $data = array();
             $data['sku']        = $product->get_sku();
@@ -89,11 +93,6 @@ if ( ! class_exists('WPLA_StocksLogger') ) :
             $data['method']     = $method;
             $data['backtrace']  = get_option('wpla_stock_log_backtrace', 1) ? $this->getFormattedBacktrace() : '';
             $this->insertLogRecord( $data );
-
-            // In WC 3.0, product->variation_id is now the product->id
-	        $stock_message = sprintf( "New stock quantity: %d for product_id: %d (%s via %s)\n", $product->get_stock_quantity(), $product_id, $caller, $method );
-
-            WPLA()->logger->notice( $stock_message );
         }
 
         /**

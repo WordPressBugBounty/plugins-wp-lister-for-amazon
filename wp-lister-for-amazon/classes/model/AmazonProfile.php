@@ -40,7 +40,19 @@ class WPLA_AmazonProfile {
 			    $this->$key = $value;
 			}
 
-			$this->fields = maybe_unserialize( $this->fields );
+			$this->fields  = maybe_unserialize( $this->fields );
+			$this->details = maybe_unserialize( $this->details );
+
+			// Fix for a previous bug where the details array is double-serialized during cloning
+			if ( !is_array( $this->details ) && !empty( $this->details ) ) {
+				// try unserializing a second time
+				$this->details = maybe_unserialize( $this->details );
+			}
+
+			if ( !is_array( $this->fields ) && !empty( $this->fields ) ) {
+				$this->fields = maybe_unserialize( $this->fields );
+			}
+
 			if ( empty( $this->fields ) )
 				$this->initDefaultFields();
 

@@ -54,6 +54,12 @@ Yes, there are. Please check out our growing knowledgebase at <https://www.wplab
 
 == Changelog ==
 
+= 2.8.3.1 - 2025-07-21 =
+Fix: SP-API validation error when sale price equals regular price in JSON feeds
+Fix: Profile duplication not copying pricing options (price adjustments, percentage modifications)
+Fix: Sale price handling when "Use Sale Price" option is globally disabled
+Fix: Sorting by stock quantity failing for variable product listings
+
 = 2.8.3 - 2025-07-18 =
 New: Added Re-convert action for profiles to re-run the conversion process and fix any missed mappings from previous versions
 New: Lock All and Unlock All added to the Tools page

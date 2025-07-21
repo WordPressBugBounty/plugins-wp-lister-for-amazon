@@ -525,10 +525,50 @@ class JsonFeedDataBuilder extends \WPLA_FeedDataBuilder {
 					$value = $profile_fields[$property];
 				}
 
-				$value = $this->formatPriceDecimal( $value );
+				// SP-API JSON Feeds API is complaining about using the same price for the Sale and Regular prices
+				// If there's no sale price, return empty to omit entire discounted_price section
+				if ( empty($value) ) {
+					$value = '';
+				} else {
+					$value = $this->formatPriceDecimal( $value );
+					
+					// After formatting, check if sale price equals regular price
+					$regular_price = $this->getRegularPriceValue( $child_id, $parent_id, $listing, $profile );
+					$regular_price = $this->formatPriceDecimal( $regular_price );
+					
+					if ( $regular_price && ( floatval($value) >= floatval($regular_price) ) ) {
+						$value = '';
+					}
+				}
 				break;
 
 			case 'purchasable_offer[0][discounted_price][0][schedule][0][start_at]':
+				// Get the final processed sale price (same logic as value_with_tax case)
+				$sale_price = $this->getSalePriceValue( $child_id, $parent_id, $listing, $profile );
+				
+				// Apply profile field if set
+				$sale_price_property = 'purchasable_offer[0][discounted_price][0][schedule][0][value_with_tax]';
+				if ( ! empty( $profile_fields[$sale_price_property] ) ) {
+					$sale_price = $profile_fields[$sale_price_property];
+				}
+				
+				// Format and check against regular price
+				if ( ! empty($sale_price) ) {
+					$sale_price = $this->formatPriceDecimal( $sale_price );
+					$regular_price = $this->getRegularPriceValue( $child_id, $parent_id, $listing, $profile );
+					$regular_price = $this->formatPriceDecimal( $regular_price );
+					
+					if ( $regular_price && ( floatval($sale_price) >= floatval($regular_price) ) ) {
+						$sale_price = '';
+					}
+				}
+				
+				// If no sale price, return empty to omit entire discounted_price section
+				if ( empty($sale_price) ) {
+					$value = '';
+					break;
+				}
+
 				$date = get_post_meta( $product_id, '_sale_price_dates_from', true );
 				if ( $date ) $value = date( 'Y-m-d', $date );
 
@@ -542,20 +582,40 @@ class JsonFeedDataBuilder extends \WPLA_FeedDataBuilder {
 					}
 				}
 
-				// if sale price is intentionally left blank by [---] shortcode, leave sale date blank as well
-				if ( ! $sale_price ) {
-					$value = '';
-				} else {
-					// We have a discounted price, so we need a schedule
-					if ( ! $value ) {
-						// Use consistent start date for both active sales and clearing previous sales
-						$value = '2011-01-01';
-					}
+				// We have a discounted price, so we need a schedule
+				if ( ! $value ) {
+					$value = '2010-12-31';
 				}
 
 				break;
 
 			case 'purchasable_offer[0][discounted_price][0][schedule][0][end_at]':
+				// Get the final processed sale price (same logic as value_with_tax case)
+				$sale_price = $this->getSalePriceValue( $child_id, $parent_id, $listing, $profile );
+				
+				// Apply profile field if set
+				$sale_price_property = 'purchasable_offer[0][discounted_price][0][schedule][0][value_with_tax]';
+				if ( ! empty( $profile_fields[$sale_price_property] ) ) {
+					$sale_price = $profile_fields[$sale_price_property];
+				}
+				
+				// Format and check against regular price
+				if ( ! empty($sale_price) ) {
+					$sale_price = $this->formatPriceDecimal( $sale_price );
+					$regular_price = $this->getRegularPriceValue( $child_id, $parent_id, $listing, $profile );
+					$regular_price = $this->formatPriceDecimal( $regular_price );
+					
+					if ( $regular_price && ( floatval($sale_price) >= floatval($regular_price) ) ) {
+						$sale_price = '';
+					}
+				}
+				
+				// If no sale price, return empty to omit entire discounted_price section
+				if ( empty($sale_price) ) {
+					$value = '';
+					break;
+				}
+
 				$date = get_post_meta( $product_id, '_sale_price_dates_to', true );
 				if ( $date ) $value = date( 'Y-m-d', $date );
 
@@ -569,18 +629,13 @@ class JsonFeedDataBuilder extends \WPLA_FeedDataBuilder {
 					}
 				}
 
-				// if sale price is intentionally left blank by [---] shortcode, leave sale date blank as well
-				if ( ! $sale_price ) {
-					$value = '';
+				// We have a discounted price, so we need a schedule
+				if ( $has_sale_price ) {
+					// Active sale: if no end date, use future date
+					if ( ! $value ) $value = '2029-12-31';
 				} else {
-					// We have a discounted price, so we need a schedule
-					if ( $has_sale_price ) {
-						// Active sale: if no end date, use future date
-						if ( ! $value ) $value = '2029-12-31';
-					} else {
-						// No active sale (clearing previous sales): use past date to indicate promotion ended
-						if ( ! $value ) $value = '2011-01-01';
-					}
+					// No active sale: use past date greater than start date (2010-12-31)
+					if ( ! $value ) $value = '2011-01-01';
 				}
 
 				break;
@@ -1278,18 +1333,28 @@ class JsonFeedDataBuilder extends \WPLA_FeedDataBuilder {
 			$value = '';
 		}
 
-		// if no sale price is set, send regular price with sale end date in the past to remove previously sent sale prices
+		// if sale price equals regular price, there's no discount - return empty to omit discounted_price section
+		if ( $standard_price && $value && ( floatval($value) >= floatval($standard_price) ) ) {
+			$value = '';
+		}
+
+		// if no sale price is set, return empty to omit discounted_price section entirely
+		// This prevents Amazon validation errors with invalid date ranges
 		if ( empty($value) ) {
-			$value = $standard_price;
+			$value = '';
 		}
 
 		// if sale price is disabled, use standard price here
 		if ( get_option( 'wpla_disable_sale_price', 0 ) ) {
-			$value = $standard_price;
+			//$value = $standard_price; # Should return empty if Use Sale Price is disabled
+			$value = '';
 		}
 
-		// Deduct the shipping fee from the min/max prices
-		$value = $this->deductShippingFeesFromMinMax( $value, $listing );
+		if ( $value ) {
+			// Deduct the shipping fee from the min/max prices
+			$value = $this->deductShippingFeesFromMinMax( $value, $listing );
+		}
+
 
 		return $value;
 	}

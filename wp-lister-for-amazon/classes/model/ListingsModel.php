@@ -300,13 +300,38 @@ class WPLA_ListingsModel extends WPLA_Model {
 			$orderby = 'fba_quantity';
 		}
 
+		// handle sort by quantity column for variable products
+		$order_by_clause = "$orderby $order";
+		
+		if ( $orderby == 'quantity' && $fba_status != 'is_fba' ) {
+			// Add JOIN to calculate variation stock totals for variable products
+			$join_sql .= "
+				LEFT JOIN (
+					SELECT 
+						variations.post_parent,
+						COALESCE(SUM(CAST(pm_stock.meta_value AS UNSIGNED)), 0) as variation_total_stock
+					FROM {$wpdb->posts} variations
+					LEFT JOIN {$wpdb->postmeta} pm_stock ON (
+						pm_stock.post_id = variations.ID 
+						AND pm_stock.meta_key = '_stock'
+					)
+					WHERE variations.post_type = 'product_variation'
+						AND variations.post_status = 'publish'
+					GROUP BY variations.post_parent
+				) var_stock ON l.post_id = var_stock.post_parent
+			";
+			
+			// Use simpler ORDER BY with calculated field from JOIN
+			$order_by_clause = "COALESCE(var_stock.variation_total_stock, l.quantity) $order";
+		}
+
         // get items
 		$items = $wpdb->get_results("
 			SELECT DISTINCT l.*
 			FROM $this->tablename l
             $join_sql 
             $where_sql
-			ORDER BY $orderby $order
+			ORDER BY $order_by_clause
             LIMIT $offset, $per_page
 		", ARRAY_A);
 
@@ -319,7 +344,6 @@ class WPLA_ListingsModel extends WPLA_Model {
 				FROM $this->tablename l
 	            $join_sql
 	            $where_sql
-				ORDER BY $orderby $order
 			");
 		}
 

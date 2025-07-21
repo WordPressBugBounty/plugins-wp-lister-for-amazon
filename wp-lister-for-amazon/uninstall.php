@@ -20,11 +20,13 @@ if ( get_option( 'wpla_uninstall', 0 ) == 1 ) {
 	$wpdb->query( "DROP TABLE IF EXISTS " . $wpdb->prefix . "amazon_feed_tpl_data" );
 	$wpdb->query( "DROP TABLE IF EXISTS " . $wpdb->prefix . "amazon_feed_tpl_values" );
 	$wpdb->query( "DROP TABLE IF EXISTS " . $wpdb->prefix . "amazon_feeds" );
+	$wpdb->query( "DROP TABLE IF EXISTS " . $wpdb->prefix . "amazon_fulfillment_feed_items" );
 	$wpdb->query( "DROP TABLE IF EXISTS " . $wpdb->prefix . "amazon_jobs" );
 	$wpdb->query( "DROP TABLE IF EXISTS " . $wpdb->prefix . "amazon_listings" );
 	$wpdb->query( "DROP TABLE IF EXISTS " . $wpdb->prefix . "amazon_log" );
 	$wpdb->query( "DROP TABLE IF EXISTS " . $wpdb->prefix . "amazon_markets" );
 	$wpdb->query( "DROP TABLE IF EXISTS " . $wpdb->prefix . "amazon_orders" );
+	$wpdb->query( "DROP TABLE IF EXISTS " . $wpdb->prefix . "amazon_product_types" );
 	$wpdb->query( "DROP TABLE IF EXISTS " . $wpdb->prefix . "amazon_payment" );
 	$wpdb->query( "DROP TABLE IF EXISTS " . $wpdb->prefix . "amazon_profiles" );
 	$wpdb->query( "DROP TABLE IF EXISTS " . $wpdb->prefix . "amazon_reports" );
