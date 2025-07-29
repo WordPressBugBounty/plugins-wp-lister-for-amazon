@@ -318,7 +318,16 @@ class WPLA_ProductWrapper {
 					$attribute_name = self::getAttributeLabel( $attribute['name'] );
 					$attribute_name = html_entity_decode( $attribute_name, ENT_QUOTES, 'UTF-8' ); // US Shoe Size (Men&#039;s) => US Shoe Size (Men's)
 					if ( ! $use_label_as_key ) $attribute_name = $attribute['name'];
+					
+					// Store first term for backward compatibility, but also store all terms for indexed access
 					$attributes[ $attribute_name ] = $terms[0]->name;
+					
+					// Store all terms in a separate key for indexed access
+					$term_names = array();
+					foreach ( $terms as $term ) {
+						$term_names[] = $term->name;
+					}
+					$attributes[ $attribute_name . '_all_terms' ] = $term_names;
 				}
 
 			} else {
@@ -327,7 +336,15 @@ class WPLA_ProductWrapper {
 				$attribute_name = $attribute['name'];
 				$attribute_name = html_entity_decode( $attribute_name, ENT_QUOTES, 'UTF-8' ); // US Shoe Size (Men&#039;s) => US Shoe Size (Men's)
 				if ( ! $use_label_as_key ) $attribute_name = $attribute['name'];
+				
+				// Store the attribute value as-is for backward compatibility
 				$attributes[ $attribute_name ] = $attribute['value'];
+				
+				// For custom attributes, also store parsed values for indexed access
+				if ( strpos( $attribute['value'], ',' ) !== false ) {
+					$values = array_map('trim', explode(',', $attribute['value']));
+					$attributes[ $attribute_name . '_all_terms' ] = $values;
+				}
 
 			}
 

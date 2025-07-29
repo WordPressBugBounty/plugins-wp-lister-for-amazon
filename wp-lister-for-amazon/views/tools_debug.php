@@ -174,7 +174,9 @@
                             <p><?php echo __( 'Import UPC/EAN from WP-Lister for eBay', 'wp-lister-for-amazon' ); ?></p>
                         </form>
 
-
+                        <?php
+                        do_action( 'wpla_tools_debug' );
+                        ?>
 					</div>
 				</div> <!-- postbox -->
 

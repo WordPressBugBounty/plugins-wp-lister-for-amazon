@@ -68,7 +68,7 @@ class JsonFeedDataBuilder extends \WPLA_FeedDataBuilder {
 			$attributes = $this->getAttributes( $item, $profile, $columns );
 
 			// skip empty attributes
-			if ( $attributes == '[]' ) {
+			if ( empty( $attributes ) ) {
 				continue;
 			}
 
@@ -303,12 +303,16 @@ class JsonFeedDataBuilder extends \WPLA_FeedDataBuilder {
 
 	public function getPriceAndQuantityFields() {
 		return array(
-			'purchasable_offer[0][our_price][0][schedule][0][value_with_tax]' => 'Price',
+			'purchasable_offer[0][our_price][0][schedule][0][value_with_tax]'           => 'Price',
+			'purchasable_offer[0][discounted_price][0][schedule][0][value_with_tax]'    => 'Sale Price',
+			'purchasable_offer[0][discounted_price][0][schedule][0][start_at]'          => 'Sale Start Date',
+			'purchasable_offer[0][discounted_price][0][schedule][0][end_at]'            => 'Sale End Date',
 			'purchasable_offer[0][minimum_seller_allowed_price][0][schedule][0][value_with_tax]' => 'Minimum Price',
 			'purchasable_offer[0][maximum_seller_allowed_price][0][schedule][0][value_with_tax]' => 'Maximum Price',
-			'fulfillment_availability[0][fulfillment_channel_code]' => 'Fulfillment Channel Code',
-			'fulfillment_availability[0][quantity]' => 'Quantity',
-			'fulfillment_availability[0][lead_time_to_ship_max_days]' => 'Leadtime'
+			'fulfillment_availability[0][fulfillment_channel_code]'     => 'Fulfillment Channel Code',
+			'fulfillment_availability[0][quantity]'                     => 'Quantity',
+			'fulfillment_availability[0][lead_time_to_ship_max_days]'   => 'Handling Time',
+			'fulfillment_availability[0][restock_date]'                 => 'Restock Date',
 		);
 	}
 
@@ -335,7 +339,9 @@ class JsonFeedDataBuilder extends \WPLA_FeedDataBuilder {
 
 			$profile = $this->getProfileFromCache( $item['profile_id'] );
 
-			if (! $this->canSubmitListing( $item, $profile ) ) {
+			$submission_check = $this->canSubmitListing( $item, $profile );
+			if ( is_wp_error( $submission_check ) ) {
+				WPLA()->logger->info( 'Skipping listing: ' . $submission_check->get_error_message() );
 				continue;
 			}
 
@@ -357,10 +363,19 @@ class JsonFeedDataBuilder extends \WPLA_FeedDataBuilder {
 			if ( $item_operation == self::OPERATION_DELETE ) {
 				$attributes = [];
 			} else {
+				// For PRODUCT feeds (P&Q and Inventory Loader), skip variable parent products entirely
+				if ( $product_type === 'PRODUCT' ) {
+					$product = wc_get_product( $item['post_id'] );
+					if ( $product && $product->get_type() == 'variable' ) {
+						WPLA()->logger->info( 'Skipping variable parent product in PRODUCT feed: ' . $item['sku'] );
+						continue;
+					}
+				}
+				
 				$attributes = $this->getAttributes( $item, $profile, $feed_attributes );
 
 				// skip empty attributes for non-delete operations
-				if ( $attributes == '[]' ) {
+				if ( empty( $attributes ) ) {
 					WPLA()->logger->info('No attributes found for this item. Skipping');
 					continue;
 				}
@@ -565,8 +580,8 @@ class JsonFeedDataBuilder extends \WPLA_FeedDataBuilder {
 				
 				// If no sale price, return empty to omit entire discounted_price section
 				if ( empty($sale_price) ) {
-					$value = '';
-					break;
+					return '';
+					//break;
 				}
 
 				$date = get_post_meta( $product_id, '_sale_price_dates_from', true );
@@ -612,8 +627,8 @@ class JsonFeedDataBuilder extends \WPLA_FeedDataBuilder {
 				
 				// If no sale price, return empty to omit entire discounted_price section
 				if ( empty($sale_price) ) {
-					$value = '';
-					break;
+					return '';
+					//break;
 				}
 
 				$date = get_post_meta( $product_id, '_sale_price_dates_to', true );
@@ -995,9 +1010,9 @@ class JsonFeedDataBuilder extends \WPLA_FeedDataBuilder {
 				}
 
 				if ( $value ) {
-					$value = str_replace('-', '/', $value);
-
+					// Convert or Map attributes first before replace dashes with slashes
 					$value = self::convertToEnglishAttributeLabel($value);
+					$value = str_replace('-', '/', $value);
 
 					switch ( strtolower( $value ) ) {
 						case 'colour':
@@ -1102,7 +1117,7 @@ class JsonFeedDataBuilder extends \WPLA_FeedDataBuilder {
 
 			case 'batteries_required[0][value]':
 				if ( ! $value && $fba_enabled ) {
-					$value = 'FALSE';	// set default value to false for FBA enabled items
+					$value = false;	// set default value to false for FBA enabled items
 				}
 				// custom product level column overwrites default value
 				if (! empty( $profile_fields[$property] ) ) {
@@ -1142,6 +1157,13 @@ class JsonFeedDataBuilder extends \WPLA_FeedDataBuilder {
 		}
 
 		WPLA()->logger->debug( 'value after switch statement: '. $value );
+
+		// Generic boolean field handling - convert string boolean values to actual booleans for Amazon API
+		if ( $value === 'true' ) {
+			$value = true;
+		} elseif ( $value === 'false' ) {
+			$value = false;
+		}
 
 		$value = $this->handleVariationAttributes( $value, $property, $listing, $product, $profile );
 
@@ -1251,6 +1273,13 @@ class JsonFeedDataBuilder extends \WPLA_FeedDataBuilder {
 		if ( empty($value) && $value !== 0 ) {
 			$value = $profile_fields[$property];
 			$used_profile_value = true;
+		}
+
+		// Apply generic boolean field handling to profile values too
+		if ( $value === 'true' ) {
+			$value = true;
+		} elseif ( $value === 'false' ) {
+			$value = false;
 		}
 
 		// Only process shortcodes if we used a profile value (product-level shortcodes already processed above)
@@ -1624,7 +1653,7 @@ class JsonFeedDataBuilder extends \WPLA_FeedDataBuilder {
 	 * @param array $item
 	 * @param WPLA_AmazonProfile $profile
 	 *
-	 * @return bool
+	 * @return true|\WP_Error Returns true if valid, WP_Error object if invalid
 	 */
 	public function canSubmitListing( $item, $profile ) {
 		WPLA()->logger->info('canSubmitListing() - id: '.$item['post_id']);
@@ -1634,22 +1663,31 @@ class JsonFeedDataBuilder extends \WPLA_FeedDataBuilder {
 		$product         = wc_get_product( $product_id );
 		$profile_details = maybe_unserialize( $profile->details );
 
-		if ( ! $product || !$item['sku'] || !$product->exists() ) {
-			WPLA()->logger->info( $product_id .': Cannot submit a listing without a WC Product or an SKU' );
-			return false;
+		if ( ! $product || !$product->exists() ) {
+			$error_msg = "WooCommerce product #{$product_id} not found or doesn't exist";
+			WPLA()->logger->info( $error_msg );
+			return new \WP_Error( 'wpla_product_not_found', $error_msg );
+		}
+
+		if ( !$item['sku'] ) {
+			$error_msg = "Listing SKU is empty for product #{$product_id}";
+			WPLA()->logger->info( $error_msg );
+			return new \WP_Error( 'WPLA_MISSING_SKU', $error_msg );
 		}
 
 		WPLA()->logger->info('processing item '.$item['sku'].' - ID '.$product_id);
 
 		// Skip listing parent variables if profile variations mode is FLAT #53534
 		if ( is_array($profile_details) && $profile_details['variations_mode'] == 'flat' && $product->is_type( 'variable' ) ) {
-			WPLA()->logger->debug('flat variations mode. skipping variable (parent)');
-			return false;
+			$error_msg = "Skipping variable parent product in flat variations mode (SKU: {$item['sku']})";
+			WPLA()->logger->debug( $error_msg );
+			return new WP_Error( 'wpla_flat_variations_parent', $error_msg );
 		}
 
 		if ( apply_filters( 'wpla_filter_skip_listing_feed_item', false, $item, $product, $profile ) === true ) {
-			WPLA()->logger->info('Skipping adding listing to the feed - wpla_filter_skip_listing_feed_item returned TRUE');
-			return false;
+			$error_msg = "Listing skipped by filter wpla_filter_skip_listing_feed_item (SKU: {$item['sku']})";
+			WPLA()->logger->info( $error_msg );
+			return new WP_Error( 'wpla_filter_skip', $error_msg );
 		}
 
 		return true;
@@ -1671,9 +1709,9 @@ class JsonFeedDataBuilder extends \WPLA_FeedDataBuilder {
 			return $value;
 		}
 
-		// Now $value is a string, so process shortcodes
+		// Now $value is a string, so process shortcodes (including indexed shortcodes like [attribute_name][0])
 		$product = wc_get_product( $listing['post_id'] );
-		if ( preg_match_all( '/\[([^\]]+)\]/', $value, $matches ) ) {
+		if ( preg_match_all( '/\[([^\]]+)\](?:\[([0-9]+)\])?/', $value, $matches ) ) {
 			foreach ($matches[0] as $placeholder) {
 				wpla_logger_start_timer('parseProfileShortcode');
 				$value = self::parseProfileShortcode( $value, $placeholder, $listing, $product, $product_id, $profile );
@@ -1746,11 +1784,12 @@ class JsonFeedDataBuilder extends \WPLA_FeedDataBuilder {
 					unset( $array[ $key ] );
 				} else {
 					// Check if the remaining array contains only 'marketplace_id' and/or 'language_tag' and an empty value
-					if ( array_diff_key($array[$key], ['marketplace_id' => '', 'language_tag' => '']) === []) {
+					$structural_fields = ['marketplace_id' => '', 'language_tag' => '', 'currency' => '', 'unit' => '', 'name' => ''];
+					if ( array_diff_key($array[$key], $structural_fields) === []) {
 						unset($array[$key]);
 					}
 				}
-			} elseif ( $value == "" && !in_array( $key, ['marketplace_id', 'language_tag'] ) ) {
+			} elseif ( $value == "" && !in_array( $key, ['marketplace_id', 'language_tag', 'currency', 'unit', 'name'] ) ) {
 				unset( $array[ $key ] );
 			}
 		}
@@ -1774,7 +1813,8 @@ class JsonFeedDataBuilder extends \WPLA_FeedDataBuilder {
 			'target_audience_keyword',
 			'ingredients',
 			'other_product_image_locator',
-			'other_offer_image_locator'
+			'other_offer_image_locator',
+			'compatible_with_vehicle_type'
 		];
 		
 		foreach ( $array as $key => $value ) {
@@ -1965,5 +2005,6 @@ class JsonFeedDataBuilder extends \WPLA_FeedDataBuilder {
 
 		return $value;
 	} // parseVariationAttributeColumn()
+
 
 }

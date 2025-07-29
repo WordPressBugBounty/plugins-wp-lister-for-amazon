@@ -144,8 +144,15 @@ class WPLA_RepricingTable extends WPLA_ListingsTable {
             $profile = $this->getProfile( $item['profile_id'] );
 
             // check for profile quantity and use it if set #21792
+            $quantity_field = null;
             if ( !empty( $profile->fields['quantity'] ) ) {
-                $quantities['Total'] = WPLA_FeedDataBuilder::parseProfileShortcode( $profile->fields['quantity'], $profile->fields['quantity'], $item, wc_get_product( $item['post_id'] ), $item['post_id'], $profile );
+                $quantity_field = $profile->fields['quantity'];
+            } elseif ( !empty( $profile->fields['fulfillment_availability[0][quantity]'] ) ) {
+                $quantity_field = $profile->fields['fulfillment_availability[0][quantity]'];
+            }
+            
+            if ( $quantity_field ) {
+                $quantities['Total'] = WPLA_FeedDataBuilder::parseProfileShortcode( $quantity_field, $quantity_field, $item, wc_get_product( $item['post_id'] ), $item['post_id'], $profile );
             }
         }
 

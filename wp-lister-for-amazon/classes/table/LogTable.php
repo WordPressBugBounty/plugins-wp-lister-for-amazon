@@ -316,6 +316,16 @@ class WPLA_LogTable extends WP_List_Table {
         //     }
         // }
 
+        // Extract HTTP method from request field (e.g. "PUT https://apihere")
+        if ( !empty( $item['request'] ) ) {
+            $request_parts = explode( ' ', $item['request'], 2 );
+            if ( count( $request_parts ) >= 2 ) {
+                $http_method = strtoupper( trim( $request_parts[0] ) );
+                // Add HTTP method as a small tag
+                $link .= ' <small style="color:#666; background:#f0f0f0; padding:2px 4px; border-radius:2px;">' . esc_html( $http_method ) . '</small>';
+            }
+        }
+
         return $link;
     }
 

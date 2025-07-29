@@ -833,6 +833,14 @@ class WPLA_CronActions {
 		// Acquire fresh lock (store current timestamp)
 		add_option( $lock_key, time(), '', 'no' );
 
+		$already_published_statuses = [
+			WPLA_ListingsModel::STATUS_SUBMITTED,
+			WPLA_ListingsModel::STATUS_ONLINE,
+			WPLA_ListingsModel::STATUS_SOLD,
+			WPLA_ListingsModel::STATUS_ARCHIVED,
+			WPLA_ListingsModel::STATUS_TRASH,
+		];
+
 		try {
 			// Rate limit settings
 			$batch_size     = 5;    // max items per batch
@@ -872,6 +880,13 @@ class WPLA_CronActions {
 						$listing    = $mdl->getItem( $listing_id );
 						$profile_id = $listing['profile_id'];
 
+						// Check if listing is already published - if so, just remove from queue
+						if ( in_array( $listing['status'], $already_published_statuses ) ) {
+							WPLA()->logger->info( "Listing {$listing_id} already published (status: {$listing['status']}), removing from queue" );
+							WPLA_ListingsModel::removeListingFromPublishingQueue( $listing_id );
+							continue;
+						}
+
 						if ( isset( $profiles_cache[ $profile_id ] ) ) {
 							$profile = $profiles_cache[ $profile_id ];
 						} else {
@@ -879,8 +894,25 @@ class WPLA_CronActions {
 							$profiles_cache[ $profile_id ] = $profile;
 						}
 
-						if ( !$json_builder->canSubmitListing( $listing, $profile ) ) {
-							throw new Exception( 'Failed canSubmitListing() check!', 401 );
+						$validation_result = $json_builder->canSubmitListing( $listing, $profile );
+						if ( is_wp_error( $validation_result ) ) {
+							$history = [
+								'errors' => [
+									[
+										'error-code'    => $validation_result->get_error_code(),
+										'error-message' => $validation_result->get_error_message(),
+										'error-type'    => 'Error'
+									]
+								],
+								'warnings' => []
+							];
+							$data = [
+								'status' => WPLA_ListingsModel::STATUS_FAILED,
+								'history' => serialize( $history )
+							];
+							$mdl->updateListing( $listing_id, $data );
+							return;
+							//throw new Exception( $validation_result->get_error_message(), 401 );
 						}
 
 						//$api->setAccountId( $profile->account_id );
@@ -900,6 +932,9 @@ class WPLA_CronActions {
 									update_post_meta( $listing['post_id'], '_wpla_asin', $asin );
 								}*/
 								$mdl->updateListing( $listing_id, $update_data );
+								
+								// Remove successfully submitted listing from publishing queue
+								WPLA_ListingsModel::removeListingFromPublishingQueue( $listing_id );
 							} else {
 								$history = [
 									'errors' => [],
@@ -933,15 +968,26 @@ class WPLA_CronActions {
 								$retry_queue[] = $listing_id;
 							} else {
 								// Non-retryable error: mark failed
-								WPLA()->logger->info( "Publish failed for {$listing_id} ({$result->StatusCode} - {$result->ErrorMessage} )" );
+								$error_message = $result->ErrorMessage;
+								$error_code = $result->ErrorCode ?? $result->StatusCode;
+								
+								// Include error details if available
+								if (isset($result->ErrorDetails) && !empty($result->ErrorDetails)) {
+									$error_message .= ' - ' . $result->ErrorDetails;
+								}
+								
+								// Debug logging to see what we actually received
+								WPLA()->logger->info( "Debug - Error object: " . print_r($result, true) );
+								
+								WPLA()->logger->info( "Publish failed for {$listing_id} (Amazon Error {$error_code}: {$error_message})" );
 								$history = [
 									'errors' => [],
 									'warnings' => []
 								];
 
 								$error = [
-									'error-code'    => $result->StatusCode,
-									'error-message' => $result->ErrorMessage,
+									'error-code'    => $error_code,
+									'error-message' => $error_message,
 									'error-type'    => 'ERROR'
 								];
 								$history['errors'][] = $error;

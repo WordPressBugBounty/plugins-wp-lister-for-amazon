@@ -489,8 +489,15 @@ class WPLA_ListingsTable extends WP_List_Table {
         $profile = $this->getProfile( $item['profile_id'] );
 
         // check for profile quantity and use it if set #21792
+        $quantity_field = null;
         if ( !empty( $profile->fields['quantity'] ) ) {
-            $qty = WPLA_FeedDataBuilder::parseProfileShortcode( $profile->fields['quantity'], $profile->fields['quantity'], $item, wc_get_product( $item['post_id'] ), $item['post_id'], $profile );
+            $quantity_field = $profile->fields['quantity'];
+        } elseif ( !empty( $profile->fields['fulfillment_availability[0][quantity]'] ) ) {
+            $quantity_field = $profile->fields['fulfillment_availability[0][quantity]'];
+        }
+        
+        if ( $quantity_field ) {
+            $qty = WPLA_FeedDataBuilder::parseProfileShortcode( $quantity_field, $quantity_field, $item, wc_get_product( $item['post_id'] ), $item['post_id'], $profile );
         }
 
         // show sold items if there are any
@@ -643,11 +650,17 @@ class WPLA_ListingsTable extends WP_List_Table {
 
         // check for profile prices (standard_price or price) and run the prices through WPLA_FeedDataBuilder::parseProfileShortcode()
         // to substitute shortcodes with actual values #20263
+        $price_field = null;
         if ( !empty( $profile->fields['standard_price'] ) ) {
-            $price = WPLA_FeedDataBuilder::parseProfileShortcode( $profile->fields['standard_price'], $profile->fields['standard_price'], $item, wc_get_product( $item['post_id'] ), $item['post_id'], $profile );
-            return $this->number_format( $price, 2 );
+            $price_field = $profile->fields['standard_price'];
         } elseif ( !empty( $profile->fields['price'] ) ) {
-            $price = WPLA_FeedDataBuilder::parseProfileShortcode( $profile->fields['price'], $profile->fields['price'], $item, wc_get_product( $item['post_id'] ), $item['post_id'], $profile );
+            $price_field = $profile->fields['price'];
+        } elseif ( !empty( $profile->fields['purchasable_offer[0][our_price][schedule][0][value_with_tax]'] ) ) {
+            $price_field = $profile->fields['purchasable_offer[0][our_price][schedule][0][value_with_tax]'];
+        }
+        
+        if ( $price_field ) {
+            $price = WPLA_FeedDataBuilder::parseProfileShortcode( $price_field, $price_field, $item, wc_get_product( $item['post_id'] ), $item['post_id'], $profile );
             return $this->number_format( $price, 2 );
         }
 
@@ -1025,8 +1038,15 @@ class WPLA_ListingsTable extends WP_List_Table {
         $profile = $this->getProfile( $item['profile_id'] );
 
         // check for profile quantity and use it if set #21792
+        $quantity_field = null;
         if ( !empty( $profile->fields['quantity'] ) ) {
-            $qty = WPLA_FeedDataBuilder::parseProfileShortcode( $profile->fields['quantity'], $profile->fields['quantity'], $item, wc_get_product( $item['post_id'] ), $item['post_id'], $profile );
+            $quantity_field = $profile->fields['quantity'];
+        } elseif ( !empty( $profile->fields['fulfillment_availability[0][quantity]'] ) ) {
+            $quantity_field = $profile->fields['fulfillment_availability[0][quantity]'];
+        }
+        
+        if ( $quantity_field ) {
+            $qty = WPLA_FeedDataBuilder::parseProfileShortcode( $quantity_field, $quantity_field, $item, wc_get_product( $item['post_id'] ), $item['post_id'], $profile );
         }
 
         return apply_filters( 'wpla_listing_get_item_quantity', $qty, $item );

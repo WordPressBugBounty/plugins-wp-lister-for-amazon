@@ -3,7 +3,7 @@
 $id  = $wpl_row->id;
 $req = $wpl_row->request;
 $url = $wpl_row->request_url;
-$par = maybe_unserialize( $wpl_row->parameters );
+$param = maybe_unserialize( $wpl_row->parameters );
 
 $response = maybe_unserialize( $wpl_row->response );
 if ( ! is_array( $response ) ) {
@@ -101,7 +101,56 @@ $req = htmlspecialchars( $req );
     <pre><?php echo str_replace( '.wplab.com','', $req ) ?></pre>
 
     <h3>Parameters</h3>
-    <pre><?php print_r( $par ) ?></pre>
+    <?php 
+    // Check if this is a PUT request with payload parameter for pretty JSON formatting
+    $is_put_request = false;
+    if ( !empty($req) ) {
+        $request_parts = explode( ' ', $req, 2 );
+        $is_put_request = ( count($request_parts) >= 2 && strtoupper(trim($request_parts[0])) === 'PUT' );
+    }
+    
+    // Check if payload contains valid JSON before showing special formatting
+    $has_json_payload = false;
+    if ( $is_put_request && is_array($param) && isset($param['payload']) ) {
+        $json_payload = $param['payload'];
+        if ( is_string($json_payload) ) {
+            $decoded = json_decode($json_payload, true);
+            $has_json_payload = ( json_last_error() === JSON_ERROR_NONE );
+        } elseif ( is_array($json_payload) || is_object($json_payload) ) {
+            $has_json_payload = true;
+        }
+    }
+    
+    if ( $has_json_payload ) {
+        // Display other parameters first
+        $other_params = $param;
+        unset($other_params['payload']);
+        if ( !empty($other_params) ) {
+            echo '<div style="margin-bottom: 15px;"><strong>Other Parameters:</strong>';
+            echo '<pre style="margin-top: 5px;">';
+            print_r( $other_params );
+            echo '</pre></div>';
+        }
+        
+        // Display JSON payload with syntax highlighting
+        echo '<div><strong>JSON Payload:</strong>';
+        echo '<pre>';
+        if ( is_string($json_payload) ) {
+            // Already validated as valid JSON above
+            $decoded = json_decode($json_payload, true);
+            echo htmlspecialchars( json_encode($decoded, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) );
+        } else {
+            // If already an array/object, encode it prettily
+            echo htmlspecialchars( json_encode($json_payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) );
+        }
+        echo '</pre></div>';
+    } else {
+        // Standard parameter display for non-PUT, non-payload, or non-JSON requests
+        echo '<pre>';
+        print_r( $param );
+        echo '</pre>';
+    }
+    ?>
 
     <h3>Response</h3>
     <pre><?php print_r( $response ) ?></pre>

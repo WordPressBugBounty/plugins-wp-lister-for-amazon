@@ -67,6 +67,26 @@ class WPLA_Product_Feed_MetaBox {
 
 	} // meta_box_feed_columns()
 
+    public function displayProfileConversionMessage( $profile_id ) {
+        $profile = new WPLA_AmazonProfile( $profile_id );
+        ?>
+        <div id="profile_conversion_message" style="border: 1px solid #ccc; padding: 15px; margin: 10px 0; border-radius: 4px;">
+            <h4 style="margin-top: 0;"><?php _e('Profile Conversion Required', 'wp-lister-for-amazon' ); ?></h4>
+            <p style="margin-bottom: 10px;">
+                <strong>This product is assigned to profile "<?php echo esc_html( $profile->profile_name ); ?>" which is still using the old feed template system.</strong>
+            </p>
+            <p style="margin-bottom: 15px;">
+                <?php _e( 'To convert this product to use the new Product Types, you must first convert the profile. Individual products cannot be converted while their profile uses feed templates.' ,'wp-lister-for-amazon' ); ?>
+            </p>
+            <p style="margin-bottom: 0;">
+                <a href="<?php echo admin_url('admin.php?page=wpla-tools&tab=profile-converter' ); ?>" class="button button-primary">
+                    <?php _e( 'Profile Converter', 'wp-lister-for-amazon' ); ?>
+                </a>
+            </p>
+        </div>
+        <?php
+    }
+
     public function displayProductTypeRecommendations( $recommendations, $installed ) {
         ?>
         <div id="product_type_recommendations">
@@ -164,8 +184,22 @@ class WPLA_Product_Feed_MetaBox {
         // Show the old selector only if there's a tpl ID and no Product Type selected. Otherwise, show the new form
 		$custom_feed_tpl_id     = get_post_meta( $post->ID, '_wpla_custom_feed_tpl_id' , true );
         $custom_product_type    = get_post_meta( $post->ID, '_wpla_custom_product_type', true );
+        
+        // Check if product is assigned to a profile that uses feed templates
+        $assigned_profile_uses_template = false;
+        $assigned_profile_id = WPLA_AmazonProfile::getProfileForProduct( $post->ID );
+        if ( $assigned_profile_id ) {
+            $assigned_profile = new WPLA_AmazonProfile( $assigned_profile_id );
+            $assigned_profile_uses_template = !empty( $assigned_profile->tpl_id );
+        }
 
-        if ( !$custom_feed_tpl_id || $custom_product_type ) {
+        // Show old template selector if:
+        // 1. Product has custom feed template ID OR
+        // 2. Product is assigned to a profile that uses feed templates
+        // AND no custom product type is selected
+        $should_show_template_selector = ($custom_feed_tpl_id || $assigned_profile_uses_template);
+        
+        if ( !$should_show_template_selector ) {
             return $this->displayProductTypeSelector( $post );
         }
 
@@ -202,9 +236,14 @@ class WPLA_Product_Feed_MetaBox {
 		$wpl_category_templates = $category_templates;
 		$wpl_liloader_templates = $liloader_templates;
 
-        //if ( !empty($product_type_recs) ) {
-            $this->displayProductTypeRecommendations( $product_type_recs, $installed );
-        //}
+        // Show profile conversion message if the assigned profile uses feed templates
+        if ( $assigned_profile_uses_template ) {
+            $this->displayProfileConversionMessage( $assigned_profile_id );
+        } else {
+            //if ( !empty($product_type_recs) ) {
+                $this->displayProductTypeRecommendations( $product_type_recs, $installed );
+            //}
+        }
 
 		?>
 							<label for="wpl-text-tpl_id" class="text_label">
@@ -423,7 +462,20 @@ class WPLA_Product_Feed_MetaBox {
     }
 
     private function usesFeedTemplate( $product_id ) {
-	    return (bool)get_post_meta( $product_id, '_wpla_custom_feed_tpl_id' , true );
+        // Check product-level feed template setting
+	    $custom_feed_tpl_id = get_post_meta( $product_id, '_wpla_custom_feed_tpl_id' , true );
+	    if ( $custom_feed_tpl_id ) {
+	        return true;
+	    }
+	    
+	    // Check if product is assigned to a profile that uses feed templates
+        $assigned_profile_id = WPLA_AmazonProfile::getProfileForProduct( $product_id );
+        if ( $assigned_profile_id ) {
+            $assigned_profile = new WPLA_AmazonProfile( $assigned_profile_id );
+            return !empty( $assigned_profile->tpl_id );
+        }
+        
+        return false;
     }
 
 	/**

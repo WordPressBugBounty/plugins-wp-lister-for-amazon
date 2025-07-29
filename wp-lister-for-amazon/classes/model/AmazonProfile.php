@@ -90,6 +90,10 @@ class WPLA_AmazonProfile {
 	function initDefaultFields() {
 		if ( ! empty( $this->fields ) ) return;
 
+		// Get WooCommerce dimension unit and convert it to Amazon format
+		$wc_dimension_unit = get_option( 'woocommerce_dimension_unit', 'in' );
+		$amazon_dimension_unit = self::convertWooCommerceUnitToAmazon( strtoupper($wc_dimension_unit) );
+
 		$this->fields = array(
 			// category feeds
 			'external_product_id' => '[amazon_product_id]',
@@ -112,7 +116,7 @@ class WPLA_AmazonProfile {
 			'sale-start-date'     => '[product_sale_start]',
 			'sale-end-date'       => '[product_sale_end]',
 
-			// category feeds
+			// JSON feeds
 			'externally_assigned_product_identifier[0][value]'                  => '[amazon_product_id]',
 			'item_name[0][value]'                                               => '[product_title]',
 			'product_description[0][value]'                                     => '[product_content]',
@@ -120,8 +124,33 @@ class WPLA_AmazonProfile {
 			'purchasable_offer[0][discounted_price][schedule][0][value_with_tax]'  => '[product_sale_price]',
 			'purchasable_offer[0][discounted_price][schedule][0][start_at]'        => '[product_sale_start]',
 			'purchasable_offer[0][discounted_price][schedule][0][end_at]'          => '[product_sale_end]',
+			'item_dimensions[0][length][value]'         => '[product_length]',
+			'item_dimensions[0][length][unit]'          => $amazon_dimension_unit,
+			'item_dimensions[0][width][value]'          => '[product_width]',
+			'item_dimensions[0][width][unit]'           => $amazon_dimension_unit,
+			'item_dimensions[0][height][value]'         => '[product_height]',
+			'item_dimensions[0][height][unit]'          => $amazon_dimension_unit,
 		);
 
+	}
+
+	/**
+	 * Convert WooCommerce dimension unit to Amazon format
+	 * 
+	 * @param string $wc_unit WooCommerce unit (uppercase)
+	 * @return string Amazon unit format
+	 */
+	private static function convertWooCommerceUnitToAmazon( $wc_unit ) {
+		$unit_mapping = [
+			// Length/Distance units (WooCommerce => Amazon)
+			'IN' => 'inches',
+			'CM' => 'centimeters',
+			'M'  => 'meters',
+			'MM' => 'millimeters',
+			'FT' => 'feet',
+		];
+
+		return isset( $unit_mapping[ $wc_unit ] ) ? $unit_mapping[ $wc_unit ] : 'inches';
 	}
 
 	/**

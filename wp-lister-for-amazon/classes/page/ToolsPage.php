@@ -66,62 +66,67 @@ class WPLA_ToolsPage extends WPLA_Page {
 
 		// check action - and nonce
 		if ( isset($_REQUEST['action']) ) {
+			$action = sanitize_key($_REQUEST['action']);
+
 			if ( check_admin_referer( 'wpla_tools_page' ) ) {
 
 				// view_logfile
-				if ( $_REQUEST['action'] == 'view_logfile') {				
+				if ( $action == 'view_logfile') {
 					$this->viewLogfile();
 				}
 
 				// wpla_clear_log
-				if ( $_REQUEST['action'] == 'wpla_clear_log') {				
+				if ( $action == 'wpla_clear_log') {
 					$this->clearLogfile();
 					$this->showMessage('Log file was cleared.');
 				}
 
 				// update_amazon_orders
-				if ( $_REQUEST['action'] == 'update_amazon_orders_30') {				
+				if ( $action == 'update_amazon_orders_30') {
 					do_action( 'wpla_update_orders' );
 				}
 	
 				// wpla_run_daily_schedule
-				if ( $_REQUEST['action'] == 'wpla_run_daily_schedule') {
+				if ( $action == 'wpla_run_daily_schedule') {
 					do_action( 'wpla_daily_schedule' );
 				}
 				
 				// wpla_run_update_schedule
-				if ( $_REQUEST['action'] == 'wpla_run_update_schedule') {
+				if ( $action == 'wpla_run_update_schedule') {
 					do_action( 'wpla_update_schedule' );
 				}
 
 				// wpla_run_autosubmit_fba_orders
-				if ( $_REQUEST['action'] == 'wpla_run_autosubmit_fba_orders') {
+				if ( $action == 'wpla_run_autosubmit_fba_orders') {
 					do_action( 'wpla_autosubmit_fba_orders' );
 				}
 
-				if ( $_REQUEST['action'] == 'wpla_import_wple_product_ids' ) {
+				if ( $action == 'wpla_import_wple_product_ids' ) {
 				    $this->importWpleProductIds();
                 }
 
 				// wpla_refresh_minmax_prices_from_wc
-				if ( $_REQUEST['action'] == 'wpla_refresh_minmax_prices_from_wc') {
+				if ( $action == 'wpla_refresh_minmax_prices_from_wc') {
 					$this->refreshMinMaxPrices();
 					wpla_show_message('Minimum and maximum prices in WP-Lister have been refreshed.');
 				}
 
 				// wpla_match_all_unlisted_with_asin
-				if ( $_REQUEST['action'] == 'wpla_match_all_unlisted_with_asin') {
+				if ( $action == 'wpla_match_all_unlisted_with_asin') {
 					$this->matchAllUnlistedWithASIN();
 				}
 
 				// wpla_download_profile_converter_map
-				if ( $_REQUEST['action'] == 'wpla_download_profile_converter_map') {
+				if ( $action == 'wpla_download_profile_converter_map') {
 					$this->downloadProfileConverterMap();
 				}
 
 
+                do_action( "wpla_execute_tools_{$action}");
+
+
 				// check_wc_out_of_sync
-				if ( $_REQUEST['action'] == 'check_wc_out_of_sync') {				
+				if ( $action == 'check_wc_out_of_sync') {
 
 					$ic = new WPLA_InventoryCheck();
 					$mode            = isset( $_REQUEST['mode'] )   		 ? wpla_clean($_REQUEST['mode'])   			: 'published';
@@ -163,7 +168,7 @@ class WPLA_ToolsPage extends WPLA_Page {
 				} // check_wc_out_of_sync
 
 				// check_wc_out_of_stock
-				if ( $_REQUEST['action'] == 'check_wc_out_of_stock') {				
+				if ( $action == 'check_wc_out_of_stock') {
 
 					$ic = new WPLA_InventoryCheck();
 					$mark_as_changed = isset( $_REQUEST['mark_as_changed'] ) ? wpla_clean($_REQUEST['mark_as_changed'])   : false;
@@ -203,7 +208,7 @@ class WPLA_ToolsPage extends WPLA_Page {
 				} // check_wc_out_of_stock
 
 				// check_wc_fba_stock
-				if ( $_REQUEST['action'] == 'check_wc_fba_stock') {				
+				if ( $action == 'check_wc_fba_stock') {
 
 					$ic = new WPLA_InventoryCheck();
 					$wpla_copy_fba_qty_to_woo = isset( $_REQUEST['wpla_copy_fba_qty_to_woo'] ) ? wpla_clean($_REQUEST['wpla_copy_fba_qty_to_woo']) : false;
@@ -244,64 +249,64 @@ class WPLA_ToolsPage extends WPLA_Page {
 				} // check_wc_fba_stock
 
 				// check_wc_sold_stock
-				if ( $_REQUEST['action'] == 'check_wc_sold_stock') {				
+				if ( $action == 'check_wc_sold_stock') {
 					$ic = new WPLA_InventoryCheck();
 					$ic->checkSoldStock();
 				}
 
 				// wpla_fix_variable_stock_status
-				if ( $_REQUEST['action'] == 'wpla_fix_variable_stock_status') {				
+				if ( $action == 'wpla_fix_variable_stock_status') {
 					$this->fixVariableStockStatus();
 					wpla_show_message('All variation stock levels have been synchronized.');
 				}
 
 				// wpla_check_for_missing_products
-				if ( $_REQUEST['action'] == 'wpla_check_for_missing_products') {				
+				if ( $action == 'wpla_check_for_missing_products') {
 					$this->findMissingProducts();
 				}
 
 				// wpla_fix_stale_postmeta
-				if ( $_REQUEST['action'] == 'wpla_fix_stale_postmeta') {				
+				if ( $action == 'wpla_fix_stale_postmeta') {
 					$this->fixStalePostMetaRecords();
 				}
 
 				// wpla_fix_orphan_child_products
-				if ( $_REQUEST['action'] == 'wpla_fix_orphan_child_products') {				
+				if ( $action == 'wpla_fix_orphan_child_products') {
 					$this->fixOrphanChildProducts();
 				}
 
 				// wpla_fix_deleted_products
-				if ( $_REQUEST['action'] == 'wpla_fix_deleted_products') {				
+				if ( $action == 'wpla_fix_deleted_products') {
 					$this->fixDeletedProducts();
 				}
 
 				// wpla_fix_spaces_in_asins
-				if ( $_REQUEST['action'] == 'wpla_fix_spaces_in_asins') {				
+				if ( $action == 'wpla_fix_spaces_in_asins') {
 					$this->fixSpacesInASINs();
 				}
 
 				// wpla_remove_all_imported_products
-				if ( $_REQUEST['action'] == 'wpla_remove_all_imported_products') {				
+				if ( $action == 'wpla_remove_all_imported_products') {
 					$this->removeAllImportedProducts();
 				}
 
 				// wpla_upgrade_tables_to_utf8mb4
-				if ( $_REQUEST['action'] == 'wpla_upgrade_tables_to_utf8mb4') {				
+				if ( $action == 'wpla_upgrade_tables_to_utf8mb4') {
 					$this->upgradeTablesUTF8MB4();
 				}
 
 				// wpla_repair_crashed_tables
-				if ( $_REQUEST['action'] == 'wpla_repair_crashed_tables') {				
+				if ( $action == 'wpla_repair_crashed_tables') {
 					$this->repairCrashedTables();
 				}
 
 				// wpla_lock_all_listings
-				if ( $_REQUEST['action'] == 'wpla_lock_all_listings') {
+				if ( $action == 'wpla_lock_all_listings') {
 					$this->lockAllListings();
 				}
 
 				// wpla_unlock_all_listings
-				if ( $_REQUEST['action'] == 'wpla_unlock_all_listings') {
+				if ( $action == 'wpla_unlock_all_listings') {
 					$this->unlockAllListings();
 				}
 

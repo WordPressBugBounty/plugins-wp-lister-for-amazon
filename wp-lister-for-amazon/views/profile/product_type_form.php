@@ -56,9 +56,6 @@
 
 	</div>
 </div>
-<?php
-echo '<pre>'. print_r( $wpl_profile, 1) .'</pre>';
-?>
 <script>
     // init
     const marketplace_select = document.getElementById('wpl-text-marketplace_id');

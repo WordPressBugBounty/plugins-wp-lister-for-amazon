@@ -313,9 +313,11 @@ class ProfileProductTypeConverter {
 		$products = [];
 
 		foreach ( $rows as $row ) {
-			if ( get_post_meta( $row->post_id, '_wpla_custom_product_type', true ) ) {
+			// Only show products and skip `product_variations` post types (by Aniket Patel)
+			if ( get_post_meta( $row->post_id, '_wpla_custom_product_type', true ) || get_post_type( $row->post_id ) !== 'product' ) {
 				continue;
 			}
+
 			$products[ $row->meta_value ][] = $row->post_id;
 		}
 
@@ -630,6 +632,9 @@ class ProfileProductTypeConverter {
 			'package_width_unit_of_measure'    => 'item_package_dimensions[0][width][unit]',
 			'package_length_unit_of_measure'   => 'item_package_dimensions[0][length][unit]',
 			'package_weight_unit_of_measure'   => 'item_package_weight[0][unit]',
+			'item_height_unit_of_measure'      => 'item_dimensions[0][height][unit]',
+			'item_width_unit_of_measure'       => 'item_dimensions[0][width][unit]',
+			'item_length_unit_of_measure'      => 'item_dimensions[0][length][unit]',
 		];
 	}
 
@@ -760,6 +765,21 @@ class ProfileProductTypeConverter {
 	}
 
 	/**
+	 * Convert California Proposition 65 compliance type values to their new format
+	 *
+	 * @param string $value The display value from old feed template
+	 * @return string The corresponding value for the new system
+	 */
+	private function convertCaliforniaProposition65ComplianceType( $value ) {
+		if ( empty( $value ) ) {
+			return $value;
+		}
+
+		// Convert title case with spaces to lowercase with underscores
+		return strtolower( str_replace( ' ', '_', $value) );
+	}
+
+	/**
 	 * Convert merchant shipping group display values to IDs using schema-based lookup
 	 * 
 	 * @param string $display_value The display value from old feed template
@@ -814,6 +834,19 @@ class ProfileProductTypeConverter {
 	 * @return string The converted value
 	 */
 	private function convertFieldValue( $key, $value ) {
+		// Boolean field normalization - handle all old boolean formats
+		if ( preg_match('/\[0\]\[value\]$/', $key) ) {
+			$value_lower = strtolower(trim($value));
+			
+			// Convert all boolean variations to lowercase strings
+			if ( in_array($value_lower, ['true', '1', 'yes']) ) {
+				return 'true';
+			} elseif ( in_array($value_lower, ['false', '0', 'no']) ) {
+				return 'false';
+			}
+			// Empty string ('') remains empty - means "not set"
+		}
+		
 		// Merchant Shipping Group conversion
 		if ( strpos( $key, 'merchant_shipping_group' ) !== false ) {
 			return $this->convertShippingGroupValue( $value );
@@ -827,6 +860,11 @@ class ProfileProductTypeConverter {
 		// Country of Origin conversion
 		if ( strpos( $key, 'supplier_declared_dg_hz_regulation' ) !== false ) {
 			return $this->convertSupplierDeclaredDangerousGoods( $value );
+		}
+		
+		// California Proposition 65 compliance type conversion
+		if ( strpos( $key, 'california_proposition_65' ) !== false && strpos( $key, 'compliance_type' ) !== false ) {
+			return $this->convertCaliforniaProposition65ComplianceType( $value );
 		}
 		
 		// Future field conversions can be added here

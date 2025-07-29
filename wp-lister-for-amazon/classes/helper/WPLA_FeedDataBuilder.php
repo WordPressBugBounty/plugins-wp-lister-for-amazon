@@ -1079,8 +1079,8 @@ class WPLA_FeedDataBuilder {
 		if ( empty($value) && $value !== 0 )
 			$value = isset( $profile_fields[ $column ] ) ? $profile_fields[$column] : '';
 
-		// find and parse all placeholders
-		if ( preg_match_all( '/\[([^\]]+)\]/', $value, $matches ) ) {
+		// find and parse all placeholders (including indexed shortcodes like [attribute_name][0])
+		if ( preg_match_all( '/\[([^\]]+)\](?:\[([0-9]+)\])?/', $value, $matches ) ) {
 			foreach ($matches[0] as $placeholder) {
 				// echo "<pre>processing ";print_r($placeholder);echo"</pre>";
 				wpla_logger_start_timer('parseProfileShortcode');
@@ -1700,8 +1700,8 @@ class WPLA_FeedDataBuilder {
  			// remove all shortcodes from product description
  			$post_content = $html_content;
 
-			// find and remove all placeholders
-			if ( preg_match_all( '/\[([^\]]+)\]/', $post_content, $matches ) ) {
+			// find and remove all placeholders (including indexed shortcodes)
+			if ( preg_match_all( '/\[([^\]]+)\](?:\[([0-9]+)\])?/', $post_content, $matches ) ) {
 				foreach ($matches[0] as $placeholder) {
 			 		$post_content = str_replace( $placeholder, '', $post_content );
 				}
@@ -1795,20 +1795,30 @@ class WPLA_FeedDataBuilder {
         $product_type = wpla_get_product_meta( $product, 'product_type' );
 		if ( $product_type == 'variation' || $product_type == 'product-part-variation' ) {
 
-			// match shortcodes - exit if none are found
-			if ( ! preg_match_all("/\\[attribute_(.*)\\]/uUsm", $field_value, $matches ) ) return $field_value;
+			// match shortcodes - exit if none are found (supports indexed syntax [attribute_name][0])
+			if ( ! preg_match_all("/\\[attribute_([^\\]]+)\\](?:\\[([0-9]+)\\])?/", $field_value, $matches ) ) return $field_value;
 
 			// get variation attributes
 			$variation_attributes = $product->get_variation_attributes();
 
-			foreach ( $matches[1] as $attribute ) {
-			    WPLA()->logger->info( 'processing attribute shortcode: '. $attribute );
+			foreach ( $matches[0] as $i => $full_match ) {
+			    $attribute = $matches[1][$i];
+			    $index = isset($matches[2][$i]) && $matches[2][$i] !== '' ? (int)$matches[2][$i] : null;
+			    WPLA()->logger->info( 'processing attribute shortcode: '. $attribute . ($index !== null ? '[' . $index . ']' : '') );
 
 				$taxonomy_name = 'attribute_pa_'.$attribute;
 				if ( isset( $variation_attributes[ $taxonomy_name ] ) && $variation_attributes[ $taxonomy_name ] !== '' ){
 					$attribute_slug  = $variation_attributes[ $taxonomy_name ];
 					$attribute_value = WPLA_ProductWrapper::getAttributeValueFromSlug( $taxonomy_name, $attribute_slug );
-					$field_value     = str_replace( '[attribute_'.$attribute.']', $attribute_value,  $field_value );
+					
+					// Handle indexed access for multi-value attributes
+					if ( $index !== null && is_string($attribute_value) ) {
+						$values = array_map('trim', explode(',', $attribute_value));
+						$attribute_value = isset($values[$index]) ? $values[$index] : '';
+					}
+					
+					// Use the full match from regex instead of reconstructing
+					$field_value = str_replace( $full_match, $attribute_value, $field_value );
 
                     WPLA()->logger->info( 'new field_value: '. $field_value );
 				}
@@ -1824,8 +1834,8 @@ class WPLA_FeedDataBuilder {
         }
 
 
-		// match shortcodes (again, because they may already been processed)
-		if ( preg_match_all("/\\[attribute_(.*)\\]/uUsm", $field_value, $matches ) ) {
+		// match shortcodes (again, because they may already been processed) - supports indexed syntax [attribute_name][0]
+		if ( preg_match_all("/\\[attribute_([^\\]]+)\\](?:\\[([0-9]+)\\])?/", $field_value, $matches ) ) {
 
 			// $product_attributes = WPLA_ProductWrapper::getAttributes( $post_id );
 			// WPLA()->logger->debug('processAttributeShortcodes() - product_attributes: '.print_r($product_attributes,1));
@@ -1835,27 +1845,42 @@ class WPLA_FeedDataBuilder {
 			// process attribute shortcodes i.e. [attribute_Brand]
 			$product_attributes = WPLA()->memcache->getProductAttributes( $post_id );
 
-			foreach ( $matches[1] as $attribute ) {
-                WPLA()->logger->info( 'processing attribute shortcode: '. $attribute );
+			foreach ( $matches[0] as $i => $full_match ) {
+                $attribute = $matches[1][$i];
+                $index = isset($matches[2][$i]) && $matches[2][$i] !== '' ? (int)$matches[2][$i] : null;
+                WPLA()->logger->info( 'processing attribute shortcode: '. $attribute . ($index !== null ? '[' . $index . ']' : '') );
 
+				// Try taxonomy attribute first, then custom attribute
 				if ( isset( $product_attributes[ 'pa_'.$attribute ] )){
 					$attribute_value = self::convertContent( $product_attributes[ 'pa_'.$attribute ] );
+					$attribute_key = 'pa_'.$attribute;
+				} elseif ( isset( $product_attributes[ $attribute ] ) ) {
+					$attribute_value = self::convertContent( $product_attributes[ $attribute ] );
+					$attribute_key = $attribute;
 				} else {
 					$attribute_value = '';
+					$attribute_key = '';
 				}
+                
+                // Handle indexed access for multi-value attributes
+                if ( $index !== null && $attribute_key !== '' ) {
+                    // Use the _all_terms array for indexed access
+                    $all_terms_key = $attribute_key . '_all_terms';
+                    if ( isset( $product_attributes[ $all_terms_key ] ) && is_array( $product_attributes[ $all_terms_key ] ) ) {
+                        $attribute_value = isset( $product_attributes[ $all_terms_key ][$index] ) ? $product_attributes[ $all_terms_key ][$index] : '';
+                    } else {
+                        // Fallback to splitting the string if _all_terms is not available
+                        $values = array_map('trim', explode(',', $attribute_value));
+                        $attribute_value = isset($values[$index]) ? $values[$index] : '';
+                    }
+                }
+                
                 WPLA()->logger->info( 'new $attribute_value: '. $attribute_value );
 
                 $attribute_value = apply_filters( 'wpla_attribute_shortcode_value', $attribute_value, $attribute, $post_id );
                 
-				$processed_html = str_replace( '[attribute_'.$attribute.']', $attribute_value,  $field_value );
-
-				// check if string exceeds max_length after processing shortcode
-				// if ( $max_length && ( $this->mb_strlen( $processed_html ) > $max_length ) ) {
-				// 	$attribute_value = '';
-				// 	$processed_html = str_replace( '[attribute_'.$attribute.']', $attribute_value,  $field_value );
-				// }
-
-				$field_value = $processed_html;
+                // Use the full match from regex instead of reconstructing
+				$field_value = str_replace( $full_match, $attribute_value, $field_value );
 
 			}
 

@@ -832,8 +832,32 @@ class WPLA_Amazon_SP_API {
 		} catch (\WPLab\Amazon\SellingPartnerApi\ApiException | Exception $ex ) {
 			// Also catch Exceptions because toXML and fromXML methods throw Exceptions on invalid XML strings
 			$error = new stdClass();
-			$error->ErrorMessage = $ex->getMessage();
-			$error->ErrorCode = $ex->getCode();
+			
+			// Extract detailed Amazon error information for HTTP 400 responses
+			if ($ex instanceof \WPLab\Amazon\SellingPartnerApi\ApiException && $ex->getCode() == 400) {
+				$response_object = $ex->getResponseObject();
+				if ($response_object && method_exists($response_object, 'getErrors')) {
+					$amazon_errors = $response_object->getErrors();
+					if (!empty($amazon_errors)) {
+						$first_error = $amazon_errors[0];
+						$error->ErrorMessage = $first_error->getMessage();
+						$error->ErrorCode = $first_error->getCode();
+						if ($first_error->getDetails()) {
+							$error->ErrorDetails = $first_error->getDetails();
+						}
+					} else {
+						$error->ErrorMessage = $ex->getMessage();
+						$error->ErrorCode = $ex->getCode();
+					}
+				} else {
+					$error->ErrorMessage = $ex->getMessage();
+					$error->ErrorCode = $ex->getCode();
+				}
+			} else {
+				$error->ErrorMessage = $ex->getMessage();
+				$error->ErrorCode = $ex->getCode();
+			}
+			
 			$error->StatusCode = $ex->getCode();
 			return $error;
 		}

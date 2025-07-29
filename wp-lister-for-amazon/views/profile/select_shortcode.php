@@ -43,6 +43,14 @@
 			Click on a shortcode and it will be inserted to the selected field.
 		</p>
 
+		<div style="background-color: #f9f9f9; padding: 10px; margin-bottom: 15px; border-left: 4px solid #0073aa;">
+			<strong>Multi-Value Attributes:</strong> For attributes with multiple values (e.g., "Red, Blue, Green"):<br>
+			<code>[attribute_color]</code> = First value only (Red) - <em>backward compatible</em><br>
+			<code>[attribute_color][0]</code> = First value (Red)<br>
+			<code>[attribute_color][1]</code> = Second value (Blue)<br>
+			<code>[attribute_color][2]</code> = Third value (Green)
+		</div>
+
 		<table style="width:100%;">
 			<tr>
 				<th>Product properties</th>

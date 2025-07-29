@@ -336,6 +336,8 @@ class WPLA_FeedValidator {
 
         if ( !empty( $profile_fields['quantity'] ) ) {
             return $profile_fields['quantity'];
+        } elseif ( !empty( $profile_fields['fulfillment_availability[0][quantity]'] ) ) {
+            return $profile_fields['fulfillment_availability[0][quantity]'];
         }
 
         return 0;

@@ -646,9 +646,15 @@ class AmazonSchemaFormGenerator {
 	private function renderBoolean( $name, $property, $value = '' ) {
 		$html = "<select name='tpl_col_$name' id='tpl_col_$name' class='select2'>";
 
+		// Add the "none" option first (like buildOptionGroups does)
+		$none_selected = $value === '' ? 'selected="selected"' : '';
+		$html .= "<option value='' $none_selected>&mdash; " . __('none', 'wp-lister-for-amazon') . " &mdash;</option>";
+
 		foreach ($property["enum"] as $key => $val) {
-			$selected_str = $value == $val ? 'selected="selected"' : '';
-			$html .= "<option value='$val' $selected_str>" . ($property["enumNames"][$key] ?? $val) . "</option>";
+			// Convert boolean values to strings for form compatibility
+			$string_val = $val ? 'true' : 'false';
+			$selected_str = $value == $string_val ? 'selected="selected"' : '';
+			$html .= "<option value='$string_val' $selected_str>" . ($property["enumNames"][$key] ?? $val) . "</option>";
 		}
 
 		$html .= "</select>";

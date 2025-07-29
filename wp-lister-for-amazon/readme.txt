@@ -54,6 +54,28 @@ Yes, there are. Please check out our growing knowledgebase at <https://www.wplab
 
 == Changelog ==
 
+= 2.8.4 - 2025-07-29 =
+New: Support for multi-value attribute shortcodes using bracket notation ([attribute_color][0], [attribute_color][1])
+Fix: Variations showing up individually on the Profile Converter instead of grouped
+Fix: Include sale price fields in PnQ JSON feeds
+Fix: Skip parent variable products for PnQ and Inventory Loader JSON feeds
+Fix: Product Type attributes showing on Edit Product page when profile uses Feed Template
+Fix: Enhanced filterEmptyFields() method to remove unnecessary elements in JSON feed
+Fix: Convert value for California Proposition 65 field properly
+Fix: Mark online listings as failed if ERROR severity issues are found
+Fix: applyProfileToItem() setting unpublished items to changed status incorrectly
+Fix: Added default profile shortcodes for product dimensions
+Fix: Convert/Map attributes before replacing dashes with slashes
+Fix: Remove listings from publishing queue if status is "already published"
+Fix: Listings table not displaying profile-level quantities for stock-disabled products
+Fix: Added compatible_with_vehicle_type to array data reindex list
+Fix: Profile dates overriding empty discounted_price validation
+Tweak: Added "— none —" option to boolean form fields
+Dev: New hooks wpla_tools_debug and wpla_execute_tools_{$action}
+Dev: canSubmitListing() validation now returns error for user visibility
+Dev: Better UI for viewing JSON payload on Logs page
+Dev: HTTP 400 errors in putListingsItem calls now show real error message
+
 = 2.8.3.1 - 2025-07-21 =
 Fix: SP-API validation error when sale price equals regular price in JSON feeds
 Fix: Profile duplication not copying pricing options (price adjustments, percentage modifications)

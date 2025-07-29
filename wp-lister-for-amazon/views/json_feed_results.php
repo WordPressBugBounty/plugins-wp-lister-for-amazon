@@ -93,7 +93,10 @@ Feed Type: <?php echo $wpl_feed->FeedType ?><br>
 <?php
 if ( isset($wpl_result_rows['issues']) && ( sizeof($wpl_result_rows['issues'])>0 ) ) :
 	$messageIds = array_column( $wpl_result_rows['issues'], 'messageId' );
-	array_multisort( $messageIds, SORT_ASC, $wpl_result_rows['issues'] );
+	// Only sort if all issues have messageId to avoid array size mismatch
+	if ( count($messageIds) === count($wpl_result_rows['issues']) ) {
+		array_multisort( $messageIds, SORT_ASC, $wpl_result_rows['issues'] );
+	}
 	?>
 
 	<table class="csv-table">

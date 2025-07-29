@@ -1482,7 +1482,7 @@ class WPLA_ListingsModel extends WPLA_Model {
 		}
 
 		foreach ( $items as $idx => $item ) {
-			if ( $item['profile_id'] ) {
+			if ( $item['profile_id'] && isset($template_ids[ $item['profile_id'] ]) ) {
 				$items[$idx]['tpl_id'] = $template_ids[ $item['profile_id'] ];
 			}
 		}
@@ -1955,6 +1955,13 @@ class WPLA_ListingsModel extends WPLA_Model {
 	public function resubmitItem( $id ) {
 		$listing = $this->getItem( $id );
 		if ( ! in_array( $listing['status'], array( self::STATUS_ONLINE, self::STATUS_FAILED, self::STATUS_SUBMITTED) ) ) {
+			return;
+		}
+
+		// Prevent locked listings from being resubmitted for full updates
+		if ( $listing['locked'] ) {
+			WPLA()->logger->info('resubmitItem() - listing ' . $id . ' is locked, only setting pnq_status');
+			$this->updateWhere( array( 'id' => $id ), array( 'pnq_status' => 1 ) );
 			return;
 		}
 
@@ -2752,26 +2759,33 @@ class WPLA_ListingsModel extends WPLA_Model {
 
 
 		if ( $update_status ) {
-			// default new status is 'changed'
-			$data['status'] = self::STATUS_CHANGED;
-			if ( $status == self::STATUS_FAILED ) 			$data['status'] = self::STATUS_CHANGED;
-			if ( $status == self::STATUS_ONLINE ) 			$data['status'] = self::STATUS_CHANGED;
+			// Prevent locked listings from getting status changes
+			if ( $item->locked ) {
+				WPLA()->logger->info('applyProfileToItem('.$id.') - listing is locked, not updating status');
+				// For locked listings, only update pnq_status to enable P&Q updates
+				$data['pnq_status'] = 1;
+			} else {
+				// default new status is 'changed'
+				$data['status'] = self::STATUS_CHANGED;
+				if ( $status == self::STATUS_FAILED ) 			$data['status'] = self::STATUS_CHANGED;
+				if ( $status == self::STATUS_ONLINE ) 			$data['status'] = self::STATUS_CHANGED;
 
-			// except for matched or imported products
-			if ( $status == self::STATUS_MATCHED ) 		    $data['status'] = $status;
-			if ( $status == self::STATUS_IMPORTED ) 		$data['status'] = $status;
-			if ( $status == self::STATUS_PREPARED ) 		$data['status'] = $status;
+				// except for matched or imported products
+				if ( $status == self::STATUS_MATCHED ) 		    $data['status'] = $status;
+				if ( $status == self::STATUS_IMPORTED ) 		$data['status'] = $status;
+				if ( $status == self::STATUS_PREPARED ) 		$data['status'] = $status;
 
-			// submitted items stay 'submitted' and archived items stay archived
-			if ( $status == self::STATUS_SUBMITTED ) 		$data['status'] = $status;
-			if ( $status == self::STATUS_ARCHIVED ) 		$data['status'] = $status;
-			if ( $status == self::STATUS_TRASH ) 			$data['status'] = $status;
-			if ( $status == self::STATUS_TRASHED ) 		    $data['status'] = $status;
+				// submitted items stay 'submitted' and archived items stay archived
+				if ( $status == self::STATUS_SUBMITTED ) 		$data['status'] = $status;
+				if ( $status == self::STATUS_ARCHIVED ) 		$data['status'] = $status;
+				if ( $status == self::STATUS_TRASH ) 			$data['status'] = $status;
+				if ( $status == self::STATUS_TRASHED ) 		    $data['status'] = $status;
 
-			// debug
-			if ( $status != $data['status'] ) {
-				WPLA()->logger->info('applyProfileToItem('.$id.') old status: '.$status );
-				WPLA()->logger->info('applyProfileToItem('.$id.') new status: '.$data['status'] );
+				// debug
+				if ( $status != $data['status'] ) {
+					WPLA()->logger->info('applyProfileToItem('.$id.') old status: '.$status );
+					WPLA()->logger->info('applyProfileToItem('.$id.') new status: '.$data['status'] );
+				}
 			}
 		}
 
