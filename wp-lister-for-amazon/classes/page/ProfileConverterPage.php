@@ -81,6 +81,12 @@ class ProfileConverterPage extends \WPLA_Page {
 
 				foreach ( $all_products as $product_id ) {
 					$custom_fields_old = get_post_meta( $product_id, '_wpla_custom_feed_columns', true );
+					
+					// Ensure we have an array before conversion
+					if ( !is_array( $custom_fields_old ) ) {
+						$custom_fields_old = [];
+					}
+					
 					$converter = new \WPLab\Amazon\Helper\ProfileProductTypeConverter();
 					$custom_fields = $converter->convertFromArray( $custom_fields_old );
 

@@ -54,6 +54,21 @@ Yes, there are. Please check out our growing knowledgebase at <https://www.wplab
 
 == Changelog ==
 
+= 2.8.5 - 2025-08-04 =
+Fix: Missing currency value for the list_price property
+Fix: Added the compatibility_options property to the reindexArrays() method to fix its indices having gaps
+Fix: Custom Size Map table failing to save when the field name contains square brackets
+Fix: Cannot access offset of type string on string during profile conversion
+Fix: Feed being generated using the old profile when switching over to a new profile
+Fix: Do not send Sale Price value and dates when Sale Price is unmapped
+Fix: Map legacy Item Condition values to use the new condition strings
+Fix: Legacy attribute form displaying for products using an already converted profile
+Fix: Edge case allows both legacy and JSON feeds to be generated at the same time for the same listing
+Fix: Remove listings from queue that fails the canSubmitListing() check
+Fix: Use the default schema currency if it's not set in the profile
+Fix: Handling Time must be removed for FBA listings
+Fix: Convert date format from YYYY/MM/DD to YYYY-MM-DD
+
 = 2.8.4 - 2025-07-29 =
 New: Support for multi-value attribute shortcodes using bracket notation ([attribute_color][0], [attribute_color][1])
 Fix: Variations showing up individually on the Profile Converter instead of grouped

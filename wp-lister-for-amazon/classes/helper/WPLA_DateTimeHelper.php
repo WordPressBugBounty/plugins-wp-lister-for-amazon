@@ -72,5 +72,30 @@ class WPLA_DateTimeHelper {
         return $timestamp;
     }
 
+    /**
+     * Convert date formats to Amazon-compatible YYYY-MM-DD format
+     *
+     * @param string $date The date string to convert
+     * @return string The converted date in YYYY-MM-DD format, or original value if already valid or invalid
+     */
+    static public function convertDateFormatForAmazon( $date ) {
+        if ( empty( $date ) || ! is_string( $date ) ) {
+            return $date;
+        }
+
+        // If already in YYYY-MM-DD format, return as-is
+        if ( preg_match( '/^\d{4}-\d{2}-\d{2}$/', $date ) ) {
+            return $date;
+        }
+
+        try {
+            $dt = new DateTime( $date );
+            return $dt->format( 'Y-m-d' );
+        } catch ( Exception $e ) {
+            // If DateTime can't parse it, return original value
+            return $date;
+        }
+    }
+
 
 } // class WPLA_DateTimeHelper

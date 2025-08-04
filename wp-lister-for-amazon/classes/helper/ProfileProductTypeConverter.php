@@ -122,13 +122,18 @@ class ProfileProductTypeConverter {
 	/**
 	 * Convert product-level attributes to product type properties
 	 *
-	 * @param array $fields
+	 * @param array|mixed $fields Array of fields to convert, or any other type (will return empty array)
 	 *
-	 * @return array
+	 * @return array Converted fields array, or empty array if input is not an array
 	 */
 	public function convertFromArray( $fields ) {
 		$old_fields = [];
 		$unmapped   = [];
+
+		// Handle non-array inputs (empty strings, null, etc.)
+		if ( !is_array( $fields ) ) {
+			return [];
+		}
 
 		if ( !$this->needsConversion( $fields ) ) {
 			return $fields;
@@ -834,6 +839,11 @@ class ProfileProductTypeConverter {
 	 * @return string The converted value
 	 */
 	private function convertFieldValue( $key, $value ) {
+		// Date field conversion - convert MM/DD/YYYY to YYYY-MM-DD for Amazon API compatibility
+		if ( in_array( $key, ['sale_from_date', 'sale_end_date'] ) || strpos( $key, 'start_at' ) !== false || strpos( $key, 'end_at' ) !== false ) {
+			$value = \WPLA_DateTimeHelper::convertDateFormatForAmazon( $value );
+		}
+		
 		// Boolean field normalization - handle all old boolean formats
 		if ( preg_match('/\[0\]\[value\]$/', $key) ) {
 			$value_lower = strtolower(trim($value));
@@ -1246,14 +1256,20 @@ class ProfileProductTypeConverter {
 		return $path;
 	}
 
+
 	/**
 	 * Checks if the given fields/properties need to be converted or mapped
 	 *
-	 * @param array $fields
+	 * @param array|mixed $fields Fields to check, or any other type (will return false)
 	 *
-	 * @return bool
+	 * @return bool True if conversion is needed, false otherwise
 	 */
 	private function needsConversion( $fields ) {
+		// Handle non-array inputs
+		if ( !is_array( $fields ) ) {
+			return false;
+		}
+
 		// look for the pattern field_name[0][value]. If this pattern is found, then there's no need to convert
 		$found = false;
 

@@ -53,6 +53,13 @@ class JsonFeedDataBuilder extends \WPLA_FeedDataBuilder {
 			if ( ! $product ) continue;
 			if ( ! $item['sku'] ) continue;
 
+			// load profile fields
+			$profile    = new WPLA_AmazonProfile( $item['profile_id'] );
+			//$profile    = $profile->id ? $profile : false;
+
+			$attributes = $this->getAttributes( $item, $profile, $columns );
+
+			// Skip variable/parent products - they should never be in P&Q feeds regardless of attributes
 			if ( $product->get_type() == 'variable' ) {
 				WPLA_ListingsModel::updateWhere(
 					array( 'id' => $item['id'] ),
@@ -60,12 +67,6 @@ class JsonFeedDataBuilder extends \WPLA_FeedDataBuilder {
 				);
 				continue; // skip parent variations in P&Q feed
 			}
-
-			// load profile fields
-			$profile    = new WPLA_AmazonProfile( $item['profile_id'] );
-			//$profile    = $profile->id ? $profile : false;
-
-			$attributes = $this->getAttributes( $item, $profile, $columns );
 
 			// skip empty attributes
 			if ( empty( $attributes ) ) {
@@ -540,6 +541,10 @@ class JsonFeedDataBuilder extends \WPLA_FeedDataBuilder {
 					$value = $profile_fields[$property];
 				}
 
+				if ( '[---]' == $profile_fields[$property] || empty( $profile_fields[$property]) ) {
+					$value = '';
+				}
+
 				// SP-API JSON Feeds API is complaining about using the same price for the Sale and Regular prices
 				// If there's no sale price, return empty to omit entire discounted_price section
 				if ( empty($value) ) {
@@ -558,12 +563,20 @@ class JsonFeedDataBuilder extends \WPLA_FeedDataBuilder {
 				break;
 
 			case 'purchasable_offer[0][discounted_price][0][schedule][0][start_at]':
-				// Get the final processed sale price (same logic as value_with_tax case)
-				$sale_price = $this->getSalePriceValue( $child_id, $parent_id, $listing, $profile );
-				
-				// Apply profile field if set
+				// Check profile field configuration first to determine if sale price should be included
 				$sale_price_property = 'purchasable_offer[0][discounted_price][0][schedule][0][value_with_tax]';
-				if ( ! empty( $profile_fields[$sale_price_property] ) ) {
+				
+				// If profile field is explicitly unmapped, don't include any sale price data
+				if ( isset($profile_fields[$sale_price_property]) && '[---]' === $profile_fields[$sale_price_property] ) {
+					return '';
+				}
+				
+				// Get the final processed sale price using the same logic as value_with_tax case
+				$sale_price = $this->getSalePriceValue( $child_id, $parent_id, $listing, $profile );
+				$sale_price = $this->processFieldValue( $sale_price, $sale_price_property, $listing, $product, $profile );
+				
+				// Apply profile field if explicitly set (not [---] and not empty)
+				if ( !empty($profile_fields[$sale_price_property]) && '[---]' !== $profile_fields[$sale_price_property] ) {
 					$sale_price = $profile_fields[$sale_price_property];
 				}
 				
@@ -597,6 +610,9 @@ class JsonFeedDataBuilder extends \WPLA_FeedDataBuilder {
 					}
 				}
 
+				// Convert MM/DD/YYYY format to YYYY-MM-DD if needed
+				$value = \WPLA_DateTimeHelper::convertDateFormatForAmazon( $value );
+
 				// We have a discounted price, so we need a schedule
 				if ( ! $value ) {
 					$value = '2010-12-31';
@@ -605,12 +621,20 @@ class JsonFeedDataBuilder extends \WPLA_FeedDataBuilder {
 				break;
 
 			case 'purchasable_offer[0][discounted_price][0][schedule][0][end_at]':
-				// Get the final processed sale price (same logic as value_with_tax case)
-				$sale_price = $this->getSalePriceValue( $child_id, $parent_id, $listing, $profile );
-				
-				// Apply profile field if set
+				// Check profile field configuration first to determine if sale price should be included
 				$sale_price_property = 'purchasable_offer[0][discounted_price][0][schedule][0][value_with_tax]';
-				if ( ! empty( $profile_fields[$sale_price_property] ) ) {
+				
+				// If profile field is explicitly unmapped, don't include any sale price data
+				if ( isset($profile_fields[$sale_price_property]) && '[---]' === $profile_fields[$sale_price_property] ) {
+					return '';
+				}
+				
+				// Get the final processed sale price using the same logic as value_with_tax case
+				$sale_price = $this->getSalePriceValue( $child_id, $parent_id, $listing, $profile );
+				$sale_price = $this->processFieldValue( $sale_price, $sale_price_property, $listing, $product, $profile );
+				
+				// Apply profile field if explicitly set (not [---] and not empty)
+				if ( !empty($profile_fields[$sale_price_property]) && '[---]' !== $profile_fields[$sale_price_property] ) {
 					$sale_price = $profile_fields[$sale_price_property];
 				}
 				
@@ -643,6 +667,9 @@ class JsonFeedDataBuilder extends \WPLA_FeedDataBuilder {
 						$value = $profile_fields[$property];
 					}
 				}
+
+				// Convert MM/DD/YYYY format to YYYY-MM-DD if needed
+				$value = \WPLA_DateTimeHelper::convertDateFormatForAmazon( $value );
 
 				// We have a discounted price, so we need a schedule
 				if ( $has_sale_price ) {
@@ -677,6 +704,28 @@ class JsonFeedDataBuilder extends \WPLA_FeedDataBuilder {
 				}
 
 				$value  = $this->formatPriceDecimal( $value );
+				break;
+
+			case 'purchasable_offer[0][currency]':
+				// Apply schema default for empty currency field
+				if ( empty( $value ) ) {
+					$product_type_name = $this->getListingProductType( $listing, $profile );
+					$marketplace_id = $this->getListingMarketplaceId( $listing, $profile );
+					$schema = $this->getSchemaFromCache( $product_type_name, $marketplace_id );
+					$value = $schema['properties']['purchasable_offer']['items']['properties']['currency']['default'] ?? get_woocommerce_currency();
+				}
+				break;
+
+			case 'list_price[0][currency]':
+				// Apply schema default for empty currency field in pricing fields
+				if ( empty( $value ) ) {
+					$product_type_name = $this->getListingProductType( $listing, $profile );
+					$marketplace_id = $this->getListingMarketplaceId( $listing, $profile );
+					$schema = $this->getSchemaFromCache( $product_type_name, $marketplace_id );
+					// Try to get currency from schema, fallback to WooCommerce default currency
+					$value = $schema['properties']['list_price']['items']['properties']['currency']['default'] ?? get_woocommerce_currency();
+				}
+				
 				break;
 
 			case 'fulfillment_availability[0][fulfillment_channel_code]':
@@ -746,8 +795,14 @@ class JsonFeedDataBuilder extends \WPLA_FeedDataBuilder {
 				break;
 
 			case 'fulfillment_availability[0][lead_time_to_ship_max_days]':
-				if ( $handling_time = get_post_meta( $child_id, '_amazon_handling_time', true ) ) {
-					$value = intval( $handling_time );
+				// For FBA listings, Amazon handles fulfillment so we shouldn't specify lead times
+				if ( ! $fba_enabled ) {
+					if ( $handling_time = get_post_meta( $child_id, '_amazon_handling_time', true ) ) {
+						$value = intval( $handling_time );
+					}
+				} else {
+					// FBA listing - exclude lead time (Amazon handles fulfillment)
+					$value = '';
 				}
 				break;
 
@@ -947,6 +1002,8 @@ class JsonFeedDataBuilder extends \WPLA_FeedDataBuilder {
 						$value = WPLA_ImportHelper::convertNumericConditionIdToType( $report_row['item-condition'] );
 					}
 				}
+
+				$value = wpla_convert_legacy_item_condition( $value );
 
 				// New is not a valid value anymore
 				if ( $value === 'New' ) {
@@ -1157,6 +1214,13 @@ class JsonFeedDataBuilder extends \WPLA_FeedDataBuilder {
 		}
 
 		WPLA()->logger->debug( 'value after switch statement: '. $value );
+
+		/*
+		// Generic currency field handling - apply default currency if field is empty and ends with [currency]
+		if ( empty( $value ) && preg_match( '/\[currency\]$/', $property ) ) {
+			$value = get_woocommerce_currency(); // Fallback to WooCommerce default currency for any empty currency field
+			WPLA()->logger->info( 'Applied default currency ' . $value . ' to field: ' . $property );
+		}*/
 
 		// Generic boolean field handling - convert string boolean values to actual booleans for Amazon API
 		if ( $value === 'true' ) {
@@ -1814,7 +1878,8 @@ class JsonFeedDataBuilder extends \WPLA_FeedDataBuilder {
 			'ingredients',
 			'other_product_image_locator',
 			'other_offer_image_locator',
-			'compatible_with_vehicle_type'
+			'compatible_with_vehicle_type',
+			'compatibility_options'
 		];
 		
 		foreach ( $array as $key => $value ) {

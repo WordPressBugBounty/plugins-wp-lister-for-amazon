@@ -233,6 +233,9 @@ class WPLA_Product_MetaBox {
         }
 
 		if ( get_option( 'wpla_enable_item_condition_fields', 2 ) != 0 ) {
+            // Map Item Condition to their new values
+            $current_condition = get_post_meta( $post->ID, '_amazon_condition_type', true );
+            $current_condition = wpla_convert_legacy_item_condition( $current_condition );
 
 			woocommerce_wp_select( array(
 				'id' 			=> 'wpl_amazon_condition_type',
@@ -255,7 +258,7 @@ class WPLA_Product_MetaBox {
 					),
 				'description' 	=> 'Indicates the condition of the item. Review the condition guidelines definitions.',
 				'desc_tip'		=>  true,
-				'value'			=> get_post_meta( $post->ID, '_amazon_condition_type', true )
+				'value'			=> $current_condition
 			) );
 
 			woocommerce_wp_text_input( array(

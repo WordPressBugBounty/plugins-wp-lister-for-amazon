@@ -1544,6 +1544,25 @@ class WPLA_AmazonFeed {
 			// each profile
 			foreach ( $grouped_inner_items as $profile_id => $items ) {
 
+				// Filter out items that may have been reassigned to different profiles (race condition fix)
+				$validated_items = array();
+				foreach ( $items as $item ) {
+					// Re-check current profile assignment to prevent race conditions
+					$current_profile_id = WPLA_AmazonProfile::getProfileForProduct( $item['post_id'] );
+					if ( $current_profile_id == $profile_id ) {
+						$validated_items[] = $item;
+					} else {
+						WPLA()->logger->info('Skipping item ' . $item['sku'] . ' - profile changed from ' . $profile_id . ' to ' . $current_profile_id);
+					}
+				}
+				$items = $validated_items;
+
+				// Skip if no valid items remain after validation
+				if ( empty($items) ) {
+					WPLA()->logger->info('No valid items remaining for profile_id: '.$profile_id.' after validation');
+					continue;
+				}
+
 				WPLA()->logger->info('building listing items feed for profile_id: '.$profile_id);
 				WPLA()->logger->info('TemplateType: '.$template_type.' - tpl_id: '.$tpl_id);
 				WPLA()->logger->info('number of items: '.sizeof($items));

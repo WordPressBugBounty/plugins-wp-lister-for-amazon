@@ -813,6 +813,9 @@ class WPLA_SettingsPage extends WPLA_Page {
 	protected function saveCustomSizeMaps() {
 	    $maps = !empty( $_REQUEST['custom_sizemap'] ) ? (array)$_REQUEST['custom_sizemap'] : array();
         $clean_maps = array();
+        
+        // Process nested arrays created by square brackets in field names
+        $maps = $this->flattenCustomSizeMapArray( $maps );
 
 	    // run through the array and remove empty rows
         foreach ( $maps as $field => $map ) {
@@ -847,6 +850,63 @@ class WPLA_SettingsPage extends WPLA_Page {
         }
 
         self::updateOption( 'custom_size_map', 	$clean_maps );
+    }
+
+    /**
+     * Flatten nested arrays created by square brackets in field names
+     * Converts complex nested structure back to simple field => map format
+     *
+     * @param array $maps Raw $_REQUEST array that may contain nested structures
+     * @return array Flattened array with proper field names as keys
+     */
+    private function flattenCustomSizeMapArray( $maps ) {
+        $flattened = array();
+        
+        foreach ( $maps as $key => $value ) {
+            if ( is_array( $value ) && isset( $value['field'] ) ) {
+                // Decode the field name if it was encoded to avoid square bracket issues
+                $field_name = rawurldecode( $value['field'] );
+                $value['field'] = $field_name;
+                
+                // For numeric keys (new mappings), keep the numeric key so original logic handles it
+                // For encoded keys (existing mappings), use the decoded field name as key
+                if ( is_numeric( $key ) ) {
+                    $flattened[ $key ] = $value;  // Keep numeric key for new mappings
+                } else if ( $key !== $field_name && rawurldecode( $key ) === $field_name ) {
+                    // This key was URL encoded, use the decoded field name
+                    $flattened[ $field_name ] = $value;  
+                } else {
+                    $flattened[ $key ] = $value;  // Regular key, use as-is
+                }
+            } else if ( is_array( $value ) ) {
+                // Nested case: field names with square brackets create nested arrays (legacy handling)
+                $this->extractNestedSizeMaps( $value, '', $flattened );
+            }
+        }
+        
+        return $flattened;
+    }
+    
+    /**
+     * Recursively extract size map data from nested arrays
+     * Handles cases where square brackets in field names create deep nesting
+     *
+     * @param array $data Current level of nested data
+     * @param string $prefix Current field name prefix being built
+     * @param array &$result Reference to result array to populate
+     */
+    private function extractNestedSizeMaps( $data, $prefix, &$result ) {
+        foreach ( $data as $key => $value ) {
+            $current_key = $prefix === '' ? $key : $prefix . '[' . $key . ']';
+            
+            if ( is_array( $value ) && isset( $value['field'] ) && isset( $value['wc_sizes'] ) && isset( $value['amazon_sizes'] ) ) {
+                // Found a complete size map structure
+                $result[ $value['field'] ] = $value;
+            } else if ( is_array( $value ) ) {
+                // Continue recursing
+                $this->extractNestedSizeMaps( $value, $current_key, $result );
+            }
+        }
     }
 
 	protected function saveVariationMergerMap() {

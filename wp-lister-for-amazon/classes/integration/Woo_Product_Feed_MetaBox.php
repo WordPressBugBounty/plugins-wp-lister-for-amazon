@@ -180,26 +180,39 @@ class WPLA_Product_Feed_MetaBox {
 	    $this->add_inline_css();
     }
 
+	/**
+	 * Display feed template selector or product type selector based on profile conversion status
+	 * 
+	 * @param WP_Post $post The product post object
+	 * @return void
+	 */
 	function display_feed_template_selector( $post ) {
-        // Show the old selector only if there's a tpl ID and no Product Type selected. Otherwise, show the new form
+        // Determine whether to show old template selector or new Product Type selector
+        // Priority: Converted profiles always show Product Type interface
 		$custom_feed_tpl_id     = get_post_meta( $post->ID, '_wpla_custom_feed_tpl_id' , true );
         $custom_product_type    = get_post_meta( $post->ID, '_wpla_custom_product_type', true );
         
-        // Check if product is assigned to a profile that uses feed templates
+        // Check if product is assigned to a profile and get profile info
         $assigned_profile_uses_template = false;
+        $assigned_profile_converted = false;
         $assigned_profile_id = WPLA_AmazonProfile::getProfileForProduct( $post->ID );
         if ( $assigned_profile_id ) {
             $assigned_profile = new WPLA_AmazonProfile( $assigned_profile_id );
             $assigned_profile_uses_template = !empty( $assigned_profile->tpl_id );
+            $assigned_profile_converted = !empty( $assigned_profile->product_type );
         }
 
-        // Show old template selector if:
-        // 1. Product has custom feed template ID OR
-        // 2. Product is assigned to a profile that uses feed templates
-        // AND no custom product type is selected
-        $should_show_template_selector = ($custom_feed_tpl_id || $assigned_profile_uses_template);
-        
-        if ( !$should_show_template_selector ) {
+        // Show new Product Type selector if:
+        // 1. Profile has been converted to Product Types, OR
+        // 2. Product has custom product type, OR  
+        // 3. No template dependencies exist
+        $should_show_product_type_selector = (
+            $assigned_profile_converted || 
+            $custom_product_type || 
+            (!$custom_feed_tpl_id && !$assigned_profile_uses_template)
+        );
+
+        if ( $should_show_product_type_selector ) {
             return $this->displayProductTypeSelector( $post );
         }
 

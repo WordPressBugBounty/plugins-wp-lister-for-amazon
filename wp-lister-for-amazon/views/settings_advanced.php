@@ -1087,14 +1087,15 @@
 
                                 <?php
                                 foreach ( $wpl_custom_size_map as $field => $map ):
+                                    $encoded_field = rawurlencode( $field );
                                 ?>
                                 <div class="size-map-block">
                                     <h4>
-                                        <input type="text" name="custom_sizemap[<?php echo $field; ?>][field]" value="<?php echo esc_attr( $field ); ?>" placeholder="Size field (e.g. apparel_size)" />
+                                        <input type="text" name="custom_sizemap[<?php echo esc_attr( $encoded_field ); ?>][field]" value="<?php echo esc_attr( $field ); ?>" placeholder="Size field (e.g. apparel_size)" />
                                         <a href="#" class="button btn_add_map_row" id="map-row-btn">+</a>
                                     </h4>
 
-                                    <table id="field_<?php echo $field; ?>" data-field="<?php echo $field; ?>" class="size-map-table">
+                                    <table id="field_<?php echo esc_attr( $encoded_field ); ?>" data-field="<?php echo esc_attr( $encoded_field ); ?>" data-field-name="<?php echo esc_attr( $field ); ?>" class="size-map-table">
                                         <tr>
                                             <th><?php echo __( 'WooCommerce size', 'wp-lister-for-amazon' ); ?></th>
                                             <th><?php echo __( 'Amazon size', 'wp-lister-for-amazon' ); ?></th>
@@ -1103,10 +1104,10 @@
                                         <?php foreach ( $map as $wc_size => $amz_size ): ?>
                                             <tr>
                                                 <td>
-                                                    <input type="text" name="custom_sizemap[<?php echo $field; ?>][wc_sizes][]" value="<?php echo $wc_size; ?>" class="text_input" />
+                                                    <input type="text" name="custom_sizemap[<?php echo esc_attr( $encoded_field ); ?>][wc_sizes][]" value="<?php echo esc_attr( $wc_size ); ?>" class="text_input" />
                                                 </td>
                                                 <td>
-                                                    <input type="text" name="custom_sizemap[<?php echo $field; ?>][amazon_sizes][]" class="text_input size-map-input" placeholder="Select or enter a custom value" value="<?php esc_attr_e( $amz_size ); ?>" />
+                                                    <input type="text" name="custom_sizemap[<?php echo esc_attr( $encoded_field ); ?>][amazon_sizes][]" class="text_input size-map-input" placeholder="Select or enter a custom value" value="<?php esc_attr_e( $amz_size ); ?>" />
                                                     <a href="#" class="button delete-map-row button-link-delete">&cross;</a>
                                                 </td>
                                             </tr>
@@ -1191,10 +1192,10 @@
                             jQuery( '#SizeMapBox' )
                                 .on( 'click', 'a.btn_add_map_row', function( e ) {
                                     e.preventDefault();
-                                    const field = jQuery(this).parents('.size-map-block').find('table.size-map-table').data('field');
+                                    const encodedField = jQuery(this).parents('.size-map-block').find('table.size-map-table').data('field');
 
                                     let tpl = jQuery('#map_row_tpl').html();
-                                    tpl = tpl.replaceAll( '__FIELD__', field );
+                                    tpl = tpl.replaceAll( '__FIELD__', encodedField );
 
 
                                     //jQuery(tpl).find('.size-map-input').autocomplete({source: size_map_values});

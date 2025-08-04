@@ -1499,6 +1499,13 @@ class WPLA_ListingsModel extends WPLA_Model {
 		foreach ( $items as $item ) {
 			$tpl_id     = $item['tpl_id'] ??  0;
 			$profile_id = $item['profile_id'];
+			
+			// Force items with no profile (profile_id = 0) to use tpl_id = 0
+			// This ensures they're handled by JSON ListingLoader feeds, not CSV fallback
+			if ( $profile_id == 0 ) {
+				$tpl_id = 0;
+			}
+			
 			$grouped_items[ $tpl_id ][ $profile_id ][] = $item;
 		}
 

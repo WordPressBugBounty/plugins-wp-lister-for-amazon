@@ -289,3 +289,27 @@ function wpla_remove_https( $url ) {
 
 	return $url;
 }
+
+function wpla_convert_legacy_item_condition( $condition ) {
+	$legacy_map = [
+		'Club'                  => 'club_club',
+		'CollectibleAcceptable' => 'collectible_acceptable',
+		'CollectibleGood'       => 'collectible_good',
+		'CollectibleLikeNew'    => 'collectible_like_new',
+		'CollectibleVeryGood'   => 'collectible_very_good',
+		'New'                   => 'new_new',
+		'NewOem'                => 'new_oem',
+		'NewOpenBox'            => 'new_open_box',
+		'Refurbished'           => 'refurbished_refurbished',
+		'UsedAcceptable'        => 'used_acceptable',
+		'UsedGood'              => 'used_good',
+		'UsedLikeNew'           => 'used_like_new',
+		'UsedVeryGood'          => 'used_very_good'
+	];
+
+	if ( isset( $legacy_map[ $condition ] ) ) {
+		$condition = $legacy_map[ $condition ];
+	}
+
+	return $condition;
+}

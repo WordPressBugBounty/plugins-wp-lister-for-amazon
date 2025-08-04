@@ -911,7 +911,8 @@ class WPLA_CronActions {
 								'history' => serialize( $history )
 							];
 							$mdl->updateListing( $listing_id, $data );
-							return;
+							WPLA_ListingsModel::removeListingFromPublishingQueue( $listing_id );
+							continue;
 							//throw new Exception( $validation_result->get_error_message(), 401 );
 						}
 
