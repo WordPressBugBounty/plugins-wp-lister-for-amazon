@@ -95,6 +95,22 @@ class WPLA_AmazonProfile {
 		$amazon_dimension_unit = self::convertWooCommerceUnitToAmazon( strtoupper($wc_dimension_unit) );
 
 		$this->fields = array(
+			// JSON feeds
+			'externally_assigned_product_identifier[0][value]'                  => '[amazon_product_id]',
+			'item_name[0][value]'                                               => '[product_title]',
+			'product_description[0][value]'                                     => '[product_content]',
+			'purchasable_offer[0][our_price][schedule][0][value_with_tax]'         => '[product_price]',
+			'purchasable_offer[0][discounted_price][schedule][0][value_with_tax]'  => '[product_sale_price]',
+			'purchasable_offer[0][discounted_price][schedule][0][start_at]'        => '[product_sale_start]',
+			'purchasable_offer[0][discounted_price][schedule][0][end_at]'          => '[product_sale_end]',
+			'item_dimensions[0][length][value]'         => '[product_length]',
+			'item_dimensions[0][length][unit]'          => $amazon_dimension_unit,
+			'item_dimensions[0][width][value]'          => '[product_width]',
+			'item_dimensions[0][width][unit]'           => $amazon_dimension_unit,
+			'item_dimensions[0][height][value]'         => '[product_height]',
+			'item_dimensions[0][height][unit]'          => $amazon_dimension_unit,
+			/*
+			### DEPRECATED FIELDS ###
 			// category feeds
 			'external_product_id' => '[amazon_product_id]',
 			'item_name'           => '[product_title]',
@@ -115,21 +131,7 @@ class WPLA_AmazonProfile {
 			'sale-price'          => '[product_sale_price]',
 			'sale-start-date'     => '[product_sale_start]',
 			'sale-end-date'       => '[product_sale_end]',
-
-			// JSON feeds
-			'externally_assigned_product_identifier[0][value]'                  => '[amazon_product_id]',
-			'item_name[0][value]'                                               => '[product_title]',
-			'product_description[0][value]'                                     => '[product_content]',
-			'purchasable_offer[0][our_price][schedule][0][value_with_tax]'         => '[product_price]',
-			'purchasable_offer[0][discounted_price][schedule][0][value_with_tax]'  => '[product_sale_price]',
-			'purchasable_offer[0][discounted_price][schedule][0][start_at]'        => '[product_sale_start]',
-			'purchasable_offer[0][discounted_price][schedule][0][end_at]'          => '[product_sale_end]',
-			'item_dimensions[0][length][value]'         => '[product_length]',
-			'item_dimensions[0][length][unit]'          => $amazon_dimension_unit,
-			'item_dimensions[0][width][value]'          => '[product_width]',
-			'item_dimensions[0][width][unit]'           => $amazon_dimension_unit,
-			'item_dimensions[0][height][value]'         => '[product_height]',
-			'item_dimensions[0][height][unit]'          => $amazon_dimension_unit,
+			*/
 		);
 
 	}

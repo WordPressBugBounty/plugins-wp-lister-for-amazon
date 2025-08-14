@@ -422,18 +422,27 @@ class ProfileProductTypeConverter {
 	public function downloadMapFile() {
 		require_once(ABSPATH . 'wp-admin/includes/file.php');
 		\WP_Filesystem();
-		$filename = download_url( $this->remote_file );
+		$temp_filename = download_url( $this->remote_file );
 
-		if ( is_wp_error( $filename ) ) {
+		if ( is_wp_error( $temp_filename ) ) {
 			return false;
 		}
 
-		$success = rename( $filename, $this->file_path );
+		$success = rename( $temp_filename, $this->file_path );
 		
 		if ( $success ) {
 			// Invalidate the cache when new file is downloaded
 			$this->clearMapCache();
 			WPLA()->logger->info( 'Product type converter map file downloaded and cache cleared' );
+		} else {
+			// Log the error when rename fails
+			WPLA()->logger->error( 'Failed to rename temporary file from ' . $temp_filename . ' to ' . $this->file_path );
+			
+			// Clean up the temporary file since rename failed
+			if ( file_exists( $temp_filename ) ) {
+				unlink( $temp_filename );
+				WPLA()->logger->info( 'Cleaned up temporary file: ' . $temp_filename );
+			}
 		}
 
 		return $success;

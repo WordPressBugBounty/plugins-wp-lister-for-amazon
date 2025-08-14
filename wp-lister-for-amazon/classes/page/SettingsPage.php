@@ -965,12 +965,12 @@ class WPLA_SettingsPage extends WPLA_Page {
         /*if ( get_option( 'wpla_run_background_inventory_check', 1) ) {
             // Turn it on
             if ( ! as_next_scheduled_action( 'wpla_bg_inventory_check' ) ) {
-                as_schedule_recurring_action( time(), $frequency * 3600, 'wpla_bg_inventory_check' );
+                as_schedule_recurring_action( time(), $frequency * 3600, 'wpla_bg_inventory_check', [], 'WPLA' );
             }
         } else {
             // Disabled - remove the scheduled task
-            as_unschedule_all_actions( 'wpla_update_reports', array('inventory_sync' => 1) );
-            as_unschedule_all_actions( 'wpla_bg_inventory_check' );
+            as_unschedule_all_actions( 'wpla_update_reports', array('inventory_sync' => 1), 'WPLA' );
+            as_unschedule_all_actions( 'wpla_bg_inventory_check', [], 'WPLA' );
         }*/
     }
 

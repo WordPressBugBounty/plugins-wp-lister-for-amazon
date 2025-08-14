@@ -865,6 +865,36 @@ class AmazonSchemaFormGenerator {
 
             $html .= '<option value="'. $value .'" '. $selected_attr .'>'. $label .'</option>';
         }
+        
+        // Check if the selected value is a custom value that's not in any of the predefined lists
+        if ( !empty( $selected ) && !is_array( $selected ) ) {
+            $is_custom_value = true;
+            
+            // Check if it's in allowed values
+            if ( array_key_exists( $selected, $allowed_values ) || in_array( $selected, $allowed_values ) ) {
+                $is_custom_value = false;
+            }
+            
+            // Check if it's a product attribute shortcode
+            foreach ( $product_attributes as $attribute ) {
+                $attr_value = '[' . str_replace( 'pa_', 'attribute_', $attribute->name ) . ']';
+                if ( $selected == $attr_value ) {
+                    $is_custom_value = false;
+                    break;
+                }
+            }
+            
+            // Check if it's in other shortcodes
+            if ( array_key_exists( $selected, $wpl_other_shortcodes ) ) {
+                $is_custom_value = false;
+            }
+            
+            // If it's a custom value, add it as a selected option
+            if ( $is_custom_value ) {
+                $html .= '<option value="'. esc_attr( $selected ) .'" selected="selected">'. esc_html( $selected ) .'</option>';
+            }
+        }
+        
         $html .= '</optgroup>';
 
 		return $html;

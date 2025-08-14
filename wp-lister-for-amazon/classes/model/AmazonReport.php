@@ -386,7 +386,7 @@ class WPLA_AmazonReport {
                 // Do not process the report if we only need to check for inventory sync
                 //if ( $inventory_sync ) {
                 // Clear the update reports cron
-                as_unschedule_all_actions( 'wpla_update_reports', array('inventory_sync' => 1) );
+                as_unschedule_all_actions( 'wpla_update_reports', array('inventory_sync' => 1), 'WPLA' );
 
                 //$new_report->autoProcessNewReport();
                 $ic = new WPLA_InventoryCheck( 'wpla_bg_inventory_check_queue_data' );
@@ -432,7 +432,7 @@ class WPLA_AmazonReport {
 					// Do not process the report if we only need to check for inventory sync
 					//if ( $inventory_sync ) {
                         // Clear the update reports cron
-                        as_unschedule_all_actions( 'wpla_update_reports', array('inventory_sync' => 1) );
+                        as_unschedule_all_actions( 'wpla_update_reports', array('inventory_sync' => 1), 'WPLA' );
 
                         //$new_report->autoProcessNewReport();
                         $ic = new WPLA_InventoryCheck( 'wpla_bg_inventory_check_queue_data' );

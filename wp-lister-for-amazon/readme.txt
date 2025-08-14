@@ -54,6 +54,24 @@ Yes, there are. Please check out our growing knowledgebase at <https://www.wplab
 
 == Changelog ==
 
+= 2.8.6 - 2025-08-12 =
+Fix: Uncaught TypeError: Illegal offset type in isset or empty in ProfileProductTypeConverter.php
+Fix: Product-level Product Type must have priority over profile Product Type
+Fix: Image fallback for variations not working
+Fix: Properties like variation_theme are sometimes omitted from the feeds
+Fix: Skip processing of feeds with FATAL processing status
+Fix: Remove the sale price start and end dates when sale price is empty
+Fix: Namespace issue when calling WP_Error
+Fix: Always exclude is_inventory_available from feeds
+Fix: Parent listing column filtering not removing invalid properties
+Fix: Handle boolean strings as strings instead of converting them to 1 and 0
+Fix: Use the product's assigned profile to add missing variations if parent listing isn't available
+Fix: Check for existing listing variations when List on Amazon is executed
+Fix: Status should fall back to the Prepared status on profile update if the listing has no ASIN (unlisted)
+Fix: Added batteries_required to the allowed parent columns
+Fix: Added a fallback to the gzdecode function when zlib is not installed
+Tweak: Remove temporary mapping file after processing
+
 = 2.8.5 - 2025-08-04 =
 Fix: Missing currency value for the list_price property
 Fix: Added the compatibility_options property to the reindexArrays() method to fix its indices having gaps

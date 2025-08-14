@@ -260,7 +260,15 @@ class WPLA_InventoryCheck extends WPLA_Model  {
         if ( $page < $total_pages ) {
             $page++;
             update_option( 'wpla_bg_inventory_check_step', $page );
-            as_schedule_single_action( time() + 1, 'wpla_bg_inventory_check_run', array( 'report' => $report->id ), 'WPLA' );
+            
+            // Only schedule if no wpla_bg_inventory_check_run task already exists
+            $existing_task = as_next_scheduled_action('wpla_bg_inventory_check_run');
+            if (!$existing_task) {
+                as_schedule_single_action( time() + 1, 'wpla_bg_inventory_check_run', array( 'report' => $report->id ), 'WPLA' );
+                WPLA()->logger->info("Scheduled next inventory check batch for report {$report->id}, page {$page}");
+            } else {
+                WPLA()->logger->info("Skipping wpla_bg_inventory_check_run scheduling - task already exists");
+            }
         } else {
 	        WPLA()->logger->info( 'Done processing report. Out of sync products found: '. count($this->oos_products) );
             // Done processing. Reset the data then send the notification email
