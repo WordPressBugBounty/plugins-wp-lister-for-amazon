@@ -54,23 +54,35 @@ Yes, there are. Please check out our growing knowledgebase at <https://www.wplab
 
 == Changelog ==
 
-= 2.8.6 - 2025-08-12 =
-Fix: Uncaught TypeError: Illegal offset type in isset or empty in ProfileProductTypeConverter.php
+= 2.8.7 - 2025-08-20 =
+New: Individual listing submissions now display on the Feeds page alongside batch feeds for better visibility
+Fix: Handling of product-level generic_keyword and bullet_point properties
+Fix: Include the "audience" property to set the validation rules to B2B if enabled on the Advanced Settings page
+Fix: XSS prevention improvements in table output
+Fix: TypeError: Illegal offset type in isset or empty in ProfileProductTypeConverter.php:1020
+Fix: Added batteries_required to the allowed parent columns
 Fix: Product-level Product Type must have priority over profile Product Type
+Fix: Skip processing of feeds with FATAL processing status
 Fix: Image fallback for variations not working
 Fix: Properties like variation_theme are sometimes omitted from the feeds
-Fix: Skip processing of feeds with FATAL processing status
+Fix: Status should fall back to the Prepared status on profile update if the listing has no ASIN (unlisted)
+Tweak: Allow shortcodes in Amazon B2B Price
+Dev: New filter `wpla_json_feed_listing_attributes`
+
+= 2.8.6 - 2025-08-13 =
+Fix: Added a fallback to the gzdecode function when zlib is not installed
 Fix: Remove the sale price start and end dates when sale price is empty
 Fix: Namespace issue when calling WP_Error
 Fix: Always exclude is_inventory_available from feeds
+Fix: Image properties must be overridable at the product level
 Fix: Parent listing column filtering not removing invalid properties
-Fix: Handle boolean strings as strings instead of converting them to 1 and 0
 Fix: Use the product's assigned profile to add missing variations if parent listing isn't available
+Fix: Handle boolean strings as strings instead of converting them to 1 and 0
+Fix: Missing ActionScheduler group name in some calls
 Fix: Check for existing listing variations when List on Amazon is executed
-Fix: Status should fall back to the Prepared status on profile update if the listing has no ASIN (unlisted)
-Fix: Added batteries_required to the allowed parent columns
-Fix: Added a fallback to the gzdecode function when zlib is not installed
-Tweak: Remove temporary mapping file after processing
+Fix: Custom attribute values (tags) are not getting rendered after saving the page
+Fix: Removed the deprecated default values from AmazonProfile that's interfering with the saving of custom attributes at the product level
+Tweak: Remove temporary mapping CSV file after processing
 
 = 2.8.5 - 2025-08-04 =
 Fix: Missing currency value for the list_price property

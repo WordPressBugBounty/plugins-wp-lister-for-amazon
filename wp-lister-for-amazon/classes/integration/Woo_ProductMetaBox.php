@@ -163,9 +163,8 @@ class WPLA_Product_MetaBox {
 				'label' 		=> __( 'Amazon B2B Price', 'wp-lister-for-amazon' ),
 				'description' 	=> __( 'Set a different B2B price', 'wp-lister-for-amazon' ),
 				'desc_tip'		=>  true,
-				'placeholder' 	=> 'B2B Price',
-				'class' 		=> 'wc_input_price',
-				'value'			=> wc_format_localized_price( get_post_meta( $post->ID, '_amazon_b2b_price', true ) )
+				'placeholder' 	=> 'B2B Price or shortcode',
+				'value'			=> get_post_meta( $post->ID, '_amazon_b2b_price', true )
 			) );
         }
 
@@ -465,7 +464,13 @@ class WPLA_Product_MetaBox {
 
 		// convert decimal comma for all price fields
 		$_amazon_price         = wc_format_decimal(	wpla_clean( $_POST['wpl_amazon_price'] ?? '' ) );
-		$_amazon_b2b_price     = wc_format_decimal( wpla_clean( $_POST['wpl_amazon_b2b_price'] ?? '' ) );
+		
+		// Handle B2B price - preserve shortcodes, format only numeric values
+		$_amazon_b2b_price_raw = wpla_clean( $_POST['wpl_amazon_b2b_price'] ?? '' );
+		$_amazon_b2b_price = ( !empty($_amazon_b2b_price_raw) && strpos($_amazon_b2b_price_raw, '[') !== false ) 
+			? $_amazon_b2b_price_raw 
+			: wc_format_decimal( $_amazon_b2b_price_raw );
+		
 		$_amazon_minimum_price = wc_format_decimal( wpla_clean( $_POST['wpl_amazon_minimum_price'] ?? '' ) );
 		$_amazon_maximum_price = wc_format_decimal( wpla_clean( $_POST['wpl_amazon_maximum_price'] ?? '' ) );
 
@@ -822,9 +827,9 @@ class WPLA_Product_MetaBox {
                     <p class="form-row form-row-last">
                         <label style="display: block;">
                             <?php _e( 'Amazon B2B Price', 'wp-lister-for-amazon' ); ?>
-                            <a class="tips" data-tip="Set a different business price for this variation" href="#">[?]</a>
+                            <a class="tips" data-tip="Set a different business price for this variation. Supports shortcodes like [product_price] and [meta_custom_field]." href="#">[?]</a>
                         </label>
-                        <input type="text" name="variable_amazon_b2b_price[<?php echo $loop; ?>]" class="wc_input_price" value="<?php echo $_amazon_b2b_price ?>" />
+                        <input type="text" name="variable_amazon_b2b_price[<?php echo $loop; ?>]" value="<?php echo $_amazon_b2b_price ?>" placeholder="B2B Price or shortcode" />
                     </p>
                 <?php endif; ?>
             </div>
@@ -977,12 +982,18 @@ class WPLA_Product_MetaBox {
             $current_variable_amazon_id_type = $variable_amazon_id_type[$i] ?? '';
             $current_variable_amazon_asin = $variable_amazon_asin[$i] ?? '';
 
+	        // Handle B2B price - preserve shortcodes, format only numeric values
+	        $variation_b2b_price_raw = isset( $variable_amazon_b2b_price[$i] ) ? trim( $variable_amazon_b2b_price[$i] ) : '';
+	        $variation_b2b_price = ( !empty($variation_b2b_price_raw) && strpos($variation_b2b_price_raw, '[') !== false )
+		        ? $variation_b2b_price_raw
+		        : wc_format_decimal( $variation_b2b_price_raw );
+
             // Update post meta
             update_post_meta( $variation_id, '_amazon_product_id', 		        trim( $current_variable_amazon_product_id ) );
             update_post_meta( $variation_id, '_amazon_id_type', 		            $current_variable_amazon_id_type );
             update_post_meta( $variation_id, '_wpla_asin', 				        trim( $current_variable_amazon_asin ) );
-            update_post_meta( $variation_id, '_amazon_price', 			isset( $variable_amazon_price[$i]          ) ? wc_format_decimal( trim( $variable_amazon_price[$i] ) ) : '' );
-            update_post_meta( $variation_id, '_amazon_b2b_price', 		isset( $variable_amazon_b2b_price[$i]      ) ? wc_format_decimal( trim( $variable_amazon_b2b_price[$i] ) ) : '' );
+            update_post_meta( $variation_id, '_amazon_price', 			  isset( $variable_amazon_price[$i]          ) ? wc_format_decimal( trim( $variable_amazon_price[$i] ) ) : '' );
+            update_post_meta( $variation_id, '_amazon_b2b_price',                  $variation_b2b_price );
             update_post_meta( $variation_id, '_amazon_minimum_price', 	isset( $variable_amazon_minimum_price[$i]  ) ? wc_format_decimal( trim( $variable_amazon_minimum_price[$i] ) ) : '' );
             update_post_meta( $variation_id, '_amazon_maximum_price', 	isset( $variable_amazon_maximum_price[$i]  ) ? wc_format_decimal( trim( $variable_amazon_maximum_price[$i] ) ) : '' );
             update_post_meta( $variation_id, '_amazon_condition_type', 	isset( $variable_amazon_condition_type[$i] ) ? trim( $variable_amazon_condition_type[$i] ) : '' );

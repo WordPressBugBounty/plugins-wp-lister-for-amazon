@@ -50,6 +50,7 @@ class WPLA_Autoloader {
 		'WPLA_FbaHelper'          => '/classes/helper/WPLA_FbaHelper.php',
 		'WPLA_CountryHelper'      => '/classes/helper/WPLA_CountryHelper.php',
 		'WPLA_DateTimeHelper'     => '/classes/helper/WPLA_DateTimeHelper.php',
+		'WPLA_Helper'             => '/classes/helper/WPLA_Helper.php',
 
 		'WPLab\Amazon\Helper\JsonFeedDataBuilder'           => '/classes/helper/JsonFeedDataBuilder.php',
 		'WPLab\Amazon\Helper\AmazonSchemaFormGenerator'     => '/classes/helper/AmazonSchemaFormGenerator.php',

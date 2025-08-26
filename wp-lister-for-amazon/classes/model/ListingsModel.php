@@ -2443,6 +2443,12 @@ class WPLA_ListingsModel extends WPLA_Model {
 			if ( $product_value = get_post_meta( $post_id, '_amazon_title', true ) )
 				$listing_title = $product_value;
 
+			// Check if variation already exists before creating
+			if ( $this->productExistsInAccount( $variation_id, $profile->account_id ) ) {
+				WPLA()->logger->info("Variation #$variation_id already exists in account {$profile->account_id}, skipping");
+				continue;
+			}
+
 			// build single variation listing item
 			$data = array();
 			$data['post_id']       = $variation_id;
@@ -2488,7 +2494,6 @@ class WPLA_ListingsModel extends WPLA_Model {
     public function insertMissingVariations( $product_id ) {
         WPLA()->logger->info( 'Find missing variations for #'. $product_id );
 
-        $lm = new WPLA_ListingsModel();
         $parent_listings = $this->getAllItemsByPostID( $product_id );
         $product = wc_get_product( $product_id );
         $variation_ids = $product->get_children();
@@ -2496,64 +2501,127 @@ class WPLA_ListingsModel extends WPLA_Model {
         if ( ! empty( $parent_listings ) ) {
             WPLA()->logger->info( 'Found parent listings: '. print_r( $parent_listings, 1 ) );
             foreach ( $parent_listings as $parent_listing ) {
-                // get account from parent listing
-                $account = WPLA_AmazonAccount::getAccount( $parent_listing->account_id );
-                if ( ! $account ) {
-                    WPLA()->logger->info( 'No account found for parent listing. Skipping.' );
-                    continue;
-                }
+                $this->processVariationsForListing( $variation_ids, $parent_listing );
+            }
+        } else {
+            $this->processVariationsWithProductProfile( $variation_ids, $product_id );
+        }
+    }
 
-                WPLA()->logger->info( 'Found account #'. $parent_listing->account_id );
+    /**
+     * Process variations for a specific parent listing
+     *
+     * @param array $variation_ids
+     * @param object $parent_listing
+     */
+    private function processVariationsForListing( $variation_ids, $parent_listing ) {
+        $account = WPLA_AmazonAccount::getAccount( $parent_listing->account_id );
+        if ( ! $account ) {
+            WPLA()->logger->info( 'No account found for parent listing. Skipping.' );
+            return;
+        }
 
-                foreach ( $variation_ids as $variation_id ) {
-                    WPLA()->logger->info( 'Checking variation #'. $variation_id );
-                    $variation = wc_get_product( $variation_id );
+        WPLA()->logger->info( 'Found account #'. $parent_listing->account_id );
+        $this->processVariationsBatch( $variation_ids, $parent_listing, $account );
+    }
 
-                    if ( ! $variation || ! $variation->exists() ) {
-                        WPLA()->logger->info('Variation #' . $variation_id . ' does not exist');
-                        continue;
-                    }
+    /**
+     * Process variations using profile assigned to product when no parent listings exist
+     *
+     * @param array $variation_ids
+     * @param int $product_id
+     */
+    private function processVariationsWithProductProfile( $variation_ids, $product_id ) {
+        WPLA()->logger->info("No parent listings found for product #$product_id. Checking product profile.");
+        
+        // Get the profile assigned to this product
+        $profile_id = WPLA_AmazonProfile::getProfileForProduct( $product_id );
+        if ( ! $profile_id ) {
+            WPLA()->logger->error("No profile assigned to product #$product_id. Cannot process variations.");
+            return;
+        }
+        
+        WPLA()->logger->info( 'Found profile #'. $profile_id .' assigned to product' );
+        
+        // Get the profile to access its account
+        $profile = new WPLA_AmazonProfile( $profile_id );
+        if ( ! $profile->account_id ) {
+            WPLA()->logger->error("Profile #$profile_id has no account assigned. Cannot process variations.");
+            return;
+        }
+        
+        $account = WPLA_AmazonAccount::getAccount( $profile->account_id );
+        if ( ! $account ) {
+            WPLA()->logger->error("Account #{$profile->account_id} from profile not found. Cannot process variations.");
+            return;
+        }
+        
+        WPLA()->logger->info( 'Using account #'. $profile->account_id .' from product profile' );
+        
+        // Create a mock parent listing object with profile data for insertVariation()
+        $mock_parent_listing = (object) array(
+            'account_id' => $profile->account_id,
+            'profile_id' => $profile_id,
+        );
+        
+        $this->processVariationsBatch( $variation_ids, $mock_parent_listing, $account );
+    }
 
-                    $sku = $variation->get_sku();
+    /**
+     * Process a batch of variations for a given parent listing and account
+     *
+     * @param array $variation_ids
+     * @param object $parent_listing
+     * @param object $account
+     */
+    private function processVariationsBatch( $variation_ids, $parent_listing, $account ) {
+        $lm = new WPLA_ListingsModel();
 
-                    if ( empty( $sku ) ) {
-                        WPLA()->logger->info('No SKU found. Skipping.');
-                    }
+        foreach ( $variation_ids as $variation_id ) {
+            WPLA()->logger->info( 'Checking variation #'. $variation_id );
+            $variation = wc_get_product( $variation_id );
 
-                    // check if this SKU / ID already exist - skip if it does
-                    if ( $lm->getItemBySkuAndAccount( $sku, $parent_listing->account_id, false ) ) {
-                        WPLA()->logger->info( 'Matching SKU and account already exists. Skipping' );
-                        continue;
-                    }
+            if ( ! $variation || ! $variation->exists() ) {
+                WPLA()->logger->info('Variation #' . $variation_id . ' does not exist');
+                continue;
+            }
 
-                    // check if this variation has a UPC/EAN set - skip if empty (unless brand registry is enabled)
-                    $_amazon_product_id = get_post_meta( $variation_id, '_amazon_product_id', true );
-                    if ( ! $_amazon_product_id && ! $account->is_reg_brand ) {
-                        WPLA()->logger->info("no amazon product ID found for the listing. Skipping");
-                        continue;
-                    }
+            $sku = $variation->get_sku();
 
-                    // skip hidden variations
-                    if ( get_post_meta( $variation_id, '_amazon_is_disabled', true ) == 'on' ) {
-                        WPLA()->logger->info("amazon_is_disabled setting is ON. Skipping");
-                        continue;
-                    }
+            if ( empty( $sku ) ) {
+                WPLA()->logger->info('No SKU found. Skipping.');
+                continue;
+            }
 
-                    // insert variation listing
-                    $success = $this->insertVariation( $variation_id, $sku, $parent_listing );
-                    // $error_msg = isset($lm->lastError) ? $lm->lastError : '';
+            // check if this SKU / ID already exist - skip if it does
+            if ( $lm->getItemBySkuAndAccount( $sku, $parent_listing->account_id, false ) ) {
+                WPLA()->logger->info( 'Matching SKU and account already exists. Skipping' );
+                continue;
+            }
 
-                    if ( $success ) {
-                        // TODO: use persistent admin message
-                        WPLA()->logger->info("Added missing variation #$variation_id / $sku");
-                    } else {
-                        echo "Failed to add missing variation #$variation_id - please report this to support!";
-                        WPLA()->logger->error("Failed to add missing variation #$variation_id / $sku");
-                    }
+            // check if this variation has a UPC/EAN set - skip if empty (unless brand registry is enabled)
+            $_amazon_product_id = get_post_meta( $variation_id, '_amazon_product_id', true );
+            if ( ! $_amazon_product_id && ! $account->is_reg_brand ) {
+                WPLA()->logger->info("no amazon product ID found for the listing. Skipping");
+                continue;
+            }
 
-                } // each variation
-            } // each parent listing
-        } // if parent listing(s) exists
+            // skip hidden variations
+            if ( get_post_meta( $variation_id, '_amazon_is_disabled', true ) == 'on' ) {
+                WPLA()->logger->info("amazon_is_disabled setting is ON. Skipping");
+                continue;
+            }
+
+            // insert variation listing
+            $success = $this->insertVariation( $variation_id, $sku, $parent_listing );
+
+            if ( $success ) {
+                WPLA()->logger->info("Added missing variation #$variation_id / $sku");
+            } else {
+                echo "Failed to add missing variation #$variation_id - please report this to support!";
+                WPLA()->logger->error("Failed to add missing variation #$variation_id / $sku");
+            }
+        }
     }
 
     /**
@@ -2774,8 +2842,12 @@ class WPLA_ListingsModel extends WPLA_Model {
 			} else {
 				// default new status is 'changed'
 				$data['status'] = self::STATUS_CHANGED;
-				if ( $status == self::STATUS_FAILED ) 			$data['status'] = self::STATUS_CHANGED;
-				if ( $status == self::STATUS_ONLINE ) 			$data['status'] = self::STATUS_CHANGED;
+				if ( $status == self::STATUS_FAILED ) {
+					$data['status'] = $asin ? self::STATUS_CHANGED : self::STATUS_PREPARED;
+				}
+				if ( $status == self::STATUS_ONLINE ) {
+					$data['status'] = self::STATUS_CHANGED;
+				}
 
 				// except for matched or imported products
 				if ( $status == self::STATUS_MATCHED ) 		    $data['status'] = $status;

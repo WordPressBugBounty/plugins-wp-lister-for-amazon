@@ -705,10 +705,28 @@ class WPLA_Amazon_SP_API {
 			$response = wp_remote_retrieve_body(  $request );*/
 
 			if ( $doc->getCompressionAlgorithm() == 'GZIP' ) {
-				$response = gzdecode($response);
+				if ( function_exists('gzdecode') ) {
+					$response = gzdecode($response);
 
-				if ($response === false) {
-					throw new Exception( 'Unable to decompress the response' );
+					if ($response === false) {
+						throw new Exception( 'Unable to decompress the response' );
+					}
+				} elseif ( function_exists('gzinflate') ) {
+					// Fallback using gzinflate() - skip GZIP header (10 bytes) and footer (8 bytes)
+					if ( strlen($response) > 18 && substr($response, 0, 3) === "\x1f\x8b\x08" ) {
+						$compressed = substr($response, 10, -8);
+						$response = gzinflate($compressed);
+						
+						if ($response === false) {
+							throw new Exception( 'Unable to decompress the response using gzinflate fallback' );
+						}
+					} else {
+						throw new Exception( 'Invalid GZIP format in response' );
+					}
+				} else {
+					// No decompression method available
+					WPLA()->logger->error('Neither gzdecode() nor gzinflate() functions are available - Zlib extension is required for GZIP decompression');
+					throw new Exception( 'Server configuration error: No GZIP decompression method available. Please enable the PHP Zlib extension.' );
 				}
 			}
 
@@ -798,10 +816,34 @@ class WPLA_Amazon_SP_API {
 	 * @return stdClass|\WPLab\Amazon\SellingPartnerApi\Model\ListingsV20210801\ListingsItemSubmissionResponse
 	 */
 	public function putListingsItem( $listing, $profile ) {
+		// Validate inputs
+		if ( !is_array( $listing ) || !isset( $listing['sku'] ) || empty( $listing['sku'] ) ) {
+			$error = new stdClass();
+			$error->ErrorMessage = 'Invalid listing data: SKU is required';
+			$error->ErrorCode = 'INVALID_INPUT';
+			return $error;
+		}
+		
+		if ( !$profile || !is_object( $profile ) ) {
+			$error = new stdClass();
+			$error->ErrorMessage = 'Invalid profile object provided';
+			$error->ErrorCode = 'INVALID_PROFILE';
+			return $error;
+		}
+		
+		// Sanitize SKU
+		$listing['sku'] = sanitize_text_field( $listing['sku'] );
+		
 		if ( $this->initAPI( 'Listings' ) === false ) {
 			$error = new stdClass();
 			$error->ErrorMessage = 'Failed to initialize SP-API configuration';
 			$error->ErrorCode = 'INIT_API_FAILED';
+			
+			// Log initialization failure
+			if ( get_option('wpla_log_to_db') == '1' ) {
+				$this->logPutListingItem( $listing, null, 'Failed to initialize SP-API configuration', 'Error INIT_API_FAILED' );
+			}
+			
 			return $error;
 		}
 
@@ -809,10 +851,10 @@ class WPLA_Amazon_SP_API {
 		$builder = new \WPLab\Amazon\Helper\JsonFeedDataBuilder();
 
 		try {
-			if ( $profile->product_type ) {
+			// Product-level custom product type takes priority over profile product type
+			$product_type = get_post_meta( $listing['post_id'], '_wpla_custom_product_type', true );
+			if ( !$product_type && $profile->product_type ) {
 				$product_type = $profile->product_type;
-			} else {
-				$product_type = get_post_meta( $listing['post_id'], '_wpla_custom_product_type', true );
 			}
 
 			// If there's still no product type at this point, use the generic PRODUCT product type and
@@ -827,8 +869,18 @@ class WPLA_Amazon_SP_API {
 				'attributes'   => $builder->getAttributes( $listing, $profile )
 			];
 
+			// Format the request data for logging
+			$formatted_request = json_encode( $body_data, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES );
+
 			$body = new \WPLab\Amazon\SellingPartnerApi\Model\ListingsV20200901\ListingsItemPutRequest( $body_data );
-			return $api->putListingsItem( $this->account->merchant_id, $listing['sku'], $this->account->marketplace_id, $body_data );
+			$result = $api->putListingsItem( $this->account->merchant_id, $listing['sku'], $this->account->marketplace_id, $body_data );
+			
+			// Log the API call if database logging is enabled
+			if ( get_option('wpla_log_to_db') == '1' ) {
+				$this->logPutListingItemRequest( $listing, $formatted_request, $result );
+			}
+			
+			return $result;
 		} catch (\WPLab\Amazon\SellingPartnerApi\ApiException | Exception $ex ) {
 			// Also catch Exceptions because toXML and fromXML methods throw Exceptions on invalid XML strings
 			$error = new stdClass();
@@ -859,9 +911,56 @@ class WPLA_Amazon_SP_API {
 			}
 			
 			$error->StatusCode = $ex->getCode();
+			
+			
 			return $error;
 		}
 	}
+
+	/**
+	 * Log putListingItem API calls to amazon_log table with formatted JSON request
+	 */
+	private function logPutListingItemRequest( $listing, $formatted_request, $result ) {
+		// Determine success status based on result
+		$success = 'Processing';
+		if ( !WPLA_Amazon_SP_API::isError( $result ) ) {
+			if ( $result->getStatus() == 'ACCEPTED' ) {
+				$success = 'Success';
+			} else {
+				// Extract error code from issues if available
+				$issues = $result->getIssues();
+				if ( !empty($issues) ) {
+					$first_issue = $issues[0];
+					if ( $first_issue->getSeverity() == 'ERROR' ) {
+						$success = 'Error ' . $first_issue->getCode();
+					} else {
+						$success = 'Warning ' . $first_issue->getCode();
+					}
+				}
+			}
+		} else {
+			// API returned an error
+			$error_code = $result->ErrorCode ?? $result->StatusCode ?? 'Unknown';
+			$success = 'Error ' . $error_code;
+		}
+
+		try {
+			$logger = new WPLA_AmazonLogger();
+			$logger->updateLog( array(
+				'callname'    => 'putListingItem',
+				'request_url' => 'SP-API listings endpoint',
+				'request'     => $formatted_request,
+				'response'    => maybe_serialize( $result ),
+				'success'     => $success,
+				'account_id'  => $this->account_id,
+				'parameters'  => 'SKU: ' . $listing['sku']
+			) );
+		} catch ( Exception $e ) {
+			// Log error if logging fails
+			WPLA()->logger->error( 'Failed to log putListingItem: ' . $e->getMessage() );
+		}
+	}
+
 
     /**
      * getListingsItem call
@@ -1781,10 +1880,28 @@ class WPLA_Amazon_SP_API {
              * Use ReportDocument::getCompressionAlgorithm from the API to determine if we need to decode the data
              */
 	        if ( $doc->getCompressionAlgorithm() == 'GZIP' ) {
-		        $response = gzdecode($response);
+		        if ( function_exists('gzdecode') ) {
+			        $response = gzdecode($response);
 
-		        if ($response === false) {
-			        throw new Exception( 'Unable to decompress the response' );
+			        if ($response === false) {
+				        throw new Exception( 'Unable to decompress the response' );
+			        }
+		        } elseif ( function_exists('gzinflate') ) {
+			        // Fallback using gzinflate() - skip GZIP header (10 bytes) and footer (8 bytes)
+			        if ( strlen($response) > 18 && substr($response, 0, 3) === "\x1f\x8b\x08" ) {
+				        $compressed = substr($response, 10, -8);
+				        $response = gzinflate($compressed);
+				        
+				        if ($response === false) {
+					        throw new Exception( 'Unable to decompress the response using gzinflate fallback' );
+				        }
+			        } else {
+				        throw new Exception( 'Invalid GZIP format in response' );
+			        }
+		        } else {
+			        // No decompression method available
+			        WPLA()->logger->error('Neither gzdecode() nor gzinflate() functions are available - Zlib extension is required for GZIP decompression');
+			        throw new Exception( 'Server configuration error: No GZIP decompression method available. Please enable the PHP Zlib extension.' );
 		        }
 	        }
 

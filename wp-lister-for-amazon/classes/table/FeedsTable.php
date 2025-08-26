@@ -29,6 +29,16 @@ class WPLA_FeedsTable extends WP_List_Table {
 
     var $total_items;
 
+    /**
+     * Check if item is an API log entry
+     *
+     * @param array $item
+     * @return bool
+     */
+    private function isApiLog( $item ) {
+        return isset($item['source_type']) && $item['source_type'] == 'api_log';
+    }
+
     /** ************************************************************************
      * REQUIRED. Set up a constructor that references the parent constructor. We 
      * use the parent reference to set some default configs.
@@ -116,6 +126,11 @@ class WPLA_FeedsTable extends WP_List_Table {
         if ( isset( $_REQUEST['paged'] ))           $page .= '&paged='.wpla_clean($_REQUEST['paged']);
         if ( isset( $_REQUEST['s'] ))               $page .= '&s=' . urlencode( wpla_clean($_REQUEST['s']) );
 
+        // Handle API logs differently from feeds
+        if ( $this->isApiLog($item) ) {
+            return $this->column_details_api_log($item, $page);
+        }
+
         //Build row actions
         $signature = md5( $item['id'] . get_option('wpla_instance') );
         $actions = array(
@@ -160,6 +175,41 @@ class WPLA_FeedsTable extends WP_List_Table {
             /*$1%s*/ $title,
             /*$2%s*/ $this->row_actions($actions),
             /*$2%s*/ $this->display_unspecific_feed_errors($item)
+        );
+    }
+
+    function column_details_api_log($item, $page){
+        // For API logs, show different title and actions
+        $sku = WPLA_Helper::extractSkuFromLogParameters($item['feedOptions'] ?? '');
+        
+        $title = 'New Listing Submission (' . esc_html($sku) . ')';
+        $title .= ' <span class="wpla-individual-listing-label">'. __('Individual Listing', 'wp-lister-for-amazon' ) .'</span>';
+
+        // API log specific actions
+        $actions = array();
+        
+        // View API response details
+        if ( $item['results'] ) {
+            $actions['view_api_response'] = sprintf(
+                '<a href="admin.php?page=wpla-log&action=wpla_display_log_entry&log_id=%s&new_tab=yes" target="_blank">%s</a>',
+                $item['id'], 
+                __( 'View API Response', 'wp-lister-for-amazon' ) 
+            );
+        }
+
+        // Link to find related product if we have SKU
+        if ( !empty( $sku ) && $sku !== 'Unknown SKU' ) {
+            $actions['view_product'] = sprintf( 
+                '<a href="admin.php?page=wpla&s=%s" target="_blank">%s</a>', 
+                urlencode( $sku ), 
+                __( 'View Product', 'wp-lister-for-amazon' ) 
+            );
+        }
+
+        //Return the title contents with visual differentiation
+        return sprintf('<div class="api-log-row">%1$s %2$s</div>',
+            /*$1%s*/ $title,
+            /*$2%s*/ $this->row_actions($actions)
         );
     }
 
@@ -219,6 +269,11 @@ class WPLA_FeedsTable extends WP_List_Table {
     }
 
     function column_FeedSubmissionId($item){
+        // For API logs, don't show anything in the Batch ID column
+        if ( $this->isApiLog($item) ) {
+            return '';
+        }
+        
         return $item['FeedSubmissionId'];
     }
 
@@ -253,6 +308,11 @@ class WPLA_FeedsTable extends WP_List_Table {
     }
 
     function column_status($item){
+
+        // Handle API logs differently
+        if ( $this->isApiLog($item) ) {
+            return $this->column_status_api_log($item);
+        }
 
         switch( $item['FeedProcessingStatus'] ){
             case '_SUBMITTED_':
@@ -307,6 +367,44 @@ class WPLA_FeedsTable extends WP_List_Table {
             /*$2%s*/ $line_count
         );
 	}
+
+    function column_status_api_log($item){
+        // Handle API log status differently
+        $success = $item['success'];
+        
+        if ( $success == 'Success' ) {
+            $color = 'green';
+            $value = __( 'Success', 'wp-lister-for-amazon' );
+        } elseif ( strpos($success, 'Error') !== false ) {
+            $color = 'red';
+            $value = __( 'Error', 'wp-lister-for-amazon' );
+            
+            // Extract error code if available
+            if ( strpos($success, 'Error ') === 0 ) {
+                $error_code = str_replace('Error ', '', $success);
+                $value = __( 'Error', 'wp-lister-for-amazon' ) . ' (' . $error_code . ')';
+            }
+        } elseif ( $success == 'Processing' ) {
+            $color = 'darkorange';
+            $value = __( 'Processing', 'wp-lister-for-amazon' );
+        } else {
+            $color = 'black';
+            $value = $success ? $success : __( 'Unknown', 'wp-lister-for-amazon' );
+        }
+
+        // Show timestamp for API logs instead of line count
+        $timestamp = '';
+        if ( $item['SubmittedDate'] ) {
+            $timestamp = sprintf( __( '%s ago', 'wp-lister-for-amazon' ), 
+                human_time_diff( strtotime( $item['SubmittedDate'].' UTC' ) ) );
+        }
+
+        return sprintf('<span style="color:%1$s">%2$s</span><br><span style="color:silver">%3$s</span>',
+            /*$1%s*/ $color,
+            /*$2%s*/ $value,
+            /*$3%s*/ $timestamp
+        );
+    }
 	  
 	
     /** ************************************************************************
@@ -319,6 +417,11 @@ class WPLA_FeedsTable extends WP_List_Table {
      * @return string Text to be placed inside the column <td> (profile title only)
      **************************************************************************/
     function column_cb($item){
+        // Don't show checkboxes for API logs - they're not actionable like feeds
+        if ( $this->isApiLog($item) ) {
+            return '';
+        }
+        
         return sprintf(
             '<input type="checkbox" name="%1$s[]" value="%2$s" />',
             /*$1%s*/ $this->_args['singular'],  //Let's simply repurpose the table's singular label ("profile")
@@ -465,6 +568,7 @@ class WPLA_FeedsTable extends WP_List_Table {
            $views['unknown'] = "<a href='{$unknown_url}' {$class} >".__( 'Unknown', 'wp-lister-for-amazon' )."</a>";
            $views['unknown'] .= '<span class="count">('.$summary->unknown.')</span>';       
        }
+
 
        return $views;
     }    

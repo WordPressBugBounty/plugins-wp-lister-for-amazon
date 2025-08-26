@@ -405,11 +405,11 @@ class WPLA_OrdersImporter {
 		$record->time    = time();
 
 		// load history
-		$history = $wpdb->get_var( "
+		$history = $wpdb->get_var( $wpdb->prepare("
 			SELECT history
 			FROM $table
-			WHERE order_id = '$order_id'
-		" );
+			WHERE order_id = %s
+		", $order_id) );
 
 		// init with empty array
 		$history = maybe_unserialize( $history );
@@ -436,11 +436,11 @@ class WPLA_OrdersImporter {
 
 		// update history
 		$history = serialize( $history );
-		$wpdb->query( "
+		$wpdb->query( $wpdb->prepare("
 			UPDATE $table
-			SET history = '$history'
-			WHERE order_id = '$order_id'
-		" );
+			SET history = %s
+			WHERE order_id = %s
+		", $history, $order_id) );
 
 	}
 
@@ -563,11 +563,11 @@ class WPLA_OrdersImporter {
 		global $wpdb;
 		$table = $wpdb->prefix . self::TABLENAME;
 
-		$id = $wpdb->get_var( "
+		$id = $wpdb->get_var( $wpdb->prepare("
 			SELECT id
 			FROM $table
-			WHERE order_id = '$order_id'
-		" );
+			WHERE order_id = %s
+		", $order_id) );
 
 		return $id;
 	}

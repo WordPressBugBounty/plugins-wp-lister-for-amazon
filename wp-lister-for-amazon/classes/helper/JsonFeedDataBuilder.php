@@ -266,11 +266,15 @@ class JsonFeedDataBuilder extends \WPLA_FeedDataBuilder {
 
 		parse_str( $fields_str, $fields_arr );
 
+		// Inject B2B offer fields if B2B price exists
+		$fields_arr = $this->injectB2BOfferFields( $fields_arr, $product_id, $marketplace_id, $listing, $product, $profile );
+
 		$fields_arr = $this->filterEmptyFields( $fields_arr );
 		$fields_arr = $this->reindexArrays( $fields_arr );
 		$fields_arr = $this->insertMarketData( $fields_arr, $marketplace_id, $language );
 
-		//$fields_arr = ['attributes' => $fields_arr];
+		$fields_arr = apply_filters('wpla_json_feed_listing_attributes', $fields_arr, $listing, $profile);
+
 		return $fields_arr;
 	}
 
@@ -706,6 +710,11 @@ class JsonFeedDataBuilder extends \WPLA_FeedDataBuilder {
 				$value  = $this->formatPriceDecimal( $value );
 				break;
 
+			case 'purchasable_offer[0][audience]':
+				// Always set default offer to ALL (B2C) - B2B offer will be added separately if needed
+				$value = 'ALL';
+				break;
+				
 			case 'purchasable_offer[0][currency]':
 				// Apply schema default for empty currency field
 				if ( empty( $value ) ) {
@@ -812,17 +821,40 @@ class JsonFeedDataBuilder extends \WPLA_FeedDataBuilder {
 			case 'bullet_point[3][value]':
 			case 'bullet_point[4][value]':
 			case 'bullet_point[5][value]':
+				// Handle bullet points separately from keywords
+				$key = $this->getProductMetaKeyFromProperty( $property );
+				if ( $key ) {
+					// Start with profile value as default
+					$value = isset( $profile_fields[$property] ) ? $profile_fields[$property] : '';
+					
+					// Override with product-level value if it exists
+					$product_value = get_post_meta( $parent_id, '_amazon_'. $key, true );
+					if ( ! empty( $product_value ) ) {
+						$value = $product_value;
+					}
+				}
+				break;
+			
 			case 'generic_keyword[0][value]':
 			case 'generic_keyword[1][value]':
 			case 'generic_keyword[2][value]':
 			case 'generic_keyword[3][value]':
 			case 'generic_keyword[4][value]':
-				$key = $this->getProductMetaKeyFromProperty( $property );
-
-				if ( $key ) {
-					$value = get_post_meta( $parent_id, '_amazon_'. $key, true );
+				// Check if single keyword mode is enabled
+				if ( 'single' == get_option( 'wpla_keyword_fields_type', 'separate' ) ) {
+					// In single mode, only put search_term in the first keyword field
+					if ( 'generic_keyword[0][value]' === $property ) {
+						$value = get_post_meta( $parent_id, '_amazon_search_term', true );
+					} else {
+						$value = ''; // Leave other keyword fields empty
+					}
+				} else {
+					// In separate mode, use individual keyword fields
+					$key = $this->getProductMetaKeyFromProperty( $property );
+					if ( $key ) {
+						$value = get_post_meta( $parent_id, '_amazon_'. $key, true );
+					}
 				}
-
 
 				if ( ! empty( $profile_fields[$property] ) ) {
 					$value = $profile_fields[$property];
@@ -845,6 +877,12 @@ class JsonFeedDataBuilder extends \WPLA_FeedDataBuilder {
 					break;
 				}
 
+				// check for product-level field value first (highest priority)
+				$custom_props = get_post_meta( $product_id, '_wpla_custom_feed_columns', true );
+				if ( is_array($custom_props) && !empty($custom_props[$property]) ) {
+					return wpla_encode_image_url( $custom_props[$property] );
+				}
+
 				// check if custom post meta field 'amazon_image_url' exists
 				if ( get_post_meta( $child_id, 'amazon_image_url', true ) ) {
 					return wpla_encode_image_url( get_post_meta( $child_id, 'amazon_image_url', true ) );
@@ -857,10 +895,10 @@ class JsonFeedDataBuilder extends \WPLA_FeedDataBuilder {
 
 				WPLA()->logger->info( 'wpla_variation_main_image_fallback: '. get_option('wpla_variation_main_image_fallback','parent') );
 				if ( empty($value) && ( $product_type == 'variation' || $product_type == 'product-part-variation' ) && get_option('wpla_variation_main_image_fallback','parent') == 'parent' ) {
-					$attachment_id = get_post_thumbnail_id( $product_id );
+					$attachment_id = get_post_thumbnail_id( $parent_id );
 					$image_url     = wp_get_attachment_image_src( $attachment_id, 'full' );
 					$value         = $image_url[0] ?? '';
-					WPLA()->logger->info( 'found '. $value .' for '. $product_id );
+					WPLA()->logger->info( 'found '. $value .' for '. $parent_id );
 				}
 
 				// if main image is disabled, use first enabled gallery image
@@ -878,7 +916,7 @@ class JsonFeedDataBuilder extends \WPLA_FeedDataBuilder {
 				}
 
 				// custom amazon image
-				// 10/24/23 - Do not use overwrite the variation image even if a custom gallery is found #63403
+				// 10/24/23 - Do not overwrite the variation image even if a custom gallery is found #63403
 				if ( empty( $value ) && $product_type != 'variation' ) {
 					$custom_images = get_post_meta( $product_id, '_amazon_image_gallery', true );
 					if ( !empty( $custom_images ) ) {
@@ -926,6 +964,13 @@ class JsonFeedDataBuilder extends \WPLA_FeedDataBuilder {
 				// if offer images are disabled, skip this column
 				if ( strstr($property,'offer_image_locator') && get_option( 'wpla_enable_product_offer_images', 0 ) == 0 ) {
 					WPLA()->logger->info( 'product_offer_images disabled. Skipping' );
+					break;
+				}
+
+				// check for product-level field value first (highest priority)
+				$custom_props = get_post_meta( $product_id, '_wpla_custom_feed_columns', true );
+				if ( is_array($custom_props) && !empty($custom_props[$property]) ) {
+					$value = self::convertImageUrl( $custom_props[$property] );
 					break;
 				}
 
@@ -1222,12 +1267,6 @@ class JsonFeedDataBuilder extends \WPLA_FeedDataBuilder {
 			WPLA()->logger->info( 'Applied default currency ' . $value . ' to field: ' . $property );
 		}*/
 
-		// Generic boolean field handling - convert string boolean values to actual booleans for Amazon API
-		if ( $value === 'true' ) {
-			$value = true;
-		} elseif ( $value === 'false' ) {
-			$value = false;
-		}
 
 		$value = $this->handleVariationAttributes( $value, $property, $listing, $product, $profile );
 
@@ -1316,41 +1355,37 @@ class JsonFeedDataBuilder extends \WPLA_FeedDataBuilder {
 			'age_range_description[0][value]', // added for 52839
 			'fabric_type[0][value]', // added for 52839
 			'supplier_declared_dg_hz_regulation[0][value]',
+			'batteries_required[0][value]',
 
 		), $property, $listing, $profile );
+
 		if ( ($product_type == 'variable' || $product_type == 'variable-product-part') && ! in_array( $property, $parent_var_columns ) ) {
 			$value = '';
-		}
+		} else {
+			// process profile fields - if not empty
+			// Checking only against an empty string because using empty() will return TRUE for 0 values, and we need to be able to submit 0 to Amazon
+			if ( !isset( $profile_fields[ $property ] ) || $profile_fields[ $property ] == '' ) {
+				return $value;
+			}
 
-		// process profile fields - if not empty
-		// Checking only against an empty string because using empty() will return TRUE for 0 values, and we need to be able to submit 0 to Amazon
-		if ( !isset( $profile_fields[ $property ] ) || $profile_fields[ $property ] == '' ) {
-			return $value;
-		}
+			// empty shortcode overrides default value
+			if ( '[---]' === $profile_fields[$property] )
+				return '';
 
-		// empty shortcode overrides default value
-		if ( '[---]' === $profile_fields[$property] )
-			return '';
+			// use profile value as it is - if $value is still empty (ie. there is no product level value for this column)
+			$used_profile_value = false;
+			if ( empty($value) && $value !== 0 ) {
+				$value = $profile_fields[$property];
+				$used_profile_value = true;
+			}
 
-		// use profile value as it is - if $value is still empty (ie. there is no product level value for this column)
-		$used_profile_value = false;
-		if ( empty($value) && $value !== 0 ) {
-			$value = $profile_fields[$property];
-			$used_profile_value = true;
-		}
 
-		// Apply generic boolean field handling to profile values too
-		if ( $value === 'true' ) {
-			$value = true;
-		} elseif ( $value === 'false' ) {
-			$value = false;
+			// Only process shortcodes if we used a profile value (product-level shortcodes already processed above)
+			if ( $used_profile_value ) {
+				$value = $this->replaceShortcodes( $value, $property, $listing, $child_id, $profile );
+			}
+			$value = $this->handleSizeAttributes( $value, $property, $listing, $profile );
 		}
-
-		// Only process shortcodes if we used a profile value (product-level shortcodes already processed above)
-		if ( $used_profile_value ) {
-			$value = $this->replaceShortcodes( $value, $property, $listing, $child_id, $profile );
-		}
-		$value = $this->handleSizeAttributes( $value, $property, $listing, $profile );
 
 		return $value;
 	}
@@ -1673,6 +1708,13 @@ class JsonFeedDataBuilder extends \WPLA_FeedDataBuilder {
 	 * @return array
 	 */
 	private function getProductCustomProperties( $product_id ) {
+		// Check if product has a custom product type set
+		// If no product type is specified, don't use any product-level custom properties
+		$product_type = get_post_meta( $product_id, '_wpla_custom_product_type', true );
+		if ( empty( $product_type ) ) {
+			return [];
+		}
+
 		$custom_props = get_post_meta( $product_id, '_wpla_custom_feed_columns', true );
 
 		if ( empty( $custom_props ) || !is_array( $custom_props ) ) {
@@ -1745,13 +1787,13 @@ class JsonFeedDataBuilder extends \WPLA_FeedDataBuilder {
 		if ( is_array($profile_details) && $profile_details['variations_mode'] == 'flat' && $product->is_type( 'variable' ) ) {
 			$error_msg = "Skipping variable parent product in flat variations mode (SKU: {$item['sku']})";
 			WPLA()->logger->debug( $error_msg );
-			return new WP_Error( 'wpla_flat_variations_parent', $error_msg );
+			return new \WP_Error( 'wpla_flat_variations_parent', $error_msg );
 		}
 
 		if ( apply_filters( 'wpla_filter_skip_listing_feed_item', false, $item, $product, $profile ) === true ) {
 			$error_msg = "Listing skipped by filter wpla_filter_skip_listing_feed_item (SKU: {$item['sku']})";
 			WPLA()->logger->info( $error_msg );
-			return new WP_Error( 'wpla_filter_skip', $error_msg );
+			return new \WP_Error( 'wpla_filter_skip', $error_msg );
 		}
 
 		return true;
@@ -1834,12 +1876,45 @@ class JsonFeedDataBuilder extends \WPLA_FeedDataBuilder {
 
 	/**
 	 * Remove empty fields. Empty fields are fields that have no properties or only have a marketplace_id and/or language_tag sub-property
+	 * Also excludes is_inventory_available field completely to prevent it from appearing in feeds
 	 * @param array $fields
 	 *
 	 * @return array
 	 */
 	private function filterEmptyFields($array) {
+		// Special handling for purchasable_offer discounted_price section
+		if (isset($array['purchasable_offer'])) {
+			foreach ($array['purchasable_offer'] as $offer_index => $offer) {
+				if (isset($offer['discounted_price'])) {
+					$has_sale_price = false;
+					
+					// Check if any discounted_price entry has a non-empty value_with_tax
+					foreach ($offer['discounted_price'] as $discount_price) {
+						if (isset($discount_price['schedule'])) {
+							foreach ($discount_price['schedule'] as $schedule) {
+								if (!empty($schedule['value_with_tax'])) {
+									$has_sale_price = true;
+									break 2; // Break out of both loops
+								}
+							}
+						}
+					}
+					
+					// If no sale price found, remove entire discounted_price section
+					if (!$has_sale_price) {
+						unset($array['purchasable_offer'][$offer_index]['discounted_price']);
+					}
+				}
+			}
+		}
+
 		foreach ($array as $key => $value) {
+			// Always exclude is_inventory_available field regardless of value
+			if ($key === 'is_inventory_available') {
+				unset($array[$key]);
+				continue;
+			}
+			
 			if (is_array($value)) {
 				// Recursively filter nested arrays
 				$array[$key] = $this->filterEmptyFields($value);
@@ -1847,9 +1922,8 @@ class JsonFeedDataBuilder extends \WPLA_FeedDataBuilder {
 				if ( $array[ $key ] == [] ) {
 					unset( $array[ $key ] );
 				} else {
-					// Check if the remaining array contains only 'marketplace_id' and/or 'language_tag' and an empty value
-					$structural_fields = ['marketplace_id' => '', 'language_tag' => '', 'currency' => '', 'unit' => '', 'name' => ''];
-					if ( array_diff_key($array[$key], $structural_fields) === []) {
+					// Only remove empty structural containers
+					if ($this->isEmptyContainer($key, $array[$key])) {
 						unset($array[$key]);
 					}
 				}
@@ -1858,6 +1932,53 @@ class JsonFeedDataBuilder extends \WPLA_FeedDataBuilder {
 			}
 		}
 		return $array;
+	}
+
+	/**
+	 * Conservative check for empty containers
+	 * Only removes containers with ONLY metadata fields that are actually empty
+	 *
+	 * @param string $key
+	 * @param array $array
+	 * @return bool
+	 */
+	private function isEmptyContainer($key, $array) {
+		// Special handling for content structures - check if they have actual content
+		$content_field_map = [
+			'variation_theme' => 'name',
+			'brand' => ['name', 'value'],
+			'department' => ['name', 'value'], 
+			'item_name' => 'value',
+			'bullet_point' => 'value',
+			'generic_keyword' => 'value',
+			'special_feature' => 'value',
+		];
+		
+		if (isset($content_field_map[$key])) {
+			$content_fields = (array)$content_field_map[$key];
+			// Check if any content field has a value
+			foreach ($content_fields as $content_field) {
+				if (isset($array[$content_field]) && $array[$content_field] !== '' && $array[$content_field] !== null) {
+					return false; // Has actual content, preserve it
+				}
+			}
+		}
+		
+		// Only remove containers with ONLY pure structural metadata AND no content
+		$pure_structural_fields = ['marketplace_id', 'language_tag', 'currency', 'unit'];
+		
+		// Must contain ONLY structural fields (no content fields)
+		$non_structural_keys = array_diff_key($array, array_flip($pure_structural_fields));
+		if (!empty($non_structural_keys)) {
+			// Check if the non-structural keys have actual content
+			foreach ($non_structural_keys as $content_key => $content_value) {
+				if ($content_value !== '' && $content_value !== null) {
+					return false; // Has content, preserve it
+				}
+			}
+		}
+		
+		return true; // Only empty structural metadata or empty content fields, safe to remove
 	}
 
 	/**
@@ -1927,6 +2048,79 @@ class JsonFeedDataBuilder extends \WPLA_FeedDataBuilder {
 		}
 
 		return $fields;
+	}
+
+	/**
+	 * Inject B2B offer fields when product has B2B pricing
+	 *
+	 * @param array $fields_arr The processed fields array
+	 * @param int $product_id The product ID
+	 * @param string $marketplace_id The marketplace ID
+	 * @param array $listing The listing data
+	 * @param WC_Product $product The WooCommerce product
+	 * @param object $profile The listing profile
+	 * @return array Modified fields array with B2B offer if needed
+	 */
+	private function injectB2BOfferFields( $fields_arr, $product_id, $marketplace_id, $listing, $product, $profile ) {
+		// Check if product has B2B price
+		$b2b_price = get_post_meta( $product_id, '_amazon_b2b_price', true );
+		
+		// Process shortcodes if B2B price contains them
+		if ( !empty($b2b_price) && is_string($b2b_price) && strpos($b2b_price, '[') !== false ) {
+			$b2b_price = $this->replaceShortcodes( $b2b_price, 'b2b_price', $listing, $product_id, $profile );
+		}
+		
+		// Apply B2B price filter  
+		$b2b_price = apply_filters( 'wpla_filter_b2b_price', $b2b_price, $product_id, $product, $listing, $profile );
+		
+		// List of B2B-specific fields that should not be in B2C offers
+		$b2b_specific_fields = ['quantity_discount_plan'];
+		
+		if ( empty( $b2b_price ) ) {
+			// No B2B price: Clean up B2B fields from B2C offer
+			if ( isset( $fields_arr['purchasable_offer'][0] ) ) {
+				foreach ( $b2b_specific_fields as $field ) {
+					unset( $fields_arr['purchasable_offer'][0][$field] );
+				}
+			}
+			return $fields_arr;
+		}
+
+		// Get currency from the existing offer or default
+		$currency = $fields_arr['purchasable_offer'][0]['currency'] ?? get_woocommerce_currency();
+
+		// Start with basic B2B offer structure
+		$b2b_offer = [
+			'audience' => 'B2B',
+			'currency' => $currency,
+			'marketplace_id' => $marketplace_id,
+			'our_price' => [
+				[
+					'schedule' => [
+						[
+							'value_with_tax' => (float) $b2b_price
+						]
+					]
+				]
+			]
+		];
+
+		// Move B2B-specific fields from offer[0] to offer[1]
+		if ( isset( $fields_arr['purchasable_offer'][0] ) ) {
+			foreach ( $b2b_specific_fields as $field ) {
+				if ( isset( $fields_arr['purchasable_offer'][0][$field] ) ) {
+					// Move the field to B2B offer
+					$b2b_offer[$field] = $fields_arr['purchasable_offer'][0][$field];
+					// Remove from B2C offer
+					unset( $fields_arr['purchasable_offer'][0][$field] );
+				}
+			}
+		}
+
+		// Add the B2B offer as second offer
+		$fields_arr['purchasable_offer'][1] = $b2b_offer;
+
+		return $fields_arr;
 	}
 
 	private function buildQueryString( $fields ) {

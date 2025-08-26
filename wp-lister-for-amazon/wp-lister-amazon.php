@@ -3,7 +3,7 @@
 Plugin Name: WP-Lister Lite for Amazon
 Plugin URI: https://www.wplab.com/plugins/wp-lister-for-amazon/
 Description: List your products on Amazon the easy way.
-Version: 2.8.6
+Version: 2.8.7
 Author: WP Lab
 Author URI: https://www.wplab.com/ 
 Max WP Version: 6.8
@@ -16,7 +16,7 @@ License: GPL2+
 
 if ( class_exists('WPLA_WPLister') ) die(sprintf( 'WP-Lister for Amazon %s is already installed and activated. Please deactivate any other version before you activate this one.', WPLA_VERSION ));
 
-define('WPLA_VERSION', '2.8.6' );
+define('WPLA_VERSION', '2.8.7' );
 define('WPLA_PATH', realpath( dirname(__FILE__) ) );
 define('WPLA_URL', plugins_url() . '/' . basename(dirname(__FILE__)) . '/' );
 
@@ -215,11 +215,13 @@ class WPLA_WPLister extends WPLA_BasePlugin {
 
 		add_action( 'admin_print_styles', array( &$this, 'printOrdersPageStyles' ) );
 
-        if ( class_exists('\Automattic\WooCommerce\Utilities\FeaturesUtil' ) && \Automattic\WooCommerce\Utilities\FeaturesUtil::feature_is_enabled('product_block_editor') ) {
+        // We do not have support for the block editor so comment this out for now
+		add_action( 'wp_print_scripts', array( &$this, 'printProductsPageScripts' ) );
+        /*if ( class_exists('\Automattic\WooCommerce\Utilities\FeaturesUtil' ) && \Automattic\WooCommerce\Utilities\FeaturesUtil::feature_is_enabled('product_block_editor') ) {
             $this->printProductsPageScripts();
         } else {
 	        add_action( 'wp_print_scripts', array( &$this, 'printProductsPageScripts' ) );
-        }
+        }*/
 
 	}
 

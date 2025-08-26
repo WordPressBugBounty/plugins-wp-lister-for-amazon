@@ -316,8 +316,19 @@ class WPLA_LogTable extends WP_List_Table {
         //     }
         // }
 
+        // putListingItem - show SKU
+        if ( 'putListingItem' == $item['callname'] ) {
+            $sku = WPLA_Helper::extractSkuFromLogParameters($item['parameters'] ?? '');
+            
+            // Append SKU to the existing link if found and not unknown
+            if ( !empty( $sku ) && $sku !== 'Unknown SKU' ) {
+                $link = str_replace( '</a>', ' (' . esc_html($sku) . ')</a>', $link );
+            }
+        }
+
         // Extract HTTP method from request field (e.g. "PUT https://apihere")
-        if ( !empty( $item['request'] ) ) {
+        // Skip this for putListingItem since it contains JSON data, not HTTP request
+        if ( !empty( $item['request'] ) && $item['callname'] != 'putListingItem' ) {
             $request_parts = explode( ' ', $item['request'], 2 );
             if ( count( $request_parts ) >= 2 ) {
                 $http_method = strtoupper( trim( $request_parts[0] ) );
@@ -576,28 +587,28 @@ class WPLA_LogTable extends WP_List_Table {
                 if ( $status == 'unknown' ) {
                     $where_sql .= " AND success IS NULL ";
                 } else {
-                    $where_sql .= " AND success = '$status' ";
+                    $where_sql .= $wpdb->prepare(" AND success = %s ", $status);
                 }
             }
         }
 
         // search box
         if ( isset( $_REQUEST['s'] ) ) {
-            $query = esc_sql( wpla_clean($_REQUEST['s']) );
-            $where_sql .= " AND ( 
-                                    ( callname = '$query' ) OR 
-                                    ( amazon_id = '$query' ) OR
-                                    ( request LIKE '%$query%' ) OR
-                                    ( response LIKE '%$query%' ) 
+            $query = wpla_clean($_REQUEST['s']);
+            $where_sql .= $wpdb->prepare(" AND ( 
+                                    ( callname = %s ) OR 
+                                    ( amazon_id = %s ) OR
+                                    ( request LIKE %s ) OR
+                                    ( response LIKE %s ) 
                                 )
                             /* AND NOT amazon_id = 0 */
-                            ";
+                            ", $query, $query, '%' . $wpdb->esc_like($query) . '%', '%' . $wpdb->esc_like($query) . '%');
         }
 
         // callname
         if ( isset( $_REQUEST['callname'] ) && !empty($_REQUEST['callname']) ) {
             $callname = wpla_clean($_REQUEST['callname']);
-            $where_sql .= " AND callname = '$callname' ";
+            $where_sql .= $wpdb->prepare(" AND callname = %s ", $callname);
         }
 
         // usertype

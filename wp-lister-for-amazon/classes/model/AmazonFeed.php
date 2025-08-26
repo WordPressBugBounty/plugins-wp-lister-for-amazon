@@ -255,6 +255,7 @@ class WPLA_AmazonFeed {
 			  	 OR FeedProcessingStatus = 'IN_PROGRESS' 
 			  	 OR FeedProcessingStatus = 'IN_QUEUE' 
 			  	 OR status = %s )
+			  AND FeedProcessingStatus NOT IN ('FATAL', 'CANCELLED')
 			ORDER BY SubmittedDate DESC
 		", $account_id, self::STATUS_SUBMITTED
 		), OBJECT_K);
@@ -274,11 +275,10 @@ class WPLA_AmazonFeed {
 	static function getPendingFeedId( $feed_type, $template_name, $account_id, $product_type = '' ) {
 		global $wpdb;
 		$table = $wpdb->prefix . self::TABLENAME;
-		$template_name = esc_sql( $template_name );
-		$where_sql     = $template_name ? "AND template_name = '$template_name'" : '';
+		$where_sql     = $template_name ? $wpdb->prepare("AND template_name = %s", $template_name) : '';
 
 		if ( $product_type ) {
-			$where_sql .= " AND product_type = '$product_type'";
+			$where_sql .= $wpdb->prepare(" AND product_type = %s", $product_type);
 		}
 
 		$item = $wpdb->get_var( $wpdb->prepare("
@@ -665,6 +665,15 @@ class WPLA_AmazonFeed {
 	function loadSubmissionResult() {
 		if ( ! $this->id ) return;
 		if ( ! $this->FeedSubmissionId ) return;
+		
+		// Handle final statuses that don't require document processing
+		if ( in_array( $this->FeedProcessingStatus, array('FATAL', 'CANCELLED') ) ) {
+			$this->status = 'processed';
+			$this->success = 'error';
+			$this->update();
+			return;
+		}
+		
 		if ( ! $this->FeedDocumentId ) return;
 		if ( $this->FeedProcessingStatus != 'DONE' ) return;
 
@@ -1429,6 +1438,11 @@ class WPLA_AmazonFeed {
      * @return int
      */
 	static public function processFeedsSubmissionList( $feeds, $account ) {
+		// Handle both single feed objects and arrays of feeds
+		if ( !is_array($feeds) ) {
+			$feeds = array($feeds);
+		}
+		
 		WPLA()->logger->info( 'processFeedsSubmissionList() - processing '.sizeof($feeds).' feeds for account '.$account->id) ;
 
 		$feeds_in_progress = 0;
@@ -2253,89 +2267,211 @@ class WPLA_AmazonFeed {
 
 	function getPageItems( $current_page, $per_page ) {
 		global $wpdb;
-		$table = $wpdb->prefix . self::TABLENAME;
+		$feeds_table = $wpdb->prefix . self::TABLENAME;
+		$log_table = $wpdb->prefix . 'amazon_log';
 
 		$orderby  = (!empty($_REQUEST['orderby'])) ? esc_sql( wpla_clean($_REQUEST['orderby']) ) : 'date_created DESC, SubmittedDate'; //If no sort, default to title
 		$order    = (!empty($_REQUEST['order']))   ? esc_sql( wpla_clean($_REQUEST['order'])   ) : 'desc'; //If no order, default to asc
 		$offset   = ( $current_page - 1 ) * $per_page;
 		$per_page = esc_sql( $per_page );
 
-        // handle filters
-        $where_sql = ' WHERE 1 = 1 ';
+        // handle filters for feeds
+        $feed_where_sql = ' WHERE 1 = 1 ';
+        $log_where_sql = ' WHERE callname = "putListingItem" ';
+        
+        // Check if database logging is disabled - if so, don't include API logs
+        $include_api_logs = (get_option('wpla_log_to_db') == '1');
 
-        // views
+        // views - apply to both feeds and logs
         if ( isset( $_REQUEST['feed_status'] ) ) {
             $status = esc_sql( wpla_clean($_REQUEST['feed_status']) );
-            // if ( in_array( $status, array('Success','Error','pending','unknown') ) ) {
             if ( $status ) {
+                // Apply status filter to both
                 if ( $status == 'unknown' ) {
-                    $where_sql .= " AND status IS NULL ";
+                    $feed_where_sql .= " AND status IS NULL ";
+                    $log_where_sql .= " AND success IS NULL ";
                 } else {
-                    $where_sql .= " AND status = '$status' ";
+                    $feed_where_sql .= $wpdb->prepare(" AND status = %s ", $status);
+                    // Map feed status to log success values
+                    if ( $status == 'Success' ) {
+                        $log_where_sql .= " AND success = 'Success' ";
+                    } elseif ( $status == 'Error' ) {
+                        $log_where_sql .= " AND success LIKE 'Error%' ";
+                    } else {
+                        $log_where_sql .= $wpdb->prepare(" AND success = %s ", $status);
+                    }
                 }
             }
         }
 
         // filter account_id
-		$account_id = ( isset($_REQUEST['account_id']) ? esc_sql( wpla_clean($_REQUEST['account_id']) ) : false);
+		$account_id = ( isset($_REQUEST['account_id']) ? intval( wpla_clean($_REQUEST['account_id']) ) : false);
 		if ( $account_id ) {
-			$where_sql .= "
-				 AND account_id = '".$account_id."'
-			";
+			$feed_where_sql .= $wpdb->prepare(" AND account_id = %d ", $account_id);
+			$log_where_sql .= $wpdb->prepare(" AND account_id = %d ", $account_id);
 		} 
 
-        // search box
+        // search box - apply to both feeds and logs
         if ( isset( $_REQUEST['s'] ) ) {
-            $query = esc_sql( wpla_clean($_REQUEST['s']) );
-            $where_sql .= " AND ( 
-                                    ( id = '$query' ) OR
-                                    ( FeedSubmissionId = '$query' ) OR 
-                                    ( FeedType = '$query' ) OR
-                                    ( results LIKE '%$query%' ) OR
-                                    ( FeedProcessingStatus LIKE '%$query%' ) OR
-                                    ( success LIKE '%$query%' ) OR
-                                    ( data LIKE '%$query%' )
-                                )
-                            /* AND NOT amazon_id = 0 */
-                            ";
+            $query = wpla_clean($_REQUEST['s']);
+            $like_query = '%' . $wpdb->esc_like($query) . '%';
+            
+            $feed_where_sql .= $wpdb->prepare(" AND ( 
+                                    ( id = %s ) OR
+                                    ( FeedSubmissionId = %s ) OR 
+                                    ( FeedType = %s ) OR
+                                    ( results LIKE %s ) OR
+                                    ( FeedProcessingStatus LIKE %s ) OR
+                                    ( success LIKE %s ) OR
+                                    ( data LIKE %s )
+                                ) ", $query, $query, $query, $like_query, $like_query, $like_query, $like_query);
+            
+            $log_where_sql .= $wpdb->prepare(" AND ( 
+                                    ( id = %s ) OR
+                                    ( parameters LIKE %s ) OR
+                                    ( request LIKE %s ) OR
+                                    ( response LIKE %s )
+                                ) ", $query, $like_query, $like_query, $like_query);
         }
 
-        // get items
-        $select_columns = "id, FeedSubmissionId, FeedType, product_type, template_name, FeedProcessingStatus, 
-	        results, success, status, SubmittedDate, CompletedProcessingDate, 
-	        date_created, account_id, line_count, feedOptions, MarketplaceIdList";
+        // Include data column only when searching
+        $feed_data_column = ( isset( $_REQUEST['s'] ) && !empty( $_REQUEST['s'] ) ) ? ", data" : ", NULL as data";
         
-        // Include data column only when searching (for ASIN/SKU search functionality)
-        if ( isset( $_REQUEST['s'] ) && !empty( $_REQUEST['s'] ) ) {
-            $select_columns .= ", data";
+        // Build query - include API logs only if database logging is enabled
+        if ( $include_api_logs ) {
+            // UNION query combining feeds and putListingItem logs
+            $items = $wpdb->get_results("
+                (SELECT 
+                    id, 
+                    'feed' as source_type,
+                    FeedSubmissionId, 
+                    FeedType, 
+                    product_type, 
+                    template_name, 
+                    FeedProcessingStatus, 
+                    results, 
+                    success, 
+                    status, 
+                    SubmittedDate, 
+                    CompletedProcessingDate, 
+                    date_created, 
+                    account_id, 
+                    line_count, 
+                    feedOptions, 
+                    MarketplaceIdList
+                    $feed_data_column
+                FROM $feeds_table
+                $feed_where_sql)
+                
+                UNION ALL
+                
+                (SELECT 
+                    id,
+                    'api_log' as source_type,
+                    NULL as FeedSubmissionId,
+                    'Individual Listing' as FeedType,
+                    NULL as product_type,
+                    NULL as template_name,
+                    NULL as FeedProcessingStatus,
+                    response as results,
+                    success,
+                    CASE 
+                        WHEN success = 'Success' THEN 'Success'
+                        WHEN success LIKE 'Error%' THEN 'Error'
+                        ELSE 'pending'
+                    END as status,
+                    timestamp as SubmittedDate,
+                    timestamp as CompletedProcessingDate,
+                    timestamp as date_created,
+                    account_id,
+                    NULL as line_count,
+                    parameters as feedOptions,
+                    NULL as MarketplaceIdList,
+                    CASE 
+                        WHEN parameters LIKE '%sku%' THEN 
+                            SUBSTRING_INDEX(SUBSTRING_INDEX(parameters, '\"sku\";s:', -1), ':', 1)
+                        ELSE NULL 
+                    END as data
+                FROM $log_table
+                $log_where_sql)
+                
+                ORDER BY $orderby $order
+                LIMIT $offset, $per_page
+            ", ARRAY_A);
+        } else {
+            // Only feeds query when logging is disabled
+            $items = $wpdb->get_results("
+                SELECT 
+                    id, 
+                    'feed' as source_type,
+                    FeedSubmissionId, 
+                    FeedType, 
+                    product_type, 
+                    template_name, 
+                    FeedProcessingStatus, 
+                    results, 
+                    success, 
+                    status, 
+                    SubmittedDate, 
+                    CompletedProcessingDate, 
+                    date_created, 
+                    account_id, 
+                    line_count, 
+                    feedOptions, 
+                    MarketplaceIdList
+                    $feed_data_column
+                FROM $feeds_table
+                $feed_where_sql
+                ORDER BY $orderby $order
+                LIMIT $offset, $per_page
+            ", ARRAY_A);
         }
-        
-		$items = $wpdb->get_results("
-			SELECT $select_columns
-			FROM $table
-            $where_sql
-			ORDER BY $orderby $order
-            LIMIT $offset, $per_page
-		", ARRAY_A);
 
-		// get total items count - if needed
+		// get total items count - handle logging enabled/disabled
 		if ( ( $current_page == 1 ) && ( count( $items ) < $per_page ) ) {
 			$this->total_items = count( $items );
 		} else {
-			$this->total_items = $wpdb->get_var("
-				SELECT COUNT(*)
-				FROM $table
-	            $where_sql
-				ORDER BY $orderby $order
-			");			
+			if ( $include_api_logs ) {
+				$this->total_items = $wpdb->get_var("
+					SELECT COUNT(*) FROM (
+						(SELECT id FROM $feeds_table $feed_where_sql)
+						UNION ALL
+						(SELECT id FROM $log_table $log_where_sql)
+					) as combined
+				");
+			} else {
+				$this->total_items = $wpdb->get_var("
+					SELECT COUNT(*)
+					FROM $feeds_table
+					$feed_where_sql
+				");
+			}
 		}
 
 		$results = [];
 		foreach( $items as $item ) {
-		    //$row = self::getFeed( $item['id'] );
 			// Convert array to object to maintain compatibility
 			$row = (object)$item;
-			$row->FeedTypeName = $this->getRecordTypeName( $row->FeedType );
+			
+			// Handle FeedTypeName for both feeds and API logs
+			if ( $row->source_type == 'feed' ) {
+				$row->FeedTypeName = $this->getRecordTypeName( $row->FeedType );
+			} else {
+				$row->FeedTypeName = 'Individual Listing Submission';
+				
+				// Extract SKU from parameters for display
+				if ( $row->feedOptions ) {
+					$params = maybe_unserialize( $row->feedOptions );
+					if ( is_array( $params ) && isset( $params['sku'] ) ) {
+						$row->display_reference = 'SKU: ' . $params['sku'];
+					} else {
+						$row->display_reference = 'API Call #' . $row->id;
+					}
+				} else {
+					$row->display_reference = 'API Call #' . $row->id;
+				}
+			}
+			
 			$results[] = (array)$row;
 		}
 

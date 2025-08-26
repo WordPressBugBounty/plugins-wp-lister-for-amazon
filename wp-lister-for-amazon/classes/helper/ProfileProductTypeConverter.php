@@ -725,6 +725,12 @@ class ProfileProductTypeConverter {
 	 * @return string The new unit value
 	 */
 	private function convertUnit( $old_unit ) {
+		// Ensure we have a string value to work with
+		if ( ! is_string( $old_unit ) ) {
+			WPLA()->logger->info('convertUnit: Invalid old_unit type: ' . gettype($old_unit) . ', value: ' . print_r($old_unit, true));
+			return $old_unit;
+		}
+		
 		$unit_mapping = [
 			// Length/Distance units (old => new)
 			'Angstrom'                  => 'angstrom',
@@ -905,6 +911,11 @@ class ProfileProductTypeConverter {
 			return $country_value;
 		}
 		
+		if ( ! is_string( $country_value ) ) {
+			WPLA()->logger->info('convertCountryOfOriginValue: Invalid country_value type: ' . gettype($country_value) . ', value: ' . print_r($country_value, true));
+			return $country_value;
+		}
+		
 		// Get the allowed values from the product type schema
 		$allowed_values = $this->getFieldEnumOptions( 'country_of_origin' );
 		
@@ -954,6 +965,12 @@ class ProfileProductTypeConverter {
 	 * @return string The ISO code or original value if not found
 	 */
 	private function getCountryCodeFallback( $country_value ) {
+		// Ensure we have a string value to work with
+		if ( ! is_string( $country_value ) ) {
+			WPLA()->logger->info('getCountryCodeFallback: Invalid country_value type: ' . gettype($country_value) . ', value: ' . print_r($country_value, true));
+			return $country_value;
+		}
+		
 		$country_mapping = [
 			// Common country names to ISO codes
 			'United States' => 'US',

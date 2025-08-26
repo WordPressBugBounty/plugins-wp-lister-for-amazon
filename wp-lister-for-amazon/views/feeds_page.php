@@ -6,6 +6,38 @@
 		width: 25%;
 	}
 
+	/* Visual differentiation for API logs vs feeds */
+	tr:has(.api-log-row) {
+		background-color: #f8f9fa;
+		border-left: 3px solid #007cba;
+	}
+	
+	.api-log-row {
+		font-weight: normal;
+	}
+	
+	
+	/* Hover effect for API log rows */
+	tr:has(.api-log-row):hover {
+		background-color: #e8f0fe;
+	}
+	
+	/* Fallback for browsers that don't support :has() */
+	.api-log-entry {
+		background-color: #f8f9fa;
+		border-left: 3px solid #007cba;
+	}
+	
+	.api-log-entry:hover {
+		background-color: #e8f0fe;
+	}
+	
+	/* Style for individual listing labels */
+	.wpla-individual-listing-label {
+		color: silver;
+		font-style: italic;
+	}
+
 </style>
 
 <div class="wrap">
